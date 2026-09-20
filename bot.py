@@ -29,49 +29,41 @@ DEFAULT_CONFIG = {
     "banner_welcome_url": "",
     "guild_id": None,
 
-    # Verificação Captcha
-    "verified_role_ids": [],          # MÚLTIPLOS CARGOS
+    "verified_role_ids": [],
     "verification_channel_id": None,
     "verification_panel_channel_id": None,
     "verification_panel_message_id": None,
 
-    # Verificação +18
     "age_verification_enabled": False,
-    "age_verified_role_ids": [],      # MÚLTIPLOS CARGOS
-    "age_underage_role_ids": [],      # MÚLTIPLOS CARGOS
-    "age_unverified_role_ids": [],    # MÚLTIPLOS CARGOS
-    "age_native_verification_role_ids": [],  # MÚLTIPLOS CARGOS
+    "age_verified_role_ids": [],
+    "age_underage_role_ids": [],
+    "age_unverified_role_ids": [],
+    "age_native_verification_role_ids": [],
     "age_kick_underage": True,
     "age_verification_channel_id": None,
     "age_panel_channel_id": None,
     "age_panel_message_id": None,
 
-    # Boas-vindas
     "welcome_channel_id": None,
     "welcome_message": "Bem-vindo(a) ao servidor!",
     "welcome_image_url": "",
 
-    # Voz
     "voice_channel_id": None,
     "voice_mute": True,
     "bot_status": "online",
 
-    # Admin (MÚLTIPLOS CARGOS)
     "admin_role_ids": [],
 
-    # Painel principal
     "painel_channel_id": None,
     "painel_message_id": None,
 
-    # Tickets
     "ticket_category_doubt_id": None,
     "ticket_category_purchase_id": None,
     "ticket_logs_channel_id": None,
     "ticket_panel_channel_id": None,
     "ticket_panel_message_id": None,
-    "ticket_support_role_ids": [],    # MÚLTIPLOS CARGOS
+    "ticket_support_role_ids": [],
 
-    # Feedback / Sugestões
     "feedback_channel_id": None,
     "suggestions_channel_id": None,
     "suggestions_panel_channel_id": None,
@@ -93,7 +85,6 @@ def load_config():
     for k, v in DEFAULT_CONFIG.items():
         if k not in data:
             data[k] = v
-    # Migração: converte IDs antigos (singular) para listas (múltiplos)
     _migrate_ids(data)
     save_config(data)
     return data
@@ -192,7 +183,6 @@ def calcular_idade(data_nasc):
         return None
 
 def role_options(include_none=False, max_items=25):
-    """Retorna opções de cargos para select."""
     opts = []
     if include_none:
         opts.append(discord.SelectOption(label="Nenhum", value="none"))
@@ -232,21 +222,22 @@ def category_options():
 
 # ===================== COMPONENTS V2 — HELPERS =====================
 def v2_container(*components, accent=None):
-    """Cria um Container V2 com cor de destaque (accent_color)."""
-    return ui.Container(accent_color=accent or color_primary(), *components)
+    """Container V2 com accent color. (posicional antes do keyword)"""
+    return ui.Container(*components, accent_color=accent or color_primary())
 
 def v2_title(text):
     return ui.TextDisplay(text)
 
 def v2_sep(large=False, visible=True):
-    return ui.Separator(spacing=discord.SeparatorSpacingSize.large if large else discord.SeparatorSpacingSize.small, visible=visible)
+    return ui.Separator(
+        spacing=discord.SeparatorSpacingSize.large if large else discord.SeparatorSpacingSize.small,
+        visible=visible
+    )
 
-# ===================== EMBEDS DE PAINEL (via V2 LayoutView) =====================
+# ===================== PAINEL PRINCIPAL =====================
 def painel_layout():
-    """LayoutView do painel principal com Components V2."""
     layout = ui.LayoutView(timeout=None)
 
-    # Container com cabeçalho
     header_parts = [
         ui.TextDisplay(f"# {bemoji()} Painel Administrativo — {bname()}"),
         ui.TextDisplay(
@@ -260,9 +251,10 @@ def painel_layout():
             accessory=ui.Thumbnail(media=avatar_url()),
         ))
     header_parts.append(ui.Separator(spacing=discord.SeparatorSpacingSize.small))
-    layout.add_item(ui.Container(accent_color=color_primary(), *header_parts))
 
-    # Menu principal
+    # ✅ CORREÇÃO: posicional primeiro, accent_color depois
+    layout.add_item(ui.Container(*header_parts, accent_color=color_primary()))
+
     row = ui.ActionRow()
     select = ui.Select(
         placeholder=f"🖤 Configurações do {bname()}",
@@ -315,7 +307,6 @@ async def main_menu_callback(interaction: discord.Interaction):
 def identity_view():
     layout = ui.LayoutView(timeout=300)
     layout.add_item(ui.Container(
-        accent_color=color_primary(),
         ui.TextDisplay("# 🎨 Identidade Visual"),
         ui.TextDisplay("Configure nome, emoji, cores, avatar e banners."),
         ui.Separator(),
@@ -341,6 +332,7 @@ def identity_view():
             ui.Button(label="Pré-visualizar", style=discord.ButtonStyle.secondary, custom_id="id_preview"),
             ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main"),
         ),
+        accent_color=color_primary(),
     ))
     return layout
 
@@ -348,7 +340,6 @@ def identity_view():
 def captcha_view():
     layout = ui.LayoutView(timeout=300)
     layout.add_item(ui.Container(
-        accent_color=color_secondary(),
         ui.TextDisplay("# ✅ Verificação Captcha"),
         ui.TextDisplay("Configure **múltiplos cargos** de verificação e canais."),
         ui.Separator(),
@@ -362,6 +353,7 @@ def captcha_view():
         ui.ActionRow(
             ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main"),
         ),
+        accent_color=color_secondary(),
     ))
     return layout
 
@@ -369,7 +361,6 @@ def captcha_view():
 def age_view():
     layout = ui.LayoutView(timeout=300)
     layout.add_item(ui.Container(
-        accent_color=color_secondary(),
         ui.TextDisplay("# 🔞 Verificação +18"),
         ui.TextDisplay("Configure cargos múltiplos para cada categoria de idade."),
         ui.Separator(),
@@ -392,6 +383,7 @@ def age_view():
         ui.ActionRow(
             ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main"),
         ),
+        accent_color=color_secondary(),
     ))
     return layout
 
@@ -399,7 +391,6 @@ def age_view():
 def welcome_view():
     layout = ui.LayoutView(timeout=300)
     layout.add_item(ui.Container(
-        accent_color=color_primary(),
         ui.TextDisplay("# 💌 Boas-vindas"),
         ui.TextDisplay("Configure a mensagem, imagem e canal de boas-vindas."),
         ui.Separator(),
@@ -412,6 +403,7 @@ def welcome_view():
             ui.Button(label="Personalizar por Usuário", style=discord.ButtonStyle.secondary, custom_id="wel_user"),
             ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main"),
         ),
+        accent_color=color_primary(),
     ))
     return layout
 
@@ -419,7 +411,6 @@ def welcome_view():
 def voice_view():
     layout = ui.LayoutView(timeout=300)
     layout.add_item(ui.Container(
-        accent_color=color_primary(),
         ui.TextDisplay("# 🔊 Voz & Status"),
         ui.TextDisplay("Configure o canal de voz 24h, mute e status do bot."),
         ui.Separator(),
@@ -431,6 +422,7 @@ def voice_view():
         ui.ActionRow(
             ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main"),
         ),
+        accent_color=color_primary(),
     ))
     return layout
 
@@ -438,7 +430,6 @@ def voice_view():
 def admin_view():
     layout = ui.LayoutView(timeout=300)
     layout.add_item(ui.Container(
-        accent_color=color_primary(),
         ui.TextDisplay("# 👑 Cargos de Admin"),
         ui.TextDisplay("Selecione **múltiplos cargos** que podem usar o painel administrativo.\nAdministradores do servidor já têm acesso por padrão."),
         ui.Separator(),
@@ -448,6 +439,7 @@ def admin_view():
         ui.ActionRow(
             ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main"),
         ),
+        accent_color=color_primary(),
     ))
     return layout
 
@@ -455,7 +447,6 @@ def admin_view():
 def painel_fixo_view():
     layout = ui.LayoutView(timeout=300)
     layout.add_item(ui.Container(
-        accent_color=color_primary(),
         ui.TextDisplay("# 📌 Painel Fixo"),
         ui.TextDisplay("Escolha o canal onde o painel principal ficará fixo."),
         ui.Separator(),
@@ -465,6 +456,7 @@ def painel_fixo_view():
         ui.ActionRow(
             ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main"),
         ),
+        accent_color=color_primary(),
     ))
     return layout
 
@@ -472,7 +464,6 @@ def painel_fixo_view():
 def tickets_view():
     layout = ui.LayoutView(timeout=300)
     layout.add_item(ui.Container(
-        accent_color=color_primary(),
         ui.TextDisplay("# 🎫 Tickets"),
         ui.TextDisplay("Configure categorias, cargos de suporte (múltiplos) e canais."),
         ui.Separator(),
@@ -491,6 +482,7 @@ def tickets_view():
         ui.ActionRow(
             ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main"),
         ),
+        accent_color=color_primary(),
     ))
     return layout
 
@@ -498,7 +490,6 @@ def tickets_view():
 def feedback_view():
     layout = ui.LayoutView(timeout=300)
     layout.add_item(ui.Container(
-        accent_color=color_primary(),
         ui.TextDisplay("# ⭐ Avaliações (Feedback)"),
         ui.TextDisplay("Canal onde as avaliações dos tickets serão enviadas."),
         ui.Separator(),
@@ -508,6 +499,7 @@ def feedback_view():
         ui.ActionRow(
             ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main"),
         ),
+        accent_color=color_primary(),
     ))
     return layout
 
@@ -515,7 +507,6 @@ def feedback_view():
 def suggestions_view():
     layout = ui.LayoutView(timeout=300)
     layout.add_item(ui.Container(
-        accent_color=color_primary(),
         ui.TextDisplay("# 💡 Sugestões"),
         ui.TextDisplay("Configure o painel e o canal onde as sugestões são enviadas."),
         ui.Separator(),
@@ -526,6 +517,7 @@ def suggestions_view():
         ui.ActionRow(
             ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main"),
         ),
+        accent_color=color_primary(),
     ))
     return layout
 
@@ -577,11 +569,11 @@ def show_config_view():
         f"**Logs Moderação:** {ch('moderation_logs_channel_id')}",
     ]
     layout.add_item(ui.Container(
-        accent_color=color_primary(),
         ui.TextDisplay("# 📋 Configuração Atual"),
         ui.TextDisplay("\n".join(lines)),
         ui.Separator(),
         ui.ActionRow(ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main")),
+        accent_color=color_primary(),
     ))
     return layout
 
@@ -596,7 +588,6 @@ class BackToMainButton(ui.Button):
 
 # ===================== VIEWS DE SELEÇÃO (múltiplos cargos) =====================
 def multi_role_view(key, title, current_ids):
-    """Cria um LayoutView com RoleSelect que aceita múltiplos cargos."""
     layout = ui.LayoutView(timeout=180)
 
     selected = []
@@ -630,16 +621,15 @@ def multi_role_view(key, title, current_ids):
     row.add_item(role_select)
 
     layout.add_item(ui.Container(
-        accent_color=color_primary(),
         ui.TextDisplay(f"# 👑 {title}"),
         ui.TextDisplay("Selecione um ou mais cargos. Depois de escolher, clique fora do menu para confirmar."),
         ui.Separator(),
         row,
+        accent_color=color_primary(),
     ))
     return layout
 
 def multi_role_selector_options(key, title):
-    """Cria um LayoutView com StringSelect (compatível caso RoleSelect falhe) — mantido para fallback."""
     return multi_role_view(key, title, config.get(key, []))
 
 def single_channel_view(key, title):
@@ -656,10 +646,10 @@ def single_channel_view(key, title):
     sel.callback = cb
     row.add_item(sel)
     layout.add_item(ui.Container(
-        accent_color=color_primary(),
         ui.TextDisplay(f"# 📌 {title}"),
         ui.Separator(),
         row,
+        accent_color=color_primary(),
     ))
     return layout
 
@@ -681,15 +671,15 @@ def single_voice_view(key, title):
                 else: await guild.voice_client.move_to(channel)
                 await update_voice_name_impl()
                 await update_voice_mute()
-            except Exception as e: pass
+            except Exception: pass
         await interaction.response.send_message(f"✅ **{title}:** {channel.name if channel else val}", ephemeral=True)
     sel.callback = cb
     row.add_item(sel)
     layout.add_item(ui.Container(
-        accent_color=color_primary(),
         ui.TextDisplay(f"# 🔊 {title}"),
         ui.Separator(),
         row,
+        accent_color=color_primary(),
     ))
     return layout
 
@@ -707,14 +697,14 @@ def single_category_view(key, title):
     sel.callback = cb
     row.add_item(sel)
     layout.add_item(ui.Container(
-        accent_color=color_primary(),
         ui.TextDisplay(f"# 📂 {title}"),
         ui.Separator(),
         row,
+        accent_color=color_primary(),
     ))
     return layout
 
-# ===================== HANDLER GLOBAL DE BOTÕES / SELECTS V2 =====================
+# ===================== HANDLER GLOBAL =====================
 @bot.event
 async def on_interaction(interaction: discord.Interaction):
     if interaction.type != discord.InteractionType.component:
@@ -722,7 +712,6 @@ async def on_interaction(interaction: discord.Interaction):
     cid = interaction.data.get("custom_id", "")
     if not cid:
         return
-    # Ignorar selects de rotas dinâmicas (tratadas nos callbacks acima)
     if cid in ("pxk_main_menu",):
         return
 
@@ -845,7 +834,7 @@ async def on_interaction(interaction: discord.Interaction):
             await interaction.response.edit_message(view=None)
             await interaction.followup.send(view=painel_layout(), ephemeral=True)
 
-        # ---------- BOTÕES DE AÇÃO (tickets, verificação) ----------
+        # ---------- BOTÕES DE AÇÃO ----------
         elif cid == "ticket_open_doubt":
             await handle_ticket_open(interaction, "doubt", "Dúvidas")
         elif cid == "ticket_open_purchase":
@@ -855,8 +844,6 @@ async def on_interaction(interaction: discord.Interaction):
         elif cid == "verify_now":
             await handle_captcha_start(interaction)
         elif cid == "captcha_verify":
-            answer = interaction.message.embeds[0].footer.text if False else None
-            # resposta via modal
             await interaction.response.send_modal(CaptchaModal.from_button(interaction))
         elif cid == "age_panel_verify":
             if not config.get("age_verification_enabled", False):
@@ -893,10 +880,10 @@ def status_view():
     sel.callback = cb
     row.add_item(sel)
     layout.add_item(ui.Container(
-        accent_color=color_primary(),
         ui.TextDisplay("# 🎭 Status do Bot"),
         ui.Separator(),
         row,
+        accent_color=color_primary(),
     ))
     return layout
 
@@ -1066,8 +1053,6 @@ class CaptchaModal(ui.Modal, title="🔐 Verificação Captcha"):
     def from_button(cls, interaction):
         return cls(answer="0", guild_id=interaction.guild.id, user_id=interaction.user.id, channel_id=interaction.channel.id)
     async def on_submit(self, interaction):
-        # Verificação simplificada (a resposta correta é armazenada no embed anterior)
-        # Aqui aceitamos qualquer resposta — o real captcha está no fluxo de verify_now
         guild = bot.get_guild(self.guild_id)
         if not guild:
             await interaction.response.send_message("❌ Servidor não encontrado.", ephemeral=True); return
@@ -1241,7 +1226,6 @@ async def handle_ticket_open(interaction, tipo, nome):
     if mentions:
         await channel.send(f"📢 {', '.join(mentions)} — novo ticket de {interaction.user.mention}.")
 
-    # Botões de ação do ticket
     view = ui.View(timeout=None)
     view.add_item(ui.Button(label="⭐ Avaliar", style=discord.ButtonStyle.primary, custom_id="rate_ticket"))
     view.add_item(ui.Button(label="🔒 Fechar", style=discord.ButtonStyle.danger, custom_id="close_ticket"))
@@ -1300,14 +1284,14 @@ class AgePanelView(ui.View):
         super().__init__(timeout=None)
     @ui.button(label="🔞 Verificar Idade", style=discord.ButtonStyle.danger, custom_id="age_panel_verify")
     async def verify(self, interaction, button):
-        pass  # tratado em on_interaction
+        pass
 
 class VerificationPanelView(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
     @ui.button(label="🔐 Verificar Agora", style=discord.ButtonStyle.success, custom_id="verify_now")
     async def verify(self, interaction, button):
-        pass  # tratado em on_interaction
+        pass
 
 class TicketPanelView(ui.View):
     def __init__(self):
