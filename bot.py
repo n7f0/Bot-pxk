@@ -222,15 +222,16 @@ def category_options():
 
 # ===================== COMPONENTS V2 — HELPERS =====================
 def v2_container(*components, accent=None):
-    """Container V2 com accent color. (posicional antes do keyword)"""
+    """Container V2 com accent color."""
     return ui.Container(*components, accent_color=accent or color_primary())
 
 def v2_title(text):
     return ui.TextDisplay(text)
 
 def v2_sep(large=False, visible=True):
+    # ✅ CORREÇÃO: enum correto é discord.SeparatorSpacing
     return ui.Separator(
-        spacing=discord.SeparatorSpacingSize.large if large else discord.SeparatorSpacingSize.small,
+        spacing=discord.SeparatorSpacing.large if large else discord.SeparatorSpacing.small,
         visible=visible
     )
 
@@ -250,9 +251,9 @@ def painel_layout():
             ui.TextDisplay("**Sistema de Administração**"),
             accessory=ui.Thumbnail(media=avatar_url()),
         ))
-    header_parts.append(ui.Separator(spacing=discord.SeparatorSpacingSize.small))
+    # ✅ CORREÇÃO: discord.SeparatorSpacing (não SeparatorSpacingSize)
+    header_parts.append(ui.Separator(spacing=discord.SeparatorSpacing.small))
 
-    # ✅ CORREÇÃO: posicional primeiro, accent_color depois
     layout.add_item(ui.Container(*header_parts, accent_color=color_primary()))
 
     row = ui.ActionRow()
