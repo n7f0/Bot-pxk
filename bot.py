@@ -58,12 +58,30 @@ DEFAULT_CONFIG = {
     "painel_channel_id": None,
     "painel_message_id": None,
 
+    # ---- TICKETS ----
     "ticket_category_doubt_id": None,
     "ticket_category_purchase_id": None,
     "ticket_logs_channel_id": None,
     "ticket_panel_channel_id": None,
     "ticket_panel_message_id": None,
     "ticket_support_role_ids": [],
+
+    # ✅ NOVOS CAMPOS EDITÁVEIS DO PAINEL DE TICKETS
+    "ticket_panel_title": "🎫 Central de Tickets — {brand}",
+    "ticket_panel_description": (
+        "### 💬 Precisa de ajuda ou quer comprar algo?\n"
+        "Escolha o tipo de atendimento no **menu abaixo** para abrir um ticket privado com nossa equipe.\n\n"
+        "**❓ Dúvidas** — suporte geral, ajuda, perguntas\n"
+        "**🛒 Compras** — produtos, serviços e pagamentos\n\n"
+        "-# Nossa equipe responderá o mais rápido possível 🖤"
+    ),
+    "ticket_panel_select_placeholder": "🎫 Selecione o tipo de ticket para abrir...",
+    "ticket_doubt_label": "Dúvidas",
+    "ticket_doubt_desc": "Suporte geral, ajuda, perguntas",
+    "ticket_doubt_emoji": "❓",
+    "ticket_purchase_label": "Compras",
+    "ticket_purchase_desc": "Produtos, serviços e pagamentos",
+    "ticket_purchase_emoji": "🛒",
 
     "feedback_channel_id": None,
     "suggestions_channel_id": None,
@@ -120,6 +138,15 @@ def banner_painel():   return config.get("banner_painel_url") or None
 def banner_ticket():   return config.get("banner_ticket_url") or None
 def banner_welcome():  return config.get("welcome_image_url") or config.get("banner_welcome_url") or None
 
+def _fmt_text(t: str) -> str:
+    """Substitui placeholders dinâmicos no texto."""
+    if not t: return ""
+    guild = get_guild()
+    members = guild.member_count if guild else 0
+    return (t.replace("{brand}", bname())
+             .replace("{emoji}", bemoji())
+             .replace("{members}", str(members)))
+
 # ===================== BOT =====================
 intents = discord.Intents.default()
 intents.members = True
@@ -143,10 +170,8 @@ def get_voice_channel():
     return None
 
 def sanitize_channel_name(name: str) -> str:
-    """Limpa o nome para um formato válido de canal do Discord."""
     name = name.strip().lower()
     name = re.sub(r"\s+", "-", name)
-    # mantém letras, números, hífen, underscore, acentos e ç
     name = re.sub(r"[^a-z0-9\-_áàâãäéèêëíìîïóòôõöúùûüçñ]", "", name)
     name = re.sub(r"-+", "-", name).strip("-")
     return (name or "ticket")[:100]
@@ -564,6 +589,35 @@ async def handle_antibot_punish(message: discord.Message):
                 )
             except Exception: pass
 
+# ===================== TICKET PANEL — REFRESH =====================
+async def refresh_ticket_panel():
+    """Reenvia/edita o painel de tickets com as configs atuais."""
+    cid = config.get("ticket_panel_channel_id")
+    if not cid: return False
+    guild = get_guild()
+    if not guild: return False
+    ch = guild.get_channel(cid)
+    if not ch: return False
+
+    mid = config.get("ticket_panel_message_id")
+    if mid:
+        try:
+            msg = await ch.fetch_message(mid)
+            await msg.edit(view=ticket_panel_layout())
+            return True
+        except Exception as e:
+            logger.debug(f"Não consegui editar painel existente: {e}")
+
+    # Se não existir, manda um novo
+    try:
+        msg = await ch.send(view=ticket_panel_layout())
+        config["ticket_panel_message_id"] = msg.id
+        save_config(config)
+        return True
+    except Exception as e:
+        logger.error(f"Erro enviando painel de tickets: {e}")
+        return False
+
 # ===================== PAINEL PRINCIPAL =====================
 def painel_layout():
     layout = ui.LayoutView(timeout=None)
@@ -844,10 +898,13 @@ def painel_fixo_view():
         accent=color_primary(),
     )
 
+# ---------- 🎫 TICKETS ----------
 def tickets_view():
+    ch_ok = "✅" if config.get("ticket_panel_channel_id") else "❌"
     return premium_submenu(
         "🎫 Sistema de Tickets",
-        "Configure categorias, cargos de suporte e canais de log.",
+        "Configure categorias, cargos, canais **e personalize todo o painel público**.\n\n"
+        f"**Painel enviado em:** {ch_ok}",
         [
             {"title": "📂 Categorias", "rows": [[
                 _btn("Dúvidas", "tk_cat_d", P, "❓"),
@@ -861,6 +918,58 @@ def tickets_view():
                 _btn("Painel de Tickets", "tk_panel", P, "🎫"),
                 _btn("Logs de Moderação", "tk_mod",   P, "🛡️"),
             ]]},
+            {"title": "🎨 Personalizar Painel", "rows": [
+                [_btn("Abrir Customização", "tk_customize", SU, "🎨")],
+            ]},
+        ],
+        accent=color_primary(),
+    )
+
+# ✅ SUBMENU: PERSONALIZAR PAINEL DE TICKETS
+def ticket_panel_custom_view():
+    t_title = config.get("ticket_panel_title") or ""
+    t_ph    = config.get("ticket_panel_select_placeholder") or ""
+    d_label = config.get("ticket_doubt_label") or ""
+    d_emoji = config.get("ticket_doubt_emoji") or ""
+    p_label = config.get("ticket_purchase_label") or ""
+    p_emoji = config.get("ticket_purchase_emoji") or ""
+
+    return premium_submenu(
+        "🎨 Personalizar Painel de Tickets",
+        "Edite **qualquer informação** que aparece no painel público de tickets.\n"
+        "-# Placeholders disponíveis: `{brand}`, `{emoji}`, `{members}`",
+        [
+            {"title": "🏷️ Cabeçalho", "rows": [
+                [
+                    _btn("Título",   "tpc_title", P, "✏️"),
+                    _btn("Descrição","tpc_desc",  P, "📝"),
+                ],
+                [_btn("Banner (URL)", "tpc_banner", P, "🖼️")],
+            ]},
+            {"title": "🔤 Menu Select", "rows": [
+                [_btn("Placeholder", "tpc_ph", P, "✏️")],
+            ]},
+            {"title": f"❓ Opção Dúvidas (atual: {d_emoji} {d_label})", "rows": [
+                [
+                    _btn("Label",     "tpc_dlabel", P, "✏️"),
+                    _btn("Descrição", "tpc_ddesc",  P, "📝"),
+                    _btn("Emoji",     "tpc_demoji", P, "✨"),
+                ],
+            ]},
+            {"title": f"🛒 Opção Compras (atual: {p_emoji} {p_label})", "rows": [
+                [
+                    _btn("Label",     "tpc_plabel", P, "✏️"),
+                    _btn("Descrição", "tpc_pdesc",  P, "📝"),
+                    _btn("Emoji",     "tpc_pemoji", P, "✨"),
+                ],
+            ]},
+            {"title": "⚙️ Ações", "rows": [
+                [
+                    _btn("🔄 Atualizar Painel Agora", "tpc_refresh", SU, "🔄"),
+                    _btn("👁️ Preview",                 "tpc_preview", S,  "👁️"),
+                ],
+                [_btn("↩️ Restaurar Padrões", "tpc_reset", D, "🗑️")],
+            ]},
         ],
         accent=color_primary(),
     )
@@ -1110,30 +1219,14 @@ def show_config_view():
         f"### 🚫 Anti-Bot",
         f"**Canal:** {ch('antibot_channel_id')}",
         f"**Log:** {ch('antibot_log_channel_id')}",
-        f"**Banir:** `{config.get('antibot_punish_ban')}`  |  **Apagar msgs:** `{config.get('antibot_delete_messages')}`",
         f"**Total punidos:** `{get_antibot_count()}`",
         "",
         f"### ✅ Captcha",
         f"**Método:** `{method_labels.get(config.get('verification_method','math'),'—')}`",
         f"**Dificuldade:** `{diff_labels.get(config.get('verification_difficulty',1),'—')}`",
         f"**Kick auto:** `{'Desativado' if not kick else f'{kick} min'}`",
-        f"**Cargos Verificados:** {role_list('verified_role_ids')}",
-        f"**Cargos Não Verificado:** {role_list('verification_unverified_role_ids')}",
-        f"**Canal Verif:** {ch('verification_channel_id')}",
-        f"**Canal Painel:** {ch('verification_panel_channel_id')}",
-        f"**Canal Log:** {ch('verification_log_channel_id')}",
-        "",
-        f"### 💌 Boas-vindas & Saída",
-        f"**Entrada:** {ch('welcome_channel_id')}",
-        f"**Saída:** {ch('leave_channel_id')}",
-        "",
-        f"### 🎙️ Logs de Voz",
-        f"**Entrou na Call:** {ch('voice_join_log_channel_id')}",
-        f"**Saiu da Call:** {ch('voice_leave_log_channel_id')}",
-        "",
-        f"### 🔊 Voz & Status",
-        f"**Canal 24h:** {ch('voice_channel_id')}",
-        f"**Mute:** `{config.get('voice_mute')}`  |  **Status:** `{config.get('bot_status')}`",
+        f"**Cargos Verif:** {role_list('verified_role_ids')}",
+        f"**Cargos Não Verif:** {role_list('verification_unverified_role_ids')}",
         "",
         f"### 🎫 Tickets",
         f"**Suporte:** {role_list('ticket_support_role_ids')}",
@@ -1141,12 +1234,10 @@ def show_config_view():
         f"**Logs:** {ch('ticket_logs_channel_id')}",
         f"**Cat Dúvidas:** {ch('ticket_category_doubt_id')}",
         f"**Cat Compras:** {ch('ticket_category_purchase_id')}",
-        "",
-        f"### 💬 Comunidade",
-        f"**Feedback:** {ch('feedback_channel_id')}",
-        f"**Sugestões Painel:** {ch('suggestions_panel_channel_id')}",
-        f"**Sugestões Canal:** {ch('suggestions_channel_id')}",
-        f"**Logs Moderação:** {ch('moderation_logs_channel_id')}",
+        f"**Título Painel:** `{config.get('ticket_panel_title') or '—'}`",
+        f"**Placeholder:** `{config.get('ticket_panel_select_placeholder') or '—'}`",
+        f"**Dúvidas:** `{config.get('ticket_doubt_emoji')} {config.get('ticket_doubt_label')}`",
+        f"**Compras:** `{config.get('ticket_purchase_emoji')} {config.get('ticket_purchase_label')}`",
     ]
 
     layout.add_item(ui.Container(
@@ -1369,7 +1460,6 @@ def verification_diff_view():
 # ===================== ✨ PAINÉIS PÚBLICOS V2 =====================
 
 def verification_panel_layout():
-    """Painel público de verificação — V2."""
     comps = [
         ui.TextDisplay(f"# ✅ Verificação — {bname()}"),
         ui.Section(
@@ -1401,17 +1491,32 @@ def verification_panel_layout():
 
 
 def ticket_panel_layout():
-    """Painel público de tickets — V2 com SELECT MENU."""
+    """Painel público de tickets — TOTALMENTE editável pelo admin."""
+    # Pega textos configurados
+    raw_title = config.get("ticket_panel_title") or "🎫 Central de Tickets — {brand}"
+    raw_desc  = config.get("ticket_panel_description") or ""
+    raw_ph    = config.get("ticket_panel_select_placeholder") or "🎫 Selecione o tipo de ticket..."
+
+    d_label = config.get("ticket_doubt_label") or "Dúvidas"
+    d_desc  = config.get("ticket_doubt_desc") or ""
+    d_emoji = config.get("ticket_doubt_emoji") or "❓"
+
+    p_label = config.get("ticket_purchase_label") or "Compras"
+    p_desc  = config.get("ticket_purchase_desc") or ""
+    p_emoji = config.get("ticket_purchase_emoji") or "🛒"
+
+    # Substitui placeholders
+    title = _fmt_text(raw_title)
+    desc  = _fmt_text(raw_desc)
+    ph    = _fmt_text(raw_ph)
+
+    if not title.startswith("#"):
+        title = f"# {title}"
+
     comps = [
-        ui.TextDisplay(f"# 🎫 Central de Tickets — {bname()}"),
+        ui.TextDisplay(title),
         ui.Section(
-            ui.TextDisplay(
-                "### 💬 Precisa de ajuda ou quer comprar algo?\n"
-                "Escolha o tipo de atendimento no **menu abaixo** para abrir um ticket privado com nossa equipe.\n\n"
-                "**❓ Dúvidas** — suporte geral, ajuda, perguntas\n"
-                "**🛒 Compras** — produtos, serviços e pagamentos\n\n"
-                "-# Nossa equipe responderá o mais rápido possível 🖤"
-            ),
+            ui.TextDisplay(desc or "-# Configure uma descrição no painel admin."),
             accessory=ui.Thumbnail(media=_thumb()),
         ),
         ui.Separator(spacing=discord.SeparatorSpacing.small),
@@ -1423,18 +1528,12 @@ def ticket_panel_layout():
         if mg is not None:
             comps.append(mg)
 
-    # ✅ SELECT MENU para escolher o tipo de ticket
+    # Select com labels/descrições/emojis configuráveis
     ticket_sel = _safe_select(
-        placeholder="🎫 Selecione o tipo de ticket para abrir...",
+        placeholder=ph,
         options=[
-            discord.SelectOption(
-                label="Dúvidas", value="doubt", emoji="❓",
-                description="Suporte geral, ajuda, perguntas"
-            ),
-            discord.SelectOption(
-                label="Compras", value="purchase", emoji="🛒",
-                description="Produtos, serviços e pagamentos"
-            ),
+            discord.SelectOption(label=d_label[:100], value="doubt", emoji=d_emoji, description=d_desc[:100] or None),
+            discord.SelectOption(label=p_label[:100], value="purchase", emoji=p_emoji, description=p_desc[:100] or None),
         ],
         custom_id="ticket_panel_select",
         min_values=1, max_values=1,
@@ -1443,9 +1542,9 @@ def ticket_panel_layout():
     async def on_ticket_select(interaction: discord.Interaction):
         val = ticket_sel.values[0]
         if val == "doubt":
-            await handle_ticket_open(interaction, "doubt", "Dúvidas")
+            await handle_ticket_open(interaction, "doubt", d_label)
         elif val == "purchase":
-            await handle_ticket_open(interaction, "purchase", "Compras")
+            await handle_ticket_open(interaction, "purchase", p_label)
 
     ticket_sel.callback = on_ticket_select
 
@@ -1458,7 +1557,6 @@ def ticket_panel_layout():
 
 
 def suggestion_panel_layout():
-    """Painel público de sugestões — V2."""
     comps = [
         ui.TextDisplay(f"# 💡 Sugestões — {bname()}"),
         ui.Section(
@@ -1483,22 +1581,20 @@ def suggestion_panel_layout():
 
 
 def ticket_actions_layout():
-    """Painel de ações exibido dentro de um ticket — V2 (4 botões)."""
     comps = [
         ui.TextDisplay("### 🔧 Ações do Ticket"),
         ui.TextDisplay("-# Use os botões abaixo para gerenciar este atendimento."),
         ui.Separator(spacing=discord.SeparatorSpacing.small),
         ui.ActionRow(
-            _btn("Avaliar",       "rate_ticket",       P,  "⭐"),
-            _btn("Fechar",        "close_ticket",      D,  "🔒"),
-            _btn("Adicionar",     "add_member",        S,  "👤"),
-            _btn("Editar Nome",   "edit_ticket_name",  P,  "✏️"),
+            _btn("Avaliar",     "rate_ticket",      P, "⭐"),
+            _btn("Fechar",      "close_ticket",     D, "🔒"),
+            _btn("Adicionar",   "add_member",       S, "👤"),
+            _btn("Editar Nome", "edit_ticket_name", P, "✏️"),
         ),
     ]
     layout = ui.LayoutView(timeout=None)
     layout.add_item(ui.Container(*comps, accent_color=color_primary()))
     return layout
-
 
 # ===================== HANDLER GLOBAL =====================
 @bot.event
@@ -1508,7 +1604,6 @@ async def on_interaction(interaction: discord.Interaction):
     cid = interaction.data.get("custom_id", "")
     if not cid:
         return
-    # Aqueles com callback próprio, não precisam de roteamento
     if cid in ("pxk_main_menu", "cleanup_multi_select", "cleanup_start",
                "antibot_counter_display", "ticket_panel_select"):
         return
@@ -1534,7 +1629,7 @@ async def on_interaction(interaction: discord.Interaction):
         elif cid == "id_bp":
             await interaction.response.send_modal(URLModal("banner_painel_url", "URL do Banner do Painel"))
         elif cid == "id_bt":
-            await interaction.response.send_modal(URLModal("banner_ticket_url", "URL do Banner de Tickets"))
+            await interaction.response.send_modal(URLModal("banner_ticket_url", "URL do Banner de Tickets", refresh="ticket"))
         elif cid == "id_bw":
             await interaction.response.send_modal(URLModal("banner_welcome_url", "URL do Banner de Boas-vindas"))
         elif cid == "id_apply":
@@ -1550,7 +1645,7 @@ async def on_interaction(interaction: discord.Interaction):
         elif cid == "ab_log":
             await interaction.response.send_message(view=single_channel_view("antibot_log_channel_id", "Canal de Log AntiBot", admin_only=True), ephemeral=True)
         elif cid == "ab_banner":
-            await interaction.response.send_modal(URLModal("antibot_banner_url", "URL do Banner AntiBot"))
+            await interaction.response.send_modal(URLModal("antibot_banner_url", "URL do Banner AntiBot", refresh="antibot"))
         elif cid == "ab_title":
             await interaction.response.send_modal(AntibotTitleModal())
         elif cid == "ab_desc":
@@ -1669,6 +1764,90 @@ async def on_interaction(interaction: discord.Interaction):
         elif cid == "tk_mod":
             await interaction.response.send_message(view=single_channel_view("moderation_logs_channel_id", "Logs de Moderação"), ephemeral=True)
 
+        # ---------- TICKET PANEL CUSTOM ----------
+        elif cid == "tk_customize":
+            await interaction.response.send_message(view=ticket_panel_custom_view(), ephemeral=True)
+        elif cid == "tpc_title":
+            await interaction.response.send_modal(GenericTextModal(
+                "ticket_panel_title", "✏️ Título do Painel de Tickets",
+                "Novo título (use {brand}, {emoji}, {members})",
+                default=config.get("ticket_panel_title") or "",
+                max_length=200, refresh="ticket"
+            ))
+        elif cid == "tpc_desc":
+            await interaction.response.send_modal(GenericTextModal(
+                "ticket_panel_description", "📝 Descrição do Painel de Tickets",
+                "Nova descrição (use {brand}, {emoji}, {members})",
+                default=config.get("ticket_panel_description") or "",
+                style=discord.TextStyle.paragraph, max_length=2000, refresh="ticket"
+            ))
+        elif cid == "tpc_banner":
+            await interaction.response.send_modal(URLModal("banner_ticket_url", "URL do Banner de Tickets", refresh="ticket"))
+        elif cid == "tpc_ph":
+            await interaction.response.send_modal(GenericTextModal(
+                "ticket_panel_select_placeholder", "✏️ Placeholder do Menu",
+                "Placeholder do select",
+                default=config.get("ticket_panel_select_placeholder") or "",
+                max_length=150, refresh="ticket"
+            ))
+        elif cid == "tpc_dlabel":
+            await interaction.response.send_modal(GenericTextModal(
+                "ticket_doubt_label", "✏️ Label — Opção Dúvidas",
+                "Label da opção",
+                default=config.get("ticket_doubt_label") or "",
+                max_length=100, refresh="ticket"
+            ))
+        elif cid == "tpc_ddesc":
+            await interaction.response.send_modal(GenericTextModal(
+                "ticket_doubt_desc", "📝 Descrição — Opção Dúvidas",
+                "Descrição da opção",
+                default=config.get("ticket_doubt_desc") or "",
+                max_length=100, refresh="ticket"
+            ))
+        elif cid == "tpc_demoji":
+            await interaction.response.send_modal(GenericTextModal(
+                "ticket_doubt_emoji", "✨ Emoji — Opção Dúvidas",
+                "Emoji (1-2 caracteres)",
+                default=config.get("ticket_doubt_emoji") or "",
+                max_length=10, refresh="ticket"
+            ))
+        elif cid == "tpc_plabel":
+            await interaction.response.send_modal(GenericTextModal(
+                "ticket_purchase_label", "✏️ Label — Opção Compras",
+                "Label da opção",
+                default=config.get("ticket_purchase_label") or "",
+                max_length=100, refresh="ticket"
+            ))
+        elif cid == "tpc_pdesc":
+            await interaction.response.send_modal(GenericTextModal(
+                "ticket_purchase_desc", "📝 Descrição — Opção Compras",
+                "Descrição da opção",
+                default=config.get("ticket_purchase_desc") or "",
+                max_length=100, refresh="ticket"
+            ))
+        elif cid == "tpc_pemoji":
+            await interaction.response.send_modal(GenericTextModal(
+                "ticket_purchase_emoji", "✨ Emoji — Opção Compras",
+                "Emoji (1-2 caracteres)",
+                default=config.get("ticket_purchase_emoji") or "",
+                max_length=10, refresh="ticket"
+            ))
+        elif cid == "tpc_refresh":
+            await interaction.response.defer(ephemeral=True)
+            ok = await refresh_ticket_panel()
+            await interaction.followup.send(
+                "✅ Painel atualizado!" if ok else "❌ Nenhum painel configurado. Use `/painelticket`.",
+                ephemeral=True
+            )
+        elif cid == "tpc_preview":
+            await interaction.response.send_message(view=ticket_panel_layout(), ephemeral=True)
+        elif cid == "tpc_reset":
+            await interaction.response.send_message(
+                "⚠️ **Restaurar todas as personalizações do painel de tickets?**",
+                view=ConfirmResetTicketPanelView(),
+                ephemeral=True
+            )
+
         # ---------- FEEDBACK ----------
         elif cid == "fb_ch":
             await interaction.response.send_message(view=single_channel_view("feedback_channel_id", "Canal de Feedback"), ephemeral=True)
@@ -1763,22 +1942,62 @@ class ColorModal(ui.Modal):
         await interaction.response.send_message(f"✅ Cor: `#{raw.upper()}`", ephemeral=True)
 
 class URLModal(ui.Modal):
-    def __init__(self, key, label):
+    def __init__(self, key, label, refresh=None):
         super().__init__(title=f"🖼️ {label}")
         self.key = key
+        self.refresh = refresh  # "antibot", "ticket" ou None
         self.v = ui.TextInput(label="URL (ou 'limpar')", required=True)
         self.add_item(self.v)
     async def on_submit(self, interaction):
         val = self.v.value.strip()
         if val.lower() in ("limpar", "clear", "none", "remover"):
             config[self.key] = ""; save_config(config)
-            await refresh_antibot_panel()
+            await self._do_refresh()
             await interaction.response.send_message("✅ URL removida.", ephemeral=True); return
         if not (val.startswith("http://") or val.startswith("https://")):
             await interaction.response.send_message("❌ URL inválida.", ephemeral=True); return
         config[self.key] = val; save_config(config)
-        await refresh_antibot_panel()
+        await self._do_refresh()
         await interaction.response.send_message("✅ URL salva!", ephemeral=True)
+
+    async def _do_refresh(self):
+        if self.refresh in ("antibot", None):
+            try: await refresh_antibot_panel()
+            except Exception: pass
+        if self.refresh in ("ticket", None):
+            try: await refresh_ticket_panel()
+            except Exception: pass
+
+class GenericTextModal(ui.Modal):
+    """Modal genérico para editar qualquer campo de texto do config."""
+    def __init__(self, key, title, label, default="", style=discord.TextStyle.short,
+                 max_length=200, refresh=None):
+        super().__init__(title=title[:45])
+        self.key = key
+        self.refresh = refresh
+        self.input = ui.TextInput(
+            label=label[:45],
+            default=(default or "")[:max_length],
+            style=style,
+            required=True,
+            max_length=max_length,
+        )
+        self.add_item(self.input)
+
+    async def on_submit(self, interaction):
+        val = self.input.value.strip()
+        config[self.key] = val
+        save_config(config)
+
+        # Refresh do painel afetado
+        if self.refresh == "antibot":
+            try: await refresh_antibot_panel()
+            except Exception: pass
+        elif self.refresh == "ticket":
+            try: await refresh_ticket_panel()
+            except Exception: pass
+
+        await interaction.response.send_message(f"✅ Atualizado!", ephemeral=True)
 
 class AntibotTitleModal(ui.Modal, title="✏️ Título do Painel AntiBot"):
     v = ui.TextInput(
@@ -1886,11 +2105,9 @@ class TicketRatingModal(ui.Modal, title="⭐ Avaliar Atendimento"):
                 except Exception: pass
         await interaction.response.send_message("✅ Obrigado!", ephemeral=True)
 
-# ✅ NOVO MODAL: Editar Nome do Ticket
 class TicketNameModal(ui.Modal, title="✏️ Editar Nome do Ticket"):
     def __init__(self, current_name: str):
         super().__init__()
-        # Limpa o nome atual (remove "ticket-" prefix se houver, para ficar mais amigável)
         pretty = current_name
         if pretty.startswith("ticket-"):
             pretty = pretty[7:]
@@ -1948,6 +2165,24 @@ class ConfirmCloseView(ui.View):
             try: await ch.delete()
             except Exception: pass
         await interaction.response.send_message("✅ Ticket fechado.", ephemeral=True)
+
+class ConfirmResetTicketPanelView(ui.View):
+    def __init__(self):
+        super().__init__(timeout=60)
+    @ui.button(label="✅ Sim, restaurar", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction, button):
+        keys = [
+            "ticket_panel_title", "ticket_panel_description",
+            "ticket_panel_select_placeholder",
+            "ticket_doubt_label", "ticket_doubt_desc", "ticket_doubt_emoji",
+            "ticket_purchase_label", "ticket_purchase_desc", "ticket_purchase_emoji",
+        ]
+        for k in keys:
+            config[k] = DEFAULT_CONFIG[k]
+        save_config(config)
+        try: await refresh_ticket_panel()
+        except Exception: pass
+        await interaction.response.send_message("✅ Padrões restaurados!", ephemeral=True)
 
 class AddMemberView(ui.View):
     def __init__(self):
@@ -2011,7 +2246,6 @@ async def handle_ticket_open(interaction, tipo, nome):
     try: add_open_ticket(interaction.user.id, channel.id)
     except Exception: pass
 
-    # Boas-vindas V2 do ticket
     welcome_comps = [
         ui.TextDisplay(f"# {bemoji()} Ticket de {nome} — {bname()}"),
         ui.Section(
@@ -2035,7 +2269,6 @@ async def handle_ticket_open(interaction, tipo, nome):
     if mentions:
         await channel.send(f"📢 {', '.join(mentions)} — novo ticket de {interaction.user.mention}.")
 
-    # Painel de ações V2 (com 4 botões, incluindo Editar Nome)
     await channel.send(view=ticket_actions_layout())
 
     await interaction.response.send_message(f"✅ Ticket criado em {channel.mention}!", ephemeral=True)
