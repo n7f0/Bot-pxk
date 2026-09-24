@@ -11,8 +11,7 @@ def get_db():
     return conn
 
 def init_db():
-    conn = get_db()
-    c = conn.cursor()
+    conn = get_db(); c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS welcome_messages (
         user_id INTEGER PRIMARY KEY, message TEXT, image_url TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS scheduled_events (
@@ -26,12 +25,10 @@ def init_db():
         target_id INTEGER, reason TEXT, created_at TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS open_tickets (
         user_id INTEGER, channel_id INTEGER, opened_at TEXT)''')
-    # NOVO
     c.execute('''CREATE TABLE IF NOT EXISTS antibot_punishments (
         id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, guild_id INTEGER,
         reason TEXT, banned INTEGER, deleted_count INTEGER, created_at TEXT)''')
-    conn.commit()
-    conn.close()
+    conn.commit(); conn.close()
 
 def get_welcome_message(user_id):
     conn = get_db(); c = conn.cursor()
