@@ -72,7 +72,6 @@ DEFAULT_CONFIG = {
 
     "moderation_logs_channel_id": None,
 
-    # ---- ANTI-BOT ----
     "antibot_channel_id": None,
     "antibot_panel_message_id": None,
     "antibot_banner_url": "",
@@ -172,7 +171,7 @@ async def update_voice_mute():
     vc = guild.voice_client
     if not vc or not vc.is_connected(): return
     try: await guild.me.edit(mute=config.get("voice_mute", True))
-    except Exception as e: logger.debug(f"Mute: {e}")
+    except Exception: pass
 
 def text_channel_options(max_items=25):
     guild = get_guild()
@@ -225,7 +224,6 @@ def _safe_media_gallery(media_url):
     except Exception:
         return None
 
-# ✅ FIX: cria Select com min/max_values clampados ao tamanho de options
 def _safe_select(placeholder, options, custom_id=None,
                   min_values=1, max_values=1):
     if not options:
@@ -448,10 +446,7 @@ def antibot_panel_view():
         if mg is not None:
             comps.append(mg)
         else:
-            comps.append(ui.Section(
-                ui.TextDisplay(""),
-                accessory=ui.Thumbnail(media=banner),
-            ))
+            comps.append(ui.Section(ui.TextDisplay(""), accessory=ui.Thumbnail(media=banner)))
 
     title_txt = config.get("antibot_title") or "• Não envie mensagem nesse canal!"
     desc_txt  = config.get("antibot_description") or (
@@ -544,7 +539,6 @@ async def handle_antibot_punish(message: discord.Message):
     except Exception as e:
         logger.error(f"Erro registrando punição: {e}")
 
-    # ✅ Auto-refresh do contador (imediato)
     await refresh_antibot_panel()
 
     log_id = config.get("antibot_log_channel_id")
@@ -907,7 +901,6 @@ async def _on_cleanup_select(interaction: discord.Interaction):
 def chat_cleanup_view():
     layout = ui.LayoutView(timeout=600)
     opts = text_channel_options()
-    # ✅ FIX: clamp max_values ao tamanho real das opções
     n = len([o for o in opts if o.value != "none"])
     max_vals = max(1, min(25, n))
 
@@ -1364,6 +1357,122 @@ def verification_diff_view():
     ))
     return layout
 
+# ===================== ✨ PAINÉIS PÚBLICOS V2 =====================
+
+def verification_panel_layout():
+    """Painel público de verificação — V2."""
+    comps = [
+        ui.TextDisplay(f"# ✅ Verificação — {bname()}"),
+        ui.Section(
+            ui.TextDisplay(
+                "### 🔐 Sistema de Verificação\n"
+                f"Olá! Para ter acesso completo ao **{bname()}**, você precisa se verificar.\n\n"
+                "**Como funciona:**\n"
+                "> • Clique no botão **✅ Verificar Agora**\n"
+                "> • Resolva o desafio que aparecer\n"
+                "> • Pronto! Você receberá os cargos automaticamente 🖤"
+            ),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+    ]
+
+    banner = banner_welcome() or banner_painel()
+    if banner:
+        mg = _safe_media_gallery(banner)
+        if mg is not None:
+            comps.append(mg)
+
+    comps.append(ui.ActionRow(
+        _btn("Verificar Agora", "verify_now", SU, "🔐")
+    ))
+    comps.append(ui.TextDisplay(f"-# {bfooter()}"))
+
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(*comps, accent_color=color_secondary()))
+    return layout
+
+
+def ticket_panel_layout():
+    """Painel público de tickets — V2."""
+    comps = [
+        ui.TextDisplay(f"# 🎫 Central de Tickets — {bname()}"),
+        ui.Section(
+            ui.TextDisplay(
+                "### 💬 Precisa de ajuda ou quer comprar algo?\n"
+                "Selecione uma opção abaixo para abrir um **ticket privado** com nossa equipe.\n\n"
+                "**❓ Dúvidas** — suporte geral, ajuda, perguntas\n"
+                "**🛒 Compras** — produtos, serviços e pagamentos\n\n"
+                "-# Nossa equipe responderá o mais rápido possível 🖤"
+            ),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+    ]
+
+    banner = banner_ticket()
+    if banner:
+        mg = _safe_media_gallery(banner)
+        if mg is not None:
+            comps.append(mg)
+
+    comps.append(ui.ActionRow(
+        _btn("Abrir Ticket — Dúvidas", "ticket_open_doubt", P, "❓"),
+        _btn("Abrir Ticket — Compras", "ticket_open_purchase", SU, "🛒"),
+    ))
+    comps.append(ui.TextDisplay(f"-# {bfooter()}"))
+
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(*comps, accent_color=color_primary()))
+    return layout
+
+
+def suggestion_panel_layout():
+    """Painel público de sugestões — V2."""
+    comps = [
+        ui.TextDisplay(f"# 💡 Sugestões — {bname()}"),
+        ui.Section(
+            ui.TextDisplay(
+                "### 🗳️ Sua voz importa!\n"
+                "Tem uma ideia para melhorar o servidor? Compartilhe com a gente!\n\n"
+                "**Como funciona:**\n"
+                "> • Clique em **💡 Enviar Sugestão**\n"
+                "> • Descreva sua ideia no modal\n"
+                "> • A comunidade vota com 👍 ou 👎"
+            ),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(
+            _btn("Enviar Sugestão", "suggest_btn", P, "💡")
+        ),
+        ui.TextDisplay(f"-# {bfooter()}"),
+    ]
+
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(*comps, accent_color=color_primary()))
+    return layout
+
+
+def ticket_actions_layout():
+    """Painel de ações exibido dentro de um ticket — V2."""
+    comps = [
+        ui.TextDisplay("### 🔧 Ações do Ticket"),
+        ui.TextDisplay(
+            "-# Use os botões abaixo para gerenciar este atendimento."
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(
+            _btn("Avaliar",   "rate_ticket",  P,  "⭐"),
+            _btn("Fechar",    "close_ticket", D,  "🔒"),
+            _btn("Adicionar", "add_member",   S,  "👤"),
+        ),
+    ]
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(*comps, accent_color=color_primary()))
+    return layout
+
+
 # ===================== HANDLER GLOBAL =====================
 @bot.event
 async def on_interaction(interaction: discord.Interaction):
@@ -1372,7 +1481,8 @@ async def on_interaction(interaction: discord.Interaction):
     cid = interaction.data.get("custom_id", "")
     if not cid:
         return
-    if cid in ("pxk_main_menu", "cleanup_multi_select", "cleanup_start"):
+    if cid in ("pxk_main_menu", "cleanup_multi_select", "cleanup_start",
+               "antibot_counter_display"):
         return
 
     try:
@@ -1582,13 +1692,11 @@ async def post_antibot_panel(interaction: discord.Interaction):
     if not ch:
         await interaction.response.send_message("❌ Canal inválido.", ephemeral=True)
         return
-
     try:
         msg = await ch.send(view=antibot_panel_view())
     except Exception as e:
         await interaction.response.send_message(f"❌ Erro: `{e}`", ephemeral=True)
         return
-
     config["antibot_panel_message_id"] = msg.id
     save_config(config)
     await interaction.response.send_message(f"✅ Painel AntiBot enviado em {ch.mention}!", ephemeral=True)
@@ -1835,22 +1943,32 @@ async def handle_ticket_open(interaction, tipo, nome):
     try: add_open_ticket(interaction.user.id, channel.id)
     except Exception: pass
 
-    e = discord.Embed(
-        title=f"{bemoji()} Ticket de {nome} — {bname()}",
-        description=f"**Olá {interaction.user.mention}!** Bem-vindo(a) ao atendimento. 💜\n\nDescreva seu pedido abaixo.",
-        color=color_primary()
-    )
-    if banner_ticket(): e.set_image(url=banner_ticket())
-    e.set_footer(text=f"{bemoji()} Equipe {bname()}")
-    await channel.send(embed=e)
+    # ✅ Boas-vindas V2 do ticket
+    welcome_comps = [
+        ui.TextDisplay(f"# {bemoji()} Ticket de {nome} — {bname()}"),
+        ui.Section(
+            ui.TextDisplay(
+                f"**Olá {interaction.user.mention}!** Bem-vindo(a) ao atendimento. 💜\n\n"
+                "Descreva seu pedido abaixo e nossa equipe responderá em breve.\n"
+                "-# Ações disponíveis no painel fixado abaixo."
+            ),
+            accessory=ui.Thumbnail(media=interaction.user.display_avatar.url),
+        ),
+    ]
+    banner = banner_ticket()
+    if banner:
+        mg = _safe_media_gallery(banner)
+        if mg is not None:
+            welcome_comps.append(mg)
+    welcome_layout = ui.LayoutView(timeout=None)
+    welcome_layout.add_item(ui.Container(*welcome_comps, accent_color=color_primary()))
+    await channel.send(view=welcome_layout)
+
     if mentions:
         await channel.send(f"📢 {', '.join(mentions)} — novo ticket de {interaction.user.mention}.")
 
-    view = ui.View(timeout=None)
-    view.add_item(ui.Button(label="⭐ Avaliar", style=discord.ButtonStyle.primary, custom_id="rate_ticket"))
-    view.add_item(ui.Button(label="🔒 Fechar", style=discord.ButtonStyle.danger, custom_id="close_ticket"))
-    view.add_item(ui.Button(label="👤 Adicionar", style=discord.ButtonStyle.secondary, custom_id="add_member"))
-    await channel.send("🔧 **Ações:**", view=view)
+    # ✅ Painel de ações V2
+    await channel.send(view=ticket_actions_layout())
 
     await interaction.response.send_message(f"✅ Ticket criado em {channel.mention}!", ephemeral=True)
 
@@ -1920,34 +2038,45 @@ async def _log_verification(guild, member, success, extra=""):
 async def send_captcha_challenge(member, channel):
     method = config.get("verification_method", "math")
 
+    # ✅ Desafio em V2
     if method == "button":
-        e = discord.Embed(
-            title=f"✅ Verificação — {bname()}",
-            description=f"Olá {member.mention}! Clique no botão abaixo para se verificar.",
-            color=color_secondary()
-        )
-        view = ui.View(timeout=3600)
-        view.add_item(ui.Button(label="✅ Verificar Agora", style=SU, custom_id="captcha_button_verify"))
+        comps = [
+            ui.TextDisplay(f"# ✅ Verificação — {bname()}"),
+            ui.Section(
+                ui.TextDisplay(
+                    f"Olá {member.mention}! Clique no botão abaixo para se verificar."
+                ),
+                accessory=ui.Thumbnail(media=member.display_avatar.url),
+            ),
+            ui.Separator(spacing=discord.SeparatorSpacing.small),
+            ui.ActionRow(_btn("Verificar Agora", "captcha_button_verify", SU, "✅")),
+        ]
+        layout = ui.LayoutView(timeout=None)
+        layout.add_item(ui.Container(*comps, accent_color=color_secondary()))
         _button_verification_target[member.id] = True
-        try: await channel.send(content=member.mention, embed=e, view=view)
+        try: await channel.send(content=member.mention, view=layout)
         except Exception as e: logger.error(f"Erro enviando verif botão: {e}")
         return
 
     question, answer = _generate_math_challenge()
     _math_answers[member.id] = answer
 
-    e = discord.Embed(
-        title=f"🧮 Verificação — {bname()}",
-        description=(
-            f"Olá {member.mention}!\n\n"
-            f"Resolva o desafio abaixo clicando em **🔐 Resolver**:\n\n"
-            f"# `{question}`"
+    comps = [
+        ui.TextDisplay(f"# 🧮 Verificação — {bname()}"),
+        ui.Section(
+            ui.TextDisplay(
+                f"Olá {member.mention}!\n\n"
+                f"Resolva o desafio abaixo clicando em **🔐 Resolver**:\n\n"
+                f"# `{question}`"
+            ),
+            accessory=ui.Thumbnail(media=member.display_avatar.url),
         ),
-        color=color_secondary()
-    )
-    view = ui.View(timeout=3600)
-    view.add_item(ui.Button(label="🔐 Resolver", style=SU, custom_id="captcha_solve"))
-    try: await channel.send(content=member.mention, embed=e, view=view)
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(_btn("Resolver", "captcha_solve", SU, "🔐")),
+    ]
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(*comps, accent_color=color_secondary()))
+    try: await channel.send(content=member.mention, view=layout)
     except Exception as e: logger.error(f"Erro enviando verif math: {e}")
 
 async def _grant_verification(guild, member):
@@ -2020,26 +2149,6 @@ class CaptchaModal(ui.Modal, title="🧮 Verificação"):
             if ch:
                 await send_captcha_challenge(member, ch)
 
-class VerificationPanelView(ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-    @ui.button(label="🔐 Verificar Agora", style=discord.ButtonStyle.success, custom_id="verify_now")
-    async def verify(self, interaction, button): pass
-
-class TicketPanelView(ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-    @ui.button(label="❓ Dúvidas", style=discord.ButtonStyle.primary, custom_id="ticket_open_doubt")
-    async def d(self, interaction, button): pass
-    @ui.button(label="🛒 Compras", style=discord.ButtonStyle.success, custom_id="ticket_open_purchase")
-    async def c(self, interaction, button): pass
-
-class SuggestionButtonView(ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-    @ui.button(label="💡 Enviar Sugestão", style=discord.ButtonStyle.primary, custom_id="suggest_btn")
-    async def s(self, interaction, button): pass
-
 # ===================== COMANDOS =====================
 @bot.tree.command(name="painelpxkadmin", description="🖤 Painel administrativo do servidor")
 @app_commands.default_permissions(administrator=True)
@@ -2082,7 +2191,7 @@ async def cmd_antibot(interaction: discord.Interaction):
     save_config(config)
     await interaction.response.send_message(f"✅ Painel AntiBot enviado em {ch.mention}!", ephemeral=True)
 
-@bot.tree.command(name="painelticket", description="🎫 Envia o painel de tickets")
+@bot.tree.command(name="painelticket", description="🎫 Envia o painel de tickets (V2)")
 @app_commands.default_permissions(administrator=True)
 async def cmd_pt(interaction):
     cid = config.get("ticket_panel_channel_id")
@@ -2091,16 +2200,12 @@ async def cmd_pt(interaction):
     ch = interaction.guild.get_channel(cid)
     if not ch:
         await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
-    e = discord.Embed(
-        title=f"🎫 Central de Tickets — {bname()}",
-        description="Clique no botão correspondente:\n\n❓ **Dúvidas**\n🛒 **Compras**",
-        color=color_primary()
-    )
-    if banner_ticket(): e.set_image(url=banner_ticket())
-    await ch.send(embed=e, view=TicketPanelView())
-    await interaction.response.send_message(f"✅ Enviado em {ch.mention}", ephemeral=True)
+    msg = await ch.send(view=ticket_panel_layout())
+    config["ticket_panel_message_id"] = msg.id
+    save_config(config)
+    await interaction.response.send_message(f"✅ Painel de tickets enviado em {ch.mention}!", ephemeral=True)
 
-@bot.tree.command(name="painelsugestoes", description="💡 Envia o painel de sugestões")
+@bot.tree.command(name="painelsugestoes", description="💡 Envia o painel de sugestões (V2)")
 @app_commands.default_permissions(administrator=True)
 async def cmd_ps(interaction):
     cid = config.get("suggestions_panel_channel_id")
@@ -2109,12 +2214,12 @@ async def cmd_ps(interaction):
     ch = interaction.guild.get_channel(cid)
     if not ch:
         await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
-    e = discord.Embed(title=f"💡 Sugestões — {bname()}", description="Clique abaixo para enviar sua ideia!", color=color_primary())
-    msg = await ch.send(embed=e, view=SuggestionButtonView())
-    config["suggestions_panel_message_id"] = msg.id; save_config(config)
-    await interaction.response.send_message(f"✅ Enviado em {ch.mention}", ephemeral=True)
+    msg = await ch.send(view=suggestion_panel_layout())
+    config["suggestions_panel_message_id"] = msg.id
+    save_config(config)
+    await interaction.response.send_message(f"✅ Painel de sugestões enviado em {ch.mention}!", ephemeral=True)
 
-@bot.tree.command(name="painelverificacao", description="✅ Envia o painel de verificação")
+@bot.tree.command(name="painelverificacao", description="✅ Envia o painel de verificação (V2)")
 @app_commands.default_permissions(administrator=True)
 async def cmd_pv(interaction):
     cid = config.get("verification_panel_channel_id")
@@ -2123,14 +2228,10 @@ async def cmd_pv(interaction):
     ch = interaction.guild.get_channel(cid)
     if not ch:
         await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
-    e = discord.Embed(
-        title=f"✅ Verificação — {bname()}",
-        description="Clique em **🔐 Verificar Agora** para iniciar.",
-        color=color_secondary()
-    )
-    msg = await ch.send(embed=e, view=VerificationPanelView())
-    config["verification_panel_message_id"] = msg.id; save_config(config)
-    await interaction.response.send_message(f"✅ Enviado em {ch.mention}", ephemeral=True)
+    msg = await ch.send(view=verification_panel_layout())
+    config["verification_panel_message_id"] = msg.id
+    save_config(config)
+    await interaction.response.send_message(f"✅ Painel de verificação enviado em {ch.mention}!", ephemeral=True)
 
 @bot.tree.command(name="limparchat", description="🧹 Apaga TODAS as mensagens de um canal")
 @app_commands.default_permissions(administrator=True)
@@ -2226,7 +2327,6 @@ async def task_voice_watchdog():
     except Exception as e:
         logger.debug(f"Voice watchdog: {e}")
 
-# ✅ NOVA TASK: auto-refresh do contador AntiBot
 @tasks.loop(minutes=2)
 async def task_antibot_refresh():
     try:
@@ -2284,7 +2384,6 @@ async def on_ready():
     await update_status()
     for t in (task_voice, task_status, task_voice_watchdog, task_antibot_refresh):
         if not t.is_running(): t.start()
-    # Refresh inicial do painel AntiBot
     try:
         await refresh_antibot_panel()
     except Exception:
