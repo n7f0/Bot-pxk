@@ -26,6 +26,10 @@ def init_db():
         target_id INTEGER, reason TEXT, created_at TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS open_tickets (
         user_id INTEGER, channel_id INTEGER, opened_at TEXT)''')
+    # NOVO
+    c.execute('''CREATE TABLE IF NOT EXISTS antibot_punishments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, guild_id INTEGER,
+        reason TEXT, banned INTEGER, deleted_count INTEGER, created_at TEXT)''')
     conn.commit()
     conn.close()
 
@@ -87,3 +91,22 @@ def count_user_tickets_last_hours(user_id, hours=8):
     c.execute("SELECT COUNT(*) FROM open_tickets WHERE user_id = ? AND opened_at > ?", (user_id, since))
     count = c.fetchone()[0]; conn.close()
     return count
+
+# ===================== ANTIBOT =====================
+def add_antibot_punishment(user_id, guild_id, reason, banned=True, deleted_count=0):
+    conn = get_db(); c = conn.cursor()
+    c.execute(
+        "INSERT INTO antibot_punishments (user_id, guild_id, reason, banned, deleted_count, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (user_id, guild_id, reason, 1 if banned else 0, deleted_count, datetime.datetime.now().isoformat())
+    )
+    conn.commit(); conn.close()
+
+def get_antibot_count(guild_id=None):
+    conn = get_db(); c = conn.cursor()
+    if guild_id:
+        c.execute("SELECT COUNT(*) FROM antibot_punishments WHERE guild_id = ?", (guild_id,))
+    else:
+        c.execute("SELECT COUNT(*) FROM antibot_punishments")
+    n = c.fetchone()[0]; conn.close()
+    return n
