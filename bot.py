@@ -1,7 +1,7 @@
 import discord
 from discord import app_commands, ui
 from discord.ext import commands, tasks
-import json, os, datetime, random, logging, aiohttp, asyncio
+import json, os, datetime, random, logging, aiohttp, asyncio, re
 from database import *
 
 # ===================== TOKEN =====================
@@ -141,6 +141,15 @@ def get_voice_channel():
         cid = config.get("voice_channel_id")
         return guild.get_channel(cid) if cid else None
     return None
+
+def sanitize_channel_name(name: str) -> str:
+    """Limpa o nome para um formato válido de canal do Discord."""
+    name = name.strip().lower()
+    name = re.sub(r"\s+", "-", name)
+    # mantém letras, números, hífen, underscore, acentos e ç
+    name = re.sub(r"[^a-z0-9\-_áàâãäéèêëíìîïóòôõöúùûüçñ]", "", name)
+    name = re.sub(r"-+", "-", name).strip("-")
+    return (name or "ticket")[:100]
 
 async def update_voice_name_impl():
     guild = get_guild()
@@ -1383,9 +1392,7 @@ def verification_panel_layout():
         if mg is not None:
             comps.append(mg)
 
-    comps.append(ui.ActionRow(
-        _btn("Verificar Agora", "verify_now", SU, "🔐")
-    ))
+    comps.append(ui.ActionRow(_btn("Verificar Agora", "verify_now", SU, "🔐")))
     comps.append(ui.TextDisplay(f"-# {bfooter()}"))
 
     layout = ui.LayoutView(timeout=None)
@@ -1394,13 +1401,13 @@ def verification_panel_layout():
 
 
 def ticket_panel_layout():
-    """Painel público de tickets — V2."""
+    """Painel público de tickets — V2 com SELECT MENU."""
     comps = [
         ui.TextDisplay(f"# 🎫 Central de Tickets — {bname()}"),
         ui.Section(
             ui.TextDisplay(
                 "### 💬 Precisa de ajuda ou quer comprar algo?\n"
-                "Selecione uma opção abaixo para abrir um **ticket privado** com nossa equipe.\n\n"
+                "Escolha o tipo de atendimento no **menu abaixo** para abrir um ticket privado com nossa equipe.\n\n"
                 "**❓ Dúvidas** — suporte geral, ajuda, perguntas\n"
                 "**🛒 Compras** — produtos, serviços e pagamentos\n\n"
                 "-# Nossa equipe responderá o mais rápido possível 🖤"
@@ -1416,10 +1423,33 @@ def ticket_panel_layout():
         if mg is not None:
             comps.append(mg)
 
-    comps.append(ui.ActionRow(
-        _btn("Abrir Ticket — Dúvidas", "ticket_open_doubt", P, "❓"),
-        _btn("Abrir Ticket — Compras", "ticket_open_purchase", SU, "🛒"),
-    ))
+    # ✅ SELECT MENU para escolher o tipo de ticket
+    ticket_sel = _safe_select(
+        placeholder="🎫 Selecione o tipo de ticket para abrir...",
+        options=[
+            discord.SelectOption(
+                label="Dúvidas", value="doubt", emoji="❓",
+                description="Suporte geral, ajuda, perguntas"
+            ),
+            discord.SelectOption(
+                label="Compras", value="purchase", emoji="🛒",
+                description="Produtos, serviços e pagamentos"
+            ),
+        ],
+        custom_id="ticket_panel_select",
+        min_values=1, max_values=1,
+    )
+
+    async def on_ticket_select(interaction: discord.Interaction):
+        val = ticket_sel.values[0]
+        if val == "doubt":
+            await handle_ticket_open(interaction, "doubt", "Dúvidas")
+        elif val == "purchase":
+            await handle_ticket_open(interaction, "purchase", "Compras")
+
+    ticket_sel.callback = on_ticket_select
+
+    comps.append(ui.ActionRow(ticket_sel))
     comps.append(ui.TextDisplay(f"-# {bfooter()}"))
 
     layout = ui.LayoutView(timeout=None)
@@ -1443,9 +1473,7 @@ def suggestion_panel_layout():
             accessory=ui.Thumbnail(media=_thumb()),
         ),
         ui.Separator(spacing=discord.SeparatorSpacing.small),
-        ui.ActionRow(
-            _btn("Enviar Sugestão", "suggest_btn", P, "💡")
-        ),
+        ui.ActionRow(_btn("Enviar Sugestão", "suggest_btn", P, "💡")),
         ui.TextDisplay(f"-# {bfooter()}"),
     ]
 
@@ -1455,17 +1483,16 @@ def suggestion_panel_layout():
 
 
 def ticket_actions_layout():
-    """Painel de ações exibido dentro de um ticket — V2."""
+    """Painel de ações exibido dentro de um ticket — V2 (4 botões)."""
     comps = [
         ui.TextDisplay("### 🔧 Ações do Ticket"),
-        ui.TextDisplay(
-            "-# Use os botões abaixo para gerenciar este atendimento."
-        ),
+        ui.TextDisplay("-# Use os botões abaixo para gerenciar este atendimento."),
         ui.Separator(spacing=discord.SeparatorSpacing.small),
         ui.ActionRow(
-            _btn("Avaliar",   "rate_ticket",  P,  "⭐"),
-            _btn("Fechar",    "close_ticket", D,  "🔒"),
-            _btn("Adicionar", "add_member",   S,  "👤"),
+            _btn("Avaliar",       "rate_ticket",       P,  "⭐"),
+            _btn("Fechar",        "close_ticket",      D,  "🔒"),
+            _btn("Adicionar",     "add_member",        S,  "👤"),
+            _btn("Editar Nome",   "edit_ticket_name",  P,  "✏️"),
         ),
     ]
     layout = ui.LayoutView(timeout=None)
@@ -1481,8 +1508,9 @@ async def on_interaction(interaction: discord.Interaction):
     cid = interaction.data.get("custom_id", "")
     if not cid:
         return
+    # Aqueles com callback próprio, não precisam de roteamento
     if cid in ("pxk_main_menu", "cleanup_multi_select", "cleanup_start",
-               "antibot_counter_display"):
+               "antibot_counter_display", "ticket_panel_select"):
         return
 
     try:
@@ -1656,10 +1684,6 @@ async def on_interaction(interaction: discord.Interaction):
             await interaction.response.edit_message(view=painel_layout())
 
         # ---------- BOTÕES DE AÇÃO ----------
-        elif cid == "ticket_open_doubt":
-            await handle_ticket_open(interaction, "doubt", "Dúvidas")
-        elif cid == "ticket_open_purchase":
-            await handle_ticket_open(interaction, "purchase", "Compras")
         elif cid == "suggest_btn":
             await interaction.response.send_modal(SuggestionModal())
         elif cid == "verify_now":
@@ -1674,6 +1698,8 @@ async def on_interaction(interaction: discord.Interaction):
             await interaction.response.send_message("⚠️ Fechar este ticket?", view=ConfirmCloseView(interaction.channel.id), ephemeral=True)
         elif cid == "add_member":
             await interaction.response.send_message(view=AddMemberView(), ephemeral=True)
+        elif cid == "edit_ticket_name":
+            await interaction.response.send_modal(TicketNameModal(interaction.channel.name))
 
     except discord.errors.NotFound:
         pass
@@ -1860,6 +1886,48 @@ class TicketRatingModal(ui.Modal, title="⭐ Avaliar Atendimento"):
                 except Exception: pass
         await interaction.response.send_message("✅ Obrigado!", ephemeral=True)
 
+# ✅ NOVO MODAL: Editar Nome do Ticket
+class TicketNameModal(ui.Modal, title="✏️ Editar Nome do Ticket"):
+    def __init__(self, current_name: str):
+        super().__init__()
+        # Limpa o nome atual (remove "ticket-" prefix se houver, para ficar mais amigável)
+        pretty = current_name
+        if pretty.startswith("ticket-"):
+            pretty = pretty[7:]
+        self.v = ui.TextInput(
+            label="Novo nome do canal",
+            default=pretty[:100],
+            placeholder="ex: compra-vip-joao",
+            required=True,
+            min_length=1,
+            max_length=100,
+            style=discord.TextStyle.short,
+        )
+        self.add_item(self.v)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        raw = self.v.value.strip()
+        new_name = sanitize_channel_name(raw)
+        if not new_name:
+            await interaction.response.send_message("❌ Nome inválido.", ephemeral=True); return
+        try:
+            old_name = interaction.channel.name
+            await interaction.channel.edit(
+                name=new_name,
+                reason=f"Renomeado por {interaction.user} ({interaction.user.id})"
+            )
+            await interaction.response.send_message(
+                f"✅ Ticket renomeado!\n**Antes:** `{old_name}`\n**Agora:** `{new_name}`",
+                ephemeral=True
+            )
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                "❌ Não tenho permissão para renomear este canal (`Gerenciar Canais`).",
+                ephemeral=True
+            )
+        except discord.HTTPException as e:
+            await interaction.response.send_message(f"❌ Erro: `{e}`", ephemeral=True)
+
 # ===================== VIEWS SIMPLES =====================
 class ConfirmCloseView(ui.View):
     def __init__(self, channel_id):
@@ -1943,7 +2011,7 @@ async def handle_ticket_open(interaction, tipo, nome):
     try: add_open_ticket(interaction.user.id, channel.id)
     except Exception: pass
 
-    # ✅ Boas-vindas V2 do ticket
+    # Boas-vindas V2 do ticket
     welcome_comps = [
         ui.TextDisplay(f"# {bemoji()} Ticket de {nome} — {bname()}"),
         ui.Section(
@@ -1967,7 +2035,7 @@ async def handle_ticket_open(interaction, tipo, nome):
     if mentions:
         await channel.send(f"📢 {', '.join(mentions)} — novo ticket de {interaction.user.mention}.")
 
-    # ✅ Painel de ações V2
+    # Painel de ações V2 (com 4 botões, incluindo Editar Nome)
     await channel.send(view=ticket_actions_layout())
 
     await interaction.response.send_message(f"✅ Ticket criado em {channel.mention}!", ephemeral=True)
@@ -2038,14 +2106,11 @@ async def _log_verification(guild, member, success, extra=""):
 async def send_captcha_challenge(member, channel):
     method = config.get("verification_method", "math")
 
-    # ✅ Desafio em V2
     if method == "button":
         comps = [
             ui.TextDisplay(f"# ✅ Verificação — {bname()}"),
             ui.Section(
-                ui.TextDisplay(
-                    f"Olá {member.mention}! Clique no botão abaixo para se verificar."
-                ),
+                ui.TextDisplay(f"Olá {member.mention}! Clique no botão abaixo para se verificar."),
                 accessory=ui.Thumbnail(media=member.display_avatar.url),
             ),
             ui.Separator(spacing=discord.SeparatorSpacing.small),
@@ -2191,7 +2256,7 @@ async def cmd_antibot(interaction: discord.Interaction):
     save_config(config)
     await interaction.response.send_message(f"✅ Painel AntiBot enviado em {ch.mention}!", ephemeral=True)
 
-@bot.tree.command(name="painelticket", description="🎫 Envia o painel de tickets (V2)")
+@bot.tree.command(name="painelticket", description="🎫 Envia o painel de tickets (V2 com select)")
 @app_commands.default_permissions(administrator=True)
 async def cmd_pt(interaction):
     cid = config.get("ticket_panel_channel_id")
