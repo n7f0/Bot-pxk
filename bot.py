@@ -1,7 +1,7 @@
 import discord
 from discord import app_commands, ui
 from discord.ext import commands, tasks
-import json, os, datetime, random, logging, aiohttp
+import json, os, datetime, random, logging, aiohttp, asyncio
 from database import *
 
 # ===================== TOKEN =====================
@@ -222,20 +222,18 @@ def category_options():
 
 # ===================== COMPONENTS V2 — HELPERS =====================
 def v2_container(*components, accent=None):
-    """Container V2 com accent color."""
     return ui.Container(*components, accent_color=accent or color_primary())
 
 def v2_title(text):
     return ui.TextDisplay(text)
 
 def v2_sep(large=False, visible=True):
-    # ✅ CORREÇÃO: enum correto é discord.SeparatorSpacing
     return ui.Separator(
         spacing=discord.SeparatorSpacing.large if large else discord.SeparatorSpacing.small,
         visible=visible
     )
 
-# ===================== PAINEL PRINCIPAL =====================
+# ===================== PAINEL PRINCIPAL (MENU DENTRO DO CONTAINER) =====================
 def painel_layout():
     layout = ui.LayoutView(timeout=None)
 
@@ -251,12 +249,10 @@ def painel_layout():
             ui.TextDisplay("**Sistema de Administração**"),
             accessory=ui.Thumbnail(media=avatar_url()),
         ))
-    # ✅ CORREÇÃO: discord.SeparatorSpacing (não SeparatorSpacingSize)
+
     header_parts.append(ui.Separator(spacing=discord.SeparatorSpacing.small))
 
-    layout.add_item(ui.Container(*header_parts, accent_color=color_primary()))
-
-    row = ui.ActionRow()
+    # ✅ MENU SELECT DENTRO DO CONTAINER (V2)
     select = ui.Select(
         placeholder=f"🖤 Configurações do {bname()}",
         options=[
@@ -272,32 +268,35 @@ def painel_layout():
             discord.SelectOption(label="Sugestões", value="suggestions", emoji="💡"),
             discord.SelectOption(label="Eventos", value="events", emoji="📅"),
             discord.SelectOption(label="Lembretes", value="reminder", emoji="⏰"),
+            discord.SelectOption(label="🧹 Limpeza de Chat", value="chat_cleanup", emoji="🧹"),
             discord.SelectOption(label="Ver Configuração Atual", value="show_config", emoji="📋"),
         ],
         custom_id="pxk_main_menu",
     )
     select.callback = main_menu_callback
-    row.add_item(select)
-    layout.add_item(row)
 
+    header_parts.append(ui.ActionRow(select))
+
+    layout.add_item(ui.Container(*header_parts, accent_color=color_primary()))
     return layout
 
 async def main_menu_callback(interaction: discord.Interaction):
     v = interaction.data["values"][0]
     routes = {
-        "identity":    lambda: interaction.response.send_message(view=identity_view(), ephemeral=True),
-        "captcha":     lambda: interaction.response.send_message(view=captcha_view(), ephemeral=True),
-        "age18":       lambda: interaction.response.send_message(view=age_view(), ephemeral=True),
-        "welcome":     lambda: interaction.response.send_message(view=welcome_view(), ephemeral=True),
-        "voice":       lambda: interaction.response.send_message(view=voice_view(), ephemeral=True),
-        "admin":       lambda: interaction.response.send_message(view=admin_view(), ephemeral=True),
-        "painel_fixo": lambda: interaction.response.send_message(view=painel_fixo_view(), ephemeral=True),
-        "tickets":     lambda: interaction.response.send_message(view=tickets_view(), ephemeral=True),
-        "feedback":    lambda: interaction.response.send_message(view=feedback_view(), ephemeral=True),
-        "suggestions": lambda: interaction.response.send_message(view=suggestions_view(), ephemeral=True),
-        "events":      lambda: interaction.response.send_modal(EventModal()),
-        "reminder":    lambda: interaction.response.send_modal(ReminderModal()),
-        "show_config": lambda: interaction.response.send_message(view=show_config_view(), ephemeral=True),
+        "identity":     lambda: interaction.response.send_message(view=identity_view(), ephemeral=True),
+        "captcha":      lambda: interaction.response.send_message(view=captcha_view(), ephemeral=True),
+        "age18":        lambda: interaction.response.send_message(view=age_view(), ephemeral=True),
+        "welcome":      lambda: interaction.response.send_message(view=welcome_view(), ephemeral=True),
+        "voice":        lambda: interaction.response.send_message(view=voice_view(), ephemeral=True),
+        "admin":        lambda: interaction.response.send_message(view=admin_view(), ephemeral=True),
+        "painel_fixo":  lambda: interaction.response.send_message(view=painel_fixo_view(), ephemeral=True),
+        "tickets":      lambda: interaction.response.send_message(view=tickets_view(), ephemeral=True),
+        "feedback":     lambda: interaction.response.send_message(view=feedback_view(), ephemeral=True),
+        "suggestions":  lambda: interaction.response.send_message(view=suggestions_view(), ephemeral=True),
+        "events":       lambda: interaction.response.send_modal(EventModal()),
+        "reminder":     lambda: interaction.response.send_modal(ReminderModal()),
+        "chat_cleanup": lambda: interaction.response.send_message(view=chat_cleanup_view(), ephemeral=True),
+        "show_config":  lambda: interaction.response.send_message(view=show_config_view(), ephemeral=True),
     }
     fn = routes.get(v)
     if fn: await fn()
@@ -522,6 +521,104 @@ def suggestions_view():
     ))
     return layout
 
+# ---------- 🧹 LIMPEZA DE CHAT (NOVO!) ----------
+def chat_cleanup_view():
+    layout = ui.LayoutView(timeout=300)
+
+    channel_select = ui.Select(
+        placeholder="🧹 Escolha o canal para apagar TODAS as mensagens...",
+        options=text_channel_options(),
+        custom_id="cleanup_channel_select",
+    )
+
+    async def on_select(interaction: discord.Interaction):
+        val = channel_select.values[0]
+        if val == "none":
+            await interaction.response.send_message("❌ Nenhum canal disponível.", ephemeral=True)
+            return
+
+        channel = interaction.guild.get_channel(int(val))
+        if not channel or not isinstance(channel, discord.TextChannel):
+            await interaction.response.send_message("❌ Canal inválido.", ephemeral=True)
+            return
+
+        # Confere permissões
+        me = interaction.guild.me
+        if not channel.permissions_for(me).manage_messages:
+            await interaction.response.send_message(
+                f"❌ Não tenho permissão de **Gerenciar Mensagens** em {channel.mention}.",
+                ephemeral=True
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        total_apagadas = 0
+        erros = 0
+        try:
+            while True:
+                try:
+                    deleted = await channel.purge(limit=100, check=lambda m: True, bulk=True)
+                except discord.HTTPException:
+                    # Fallback para mensagens antigas
+                    deleted = await channel.purge(limit=100, check=lambda m: True, bulk=False)
+                if not deleted:
+                    break
+                total_apagadas += len(deleted)
+                await asyncio.sleep(0.5)  # evita rate limit
+        except discord.Forbidden:
+            await interaction.followup.send(
+                f"❌ Permissão negada durante a limpeza. Apagadas: **{total_apagadas}**.",
+                ephemeral=True
+            )
+            return
+        except Exception as e:
+            logger.error(f"Erro limpeza: {e}", exc_info=True)
+            await interaction.followup.send(
+                f"⚠️ Erro após apagar **{total_apagadas}** mensagens: `{e}`",
+                ephemeral=True
+            )
+            return
+
+        # Log opcional
+        log_id = config.get("moderation_logs_channel_id")
+        if log_id:
+            log_ch = interaction.guild.get_channel(log_id)
+            if log_ch:
+                try:
+                    await log_ch.send(
+                        f"🧹 **Limpeza de Chat** — {channel.mention}\n"
+                        f"• Executado por: {interaction.user.mention}\n"
+                        f"• Mensagens apagadas: **{total_apagadas}**"
+                    )
+                except Exception:
+                    pass
+
+        await interaction.followup.send(
+            f"✅ **Limpeza concluída!**\n"
+            f"• Canal: {channel.mention}\n"
+            f"• Mensagens apagadas: **{total_apagadas}**",
+            ephemeral=True
+        )
+
+    channel_select.callback = on_select
+
+    layout.add_item(ui.Container(
+        ui.TextDisplay("# 🧹 Limpeza de Chat"),
+        ui.TextDisplay(
+            "Selecione um canal abaixo para **apagar TODAS as mensagens** (antigas ou recentes).\n\n"
+            "⚠️ **Ação irreversível!** O bot precisa da permissão **Gerenciar Mensagens** no canal escolhido."
+        ),
+        ui.Separator(),
+        ui.ActionRow(channel_select),
+        ui.Separator(),
+        ui.ActionRow(
+            ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main"),
+        ),
+        accent_color=color_danger(),
+    ))
+    return layout
+
 # ---------- SHOW CONFIG ----------
 def show_config_view():
     layout = ui.LayoutView(timeout=300)
@@ -598,7 +695,6 @@ def multi_role_view(key, title, current_ids):
             if r: selected.append(r)
         except Exception: pass
 
-    row = ui.ActionRow()
     role_select = ui.RoleSelect(
         placeholder=f"Selecione cargos (múltiplos) — {title}",
         min_values=0,
@@ -619,13 +715,12 @@ def multi_role_view(key, title, current_ids):
             await interaction.response.send_message(f"✅ **{title}:** nenhum cargo definido.", ephemeral=True)
 
     role_select.callback = on_role_select
-    row.add_item(role_select)
 
     layout.add_item(ui.Container(
         ui.TextDisplay(f"# 👑 {title}"),
         ui.TextDisplay("Selecione um ou mais cargos. Depois de escolher, clique fora do menu para confirmar."),
         ui.Separator(),
-        row,
+        ui.ActionRow(role_select),
         accent_color=color_primary(),
     ))
     return layout
@@ -636,7 +731,6 @@ def multi_role_selector_options(key, title):
 def single_channel_view(key, title):
     layout = ui.LayoutView(timeout=180)
     opts = text_channel_options()
-    row = ui.ActionRow()
     sel = ui.Select(placeholder=title, options=opts)
     async def cb(interaction):
         val = sel.values[0]
@@ -645,11 +739,10 @@ def single_channel_view(key, title):
         config[key] = int(val); save_config(config)
         await interaction.response.send_message(f"✅ **{title}:** <#{val}>", ephemeral=True)
     sel.callback = cb
-    row.add_item(sel)
     layout.add_item(ui.Container(
         ui.TextDisplay(f"# 📌 {title}"),
         ui.Separator(),
-        row,
+        ui.ActionRow(sel),
         accent_color=color_primary(),
     ))
     return layout
@@ -657,7 +750,6 @@ def single_channel_view(key, title):
 def single_voice_view(key, title):
     layout = ui.LayoutView(timeout=180)
     opts = voice_channel_options()
-    row = ui.ActionRow()
     sel = ui.Select(placeholder=title, options=opts)
     async def cb(interaction):
         val = sel.values[0]
@@ -675,11 +767,10 @@ def single_voice_view(key, title):
             except Exception: pass
         await interaction.response.send_message(f"✅ **{title}:** {channel.name if channel else val}", ephemeral=True)
     sel.callback = cb
-    row.add_item(sel)
     layout.add_item(ui.Container(
         ui.TextDisplay(f"# 🔊 {title}"),
         ui.Separator(),
-        row,
+        ui.ActionRow(sel),
         accent_color=color_primary(),
     ))
     return layout
@@ -687,7 +778,6 @@ def single_voice_view(key, title):
 def single_category_view(key, title):
     layout = ui.LayoutView(timeout=180)
     opts = category_options()
-    row = ui.ActionRow()
     sel = ui.Select(placeholder=title, options=opts)
     async def cb(interaction):
         val = sel.values[0]
@@ -696,11 +786,10 @@ def single_category_view(key, title):
         config[key] = int(val); save_config(config)
         await interaction.response.send_message(f"✅ **{title}** definida.", ephemeral=True)
     sel.callback = cb
-    row.add_item(sel)
     layout.add_item(ui.Container(
         ui.TextDisplay(f"# 📂 {title}"),
         ui.Separator(),
-        row,
+        ui.ActionRow(sel),
         accent_color=color_primary(),
     ))
     return layout
@@ -713,7 +802,7 @@ async def on_interaction(interaction: discord.Interaction):
     cid = interaction.data.get("custom_id", "")
     if not cid:
         return
-    if cid in ("pxk_main_menu",):
+    if cid in ("pxk_main_menu", "cleanup_channel_select"):
         return
 
     try:
@@ -867,7 +956,6 @@ async def on_interaction(interaction: discord.Interaction):
 # ===================== STATUS VIEW =====================
 def status_view():
     layout = ui.LayoutView(timeout=180)
-    row = ui.ActionRow()
     sel = ui.Select(placeholder="Escolha o status", options=[
         discord.SelectOption(label="Online", value="online", emoji="🟢"),
         discord.SelectOption(label="Ausente", value="idle", emoji="🟡"),
@@ -879,11 +967,10 @@ def status_view():
         await update_status()
         await interaction.response.send_message(f"✅ Status: **{sel.values[0]}**", ephemeral=True)
     sel.callback = cb
-    row.add_item(sel)
     layout.add_item(ui.Container(
         ui.TextDisplay("# 🎭 Status do Bot"),
         ui.Separator(),
-        row,
+        ui.ActionRow(sel),
         accent_color=color_primary(),
     ))
     return layout
@@ -1416,6 +1503,28 @@ async def cmd_rev(interaction, membro: discord.Member):
         ch = interaction.guild.get_channel(ch_id)
         if ch: await iniciar_verificacao_idade(membro, ch)
     await interaction.response.send_message(f"✅ {membro.mention} colocado para reverificar.", ephemeral=True)
+
+@bot.tree.command(name="limparchat", description="🧹 Apaga TODAS as mensagens de um canal")
+@app_commands.default_permissions(administrator=True)
+@app_commands.describe(canal="Canal que será totalmente limpo")
+async def cmd_limpar(interaction: discord.Interaction, canal: discord.TextChannel):
+    if not canal.permissions_for(interaction.guild.me).manage_messages:
+        await interaction.response.send_message(f"❌ Sem permissão em {canal.mention}.", ephemeral=True); return
+    await interaction.response.defer(ephemeral=True)
+    total = 0
+    try:
+        while True:
+            try:
+                deleted = await canal.purge(limit=100, check=lambda m: True, bulk=True)
+            except discord.HTTPException:
+                deleted = await canal.purge(limit=100, check=lambda m: True, bulk=False)
+            if not deleted:
+                break
+            total += len(deleted)
+            await asyncio.sleep(0.5)
+    except Exception as e:
+        await interaction.followup.send(f"⚠️ Erro após {total} mensagens: `{e}`", ephemeral=True); return
+    await interaction.followup.send(f"✅ **{total}** mensagens apagadas de {canal.mention}!", ephemeral=True)
 
 @bot.tree.command(name="mutar", description="🔇 Muta o bot na call")
 async def cmd_mutar(interaction):
