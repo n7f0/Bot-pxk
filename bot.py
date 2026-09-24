@@ -187,17 +187,6 @@ def calcular_idade(data_nasc):
     except ValueError:
         return None
 
-def role_options(include_none=False, max_items=25):
-    opts = []
-    if include_none:
-        opts.append(discord.SelectOption(label="Nenhum", value="none"))
-    guild = get_guild()
-    if guild:
-        for r in guild.roles:
-            if r.name != "@everyone" and not r.managed:
-                opts.append(discord.SelectOption(label=r.name[:100], value=str(r.id)))
-    return opts[:max_items] or [discord.SelectOption(label="Nenhum cargo", value="none")]
-
 def text_channel_options(max_items=25):
     guild = get_guild()
     opts = []
@@ -237,6 +226,21 @@ def _btn(label, cid, style=P, emoji=None):
 def _thumb():
     return avatar_url() or "https://cdn.discordapp.com/embed/avatars/0.png"
 
+# ✅ NOVO: builder seguro para MediaGallery (fallback se não existir na lib)
+def _safe_media_gallery(media_url):
+    """Retorna MediaGallery se a classe existir, senão None."""
+    if not media_url:
+        return None
+    MG  = getattr(ui, "MediaGallery", None) or getattr(discord, "MediaGallery", None)
+    MGI = getattr(ui, "MediaGalleryItem", None) or getattr(discord, "MediaGalleryItem", None)
+    if not MG or not MGI:
+        return None
+    try:
+        return MG(MGI(media=media_url))
+    except Exception as e:
+        logger.warning(f"MediaGallery indisponível: {e}")
+        return None
+
 def premium_submenu(title, description, sections, accent=None):
     layout = ui.LayoutView(timeout=300)
     comps = [
@@ -256,9 +260,8 @@ def premium_submenu(title, description, sections, accent=None):
     layout.add_item(ui.Container(*comps, accent_color=accent or color_primary()))
     return layout
 
-# ===================== CARDS PREMIUM DE MEMBRO / VOZ =====================
+# ===================== CARD DE MEMBRO / VOZ =====================
 async def _fetch_banner_url(user_id: int):
-    """Tenta obter o banner do usuário."""
     try:
         user = await bot.fetch_user(user_id)
         if user and user.banner:
@@ -271,17 +274,13 @@ def _build_member_card(
     member: discord.Member,
     title: str,
     subtitle: str,
-    action: str,          # "join", "leave", "vjoin", "vleave"
+    action: str,
     accent: int,
     banner_url: str = None,
     extra_lines: list = None,
     voice_channel: discord.abc.GuildChannel = None,
-    old_voice_channel: discord.abc.GuildChannel = None,
 ):
-    """Constrói o LayoutView V2 premium para eventos de membro/voz."""
     now_ts = int(datetime.datetime.now().timestamp())
-
-    # Avatar grande como imagem principal
     avatar = member.display_avatar.with_size(512).url
 
     comps = [
@@ -295,31 +294,32 @@ def _build_member_card(
         ),
     ]
 
-    # Banner (se existir) — mostra foto detalhada
+    # Banner via MediaGallery (só se a lib suportar)
     if banner_url:
-        comps.append(ui.MediaGallery(ui.MediaGalleryItem(media=banner_url)))
+        mg = _safe_media_gallery(banner_url)
+        if mg is not None:
+            comps.append(mg)
 
     comps.append(ui.Separator(spacing=discord.SeparatorSpacing.small))
 
-    # Informações detalhadas
-    info = []
-    info.append(f"**👤 Usuário:** {member.mention}")
-    info.append(f"**🏷️ Nome:** `{member.name}`")
-    info.append(f"**🆔 ID:** `{member.id}`")
-    info.append(f"**📅 Conta criada:** <t:{int(member.created_at.timestamp())}:R>")
+    info = [
+        f"**👤 Usuário:** {member.mention}",
+        f"**🏷️ Nome:** `{member.name}`",
+        f"**🆔 ID:** `{member.id}`",
+        f"**📅 Conta criada:** <t:{int(member.created_at.timestamp())}:R>",
+    ]
 
     if action == "join":
         info.append(f"**👥 Membro nº:** `{member.guild.member_count}`")
     elif action == "leave":
         if member.joined_at:
             delta = datetime.datetime.now(datetime.timezone.utc) - member.joined_at
-            dias = delta.days
             info.append(f"**📥 Entrou em:** <t:{int(member.joined_at.timestamp())}:R>")
-            info.append(f"**⏳ Tempo no servidor:** `{dias} dias`")
+            info.append(f"**⏳ Tempo no servidor:** `{delta.days} dias`")
         info.append(f"**👥 Restam:** `{member.guild.member_count} membros`")
     elif action == "vjoin":
         info.append(f"**🔊 Canal:** {voice_channel.mention if voice_channel else '—'}")
-        info.append(f"**👥 Pessoas no canal:** `{len(voice_channel.members) if voice_channel else 0}`")
+        info.append(f"**👥 No canal:** `{len(voice_channel.members) if voice_channel else 0}`")
     elif action == "vleave":
         info.append(f"**🔊 Canal:** {voice_channel.mention if voice_channel else '—'}")
         info.append(f"**📤 Saiu às:** <t:{now_ts}:T>")
@@ -328,7 +328,6 @@ def _build_member_card(
         info.extend(extra_lines)
 
     comps.append(ui.TextDisplay("\n".join(info)))
-
     comps.append(ui.Separator(spacing=discord.SeparatorSpacing.small))
     comps.append(ui.TextDisplay(subtitle))
     comps.append(ui.TextDisplay(f"-# {bfooter()} • <t:{now_ts}:f>"))
@@ -337,7 +336,7 @@ def _build_member_card(
     layout.add_item(ui.Container(*comps, accent_color=accent))
     return layout
 
-# ===================== ENVIO DE LOGS DE MEMBRO / VOZ =====================
+# ===================== ENVIO DE LOGS =====================
 async def send_welcome_message(member: discord.Member):
     cid = config.get("welcome_channel_id")
     if not cid: return
@@ -383,9 +382,6 @@ async def send_leave_message(member: discord.Member):
         logger.error(f"Erro leave: {e}")
 
 async def send_voice_log(member: discord.Member, channel: discord.abc.GuildChannel, action: str):
-    """
-    action: "join" | "leave"
-    """
     if action == "join":
         cid = config.get("voice_join_log_channel_id")
         title = f"🔊 {member.display_name} entrou na call"
@@ -506,7 +502,6 @@ async def main_menu_callback(interaction: discord.Interaction):
     if fn: await fn()
 
 # ===================== SUBMENUS =====================
-
 def identity_view():
     return premium_submenu(
         "🎨 Identidade Visual",
@@ -584,12 +579,10 @@ def age_view():
         accent=color_secondary(),
     )
 
-# ---------- 💌 BOAS-VINDAS & SAÍDA ----------
 def welcome_view():
     return premium_submenu(
         "💌 Boas-vindas & Saída",
-        "Configure as mensagens premium de **entrada** e **saída** do servidor.\n"
-        "-# Os cards mostram avatar, banner, ID, idade da conta e muito mais.",
+        "Configure as mensagens premium de **entrada** e **saída** do servidor.",
         [
             {"title": "🎉 Entrada no Servidor", "rows": [
                 [
@@ -603,11 +596,11 @@ def welcome_view():
             ]},
             {"title": "👋 Saída do Servidor", "rows": [
                 [
-                    _btn("Canal de Saída",       "lev_ch",  P, "📢"),
-                    _btn("Mensagem de Saída",    "lev_msg", P, "✏️"),
+                    _btn("Canal de Saída",    "lev_ch",  P, "📢"),
+                    _btn("Mensagem de Saída", "lev_msg", P, "✏️"),
                 ],
                 [
-                    _btn("Testar Saída",         "lev_test", SU, "🧪"),
+                    _btn("Testar Saída",      "lev_test", SU, "🧪"),
                 ],
             ]},
             {"title": "🎯 Personalização", "rows": [[
@@ -617,20 +610,18 @@ def welcome_view():
         accent=color_primary(),
     )
 
-# ---------- 🎙️ LOGS DE VOZ ----------
 def voicelogs_view():
     return premium_submenu(
         "🎙️ Logs de Voz",
-        "Escolha canais separados para registrar **quem entra** e **quem sai** das calls.\n"
-        "-# Cada log mostra avatar, banner, ID, canal e horário.",
+        "Escolha canais separados para registrar **quem entra** e **quem sai** das calls.",
         [
             {"title": "🔊 Entrada na Call", "rows": [[
-                _btn("Canal de Log — Entrou", "vl_join_ch", P, "🔊"),
+                _btn("Canal de Log — Entrou", "vl_join_ch",   P, "🔊"),
                 _btn("Testar Entrada",        "vl_join_test", SU, "🧪"),
             ]]},
             {"title": "🔇 Saída da Call", "rows": [[
-                _btn("Canal de Log — Saiu",   "vl_leave_ch",  P, "🔇"),
-                _btn("Testar Saída",          "vl_leave_test", SU, "🧪"),
+                _btn("Canal de Log — Saiu", "vl_leave_ch",   P, "🔇"),
+                _btn("Testar Saída",        "vl_leave_test", SU, "🧪"),
             ]]},
         ],
         accent=color_secondary(),
@@ -722,30 +713,22 @@ def suggestions_view():
         accent=color_primary(),
     )
 
-# ---------- 🧹 LIMPEZA DE CHAT ----------
 async def on_cleanup_select(interaction: discord.Interaction):
     val = interaction.data["values"][0]
     if val == "none":
         await interaction.response.send_message("❌ Nenhum canal disponível.", ephemeral=True)
         return
-
     channel = interaction.guild.get_channel(int(val))
     if not channel or not isinstance(channel, discord.TextChannel):
-        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True)
-        return
-
-    me = interaction.guild.me
-    perms = channel.permissions_for(me)
+        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
+    perms = channel.permissions_for(interaction.guild.me)
     if not perms.manage_messages or not perms.read_message_history:
         await interaction.response.send_message(
             f"❌ Preciso de **Gerenciar Mensagens** e **Ler Histórico** em {channel.mention}.",
             ephemeral=True
-        )
-        return
-
+        ); return
     await interaction.response.defer(ephemeral=True)
     total, erro = await perform_chat_cleanup(channel, interaction.guild)
-
     log_id = config.get("moderation_logs_channel_id")
     if log_id:
         log_ch = interaction.guild.get_channel(log_id)
@@ -756,9 +739,7 @@ async def on_cleanup_select(interaction: discord.Interaction):
                     f"• Executado por: {interaction.user.mention}\n"
                     f"• Mensagens apagadas: **{total}**"
                 )
-            except Exception:
-                pass
-
+            except Exception: pass
     if erro:
         await interaction.followup.send(
             f"⚠️ Limpeza concluída com avisos.\n• Canal: {channel.mention}\n• Apagadas: **{total}**\n• Erro: `{erro}`",
@@ -778,7 +759,6 @@ def chat_cleanup_view():
         custom_id="cleanup_channel_select",
     )
     channel_select.callback = on_cleanup_select
-
     layout.add_item(ui.Container(
         ui.TextDisplay("# 🧹 Limpeza de Chat"),
         ui.Section(
@@ -799,12 +779,10 @@ def chat_cleanup_view():
 
 def show_config_view():
     layout = ui.LayoutView(timeout=300)
-
     def role_list(key):
         ids = config.get(key, [])
         if not ids: return "—"
         return ", ".join(f"<@&{r}>" for r in ids)
-
     def ch(key):
         cid = config.get(key)
         return f"<#{cid}>" if cid else "—"
@@ -877,13 +855,11 @@ def multi_role_view(key, title, current_ids):
             r = get_guild().get_role(rid)
             if r: selected.append(r)
         except Exception: pass
-
     role_select = ui.RoleSelect(
         placeholder=f"Selecione cargos (múltiplos)",
         min_values=0, max_values=25,
         default_values=selected if selected else None,
     )
-
     async def on_role_select(interaction: discord.Interaction):
         ids = [int(r.id) for r in role_select.values]
         config[key] = ids
@@ -895,9 +871,7 @@ def multi_role_view(key, title, current_ids):
             )
         else:
             await interaction.response.send_message(f"✅ **{title}:** nenhum cargo definido.", ephemeral=True)
-
     role_select.callback = on_role_select
-
     layout.add_item(ui.Container(
         ui.TextDisplay(f"# 👑 {title}"),
         ui.Section(
@@ -1213,7 +1187,6 @@ async def perform_chat_cleanup(channel: discord.TextChannel, guild: discord.Guil
     erro = None
     cutoff = discord.utils.utcnow() - datetime.timedelta(days=13)
 
-    # Fase 1: bulk delete < 14 dias
     try:
         while True:
             try:
@@ -1228,7 +1201,6 @@ async def perform_chat_cleanup(channel: discord.TextChannel, guild: discord.Guil
     except Exception as e:
         logger.error(f"Erro fase 1: {e}", exc_info=True)
 
-    # Fase 2: delete individual para antigas
     erros_consecutivos = 0
     try:
         async for msg in channel.history(limit=None, before=cutoff, oldest_first=False):
@@ -1945,13 +1917,11 @@ async def on_member_join(member):
     if member.bot: return
     guild = member.guild
 
-    # ---- Card premium de boas-vindas ----
     try:
         await send_welcome_message(member)
     except Exception as e:
         logger.error(f"Erro send_welcome: {e}")
 
-    # ---- Sistema de idade (inalterado) ----
     if config.get("age_verification_enabled", False):
         if any(r.id in config.get("age_verified_role_ids", []) for r in member.roles):
             return
@@ -2004,7 +1974,6 @@ async def on_member_join(member):
 @bot.event
 async def on_member_remove(member):
     if member.bot: return
-    # ---- Card premium de saída ----
     try:
         await send_leave_message(member)
     except Exception as e:
@@ -2016,13 +1985,11 @@ async def on_member_remove(member):
 async def on_voice_state_update(member, before, after):
     if member.bot: return
 
-    # Entrou em call (não estava em nenhuma, agora está)
     if before.channel is None and after.channel is not None:
         try:
             await send_voice_log(member, after.channel, "join")
         except Exception as e:
             logger.error(f"Erro voice join: {e}")
-    # Saiu de call (estava em uma, agora não está em nenhuma)
     elif before.channel is not None and after.channel is None:
         try:
             await send_voice_log(member, before.channel, "leave")
