@@ -47,6 +47,11 @@ DEFAULT_CONFIG = {
     "welcome_channel_id": None,
     "welcome_message": "Bem-vindo(a) ao servidor!",
     "welcome_image_url": "",
+    "leave_channel_id": None,
+    "leave_message": "Até logo! Sentiremos sua falta. 💜",
+
+    "voice_join_log_channel_id": None,
+    "voice_leave_log_channel_id": None,
 
     "voice_channel_id": None,
     "voice_mute": True,
@@ -230,14 +235,9 @@ def _btn(label, cid, style=P, emoji=None):
     return ui.Button(label=label, style=style, custom_id=cid, emoji=emoji)
 
 def _thumb():
-    """Thumbnail padrão — avatar do bot se houver."""
     return avatar_url() or "https://cdn.discordapp.com/embed/avatars/0.png"
 
 def premium_submenu(title, description, sections, accent=None):
-    """
-    Constrói um submenu premium V2.
-    sections: [{"title": "**🏷️ Marca**", "rows": [[btn, btn], [btn]]}, ...]
-    """
     layout = ui.LayoutView(timeout=300)
     comps = [
         ui.TextDisplay(f"# {title}"),
@@ -246,24 +246,182 @@ def premium_submenu(title, description, sections, accent=None):
             accessory=ui.Thumbnail(media=_thumb()),
         ),
     ]
-
     for sec in sections:
         comps.append(ui.Separator(spacing=discord.SeparatorSpacing.small))
         comps.append(ui.TextDisplay(f"### {sec['title']}"))
         for row in sec["rows"]:
             comps.append(ui.ActionRow(*row))
-
     comps.append(ui.Separator(spacing=discord.SeparatorSpacing.large))
     comps.append(ui.ActionRow(_btn("Voltar ao Menu", "back_main", D, "↩️")))
-
     layout.add_item(ui.Container(*comps, accent_color=accent or color_primary()))
     return layout
 
-# ===================== PAINEL PRINCIPAL PREMIUM =====================
+# ===================== CARDS PREMIUM DE MEMBRO / VOZ =====================
+async def _fetch_banner_url(user_id: int):
+    """Tenta obter o banner do usuário."""
+    try:
+        user = await bot.fetch_user(user_id)
+        if user and user.banner:
+            return user.banner.url
+    except Exception:
+        pass
+    return None
+
+def _build_member_card(
+    member: discord.Member,
+    title: str,
+    subtitle: str,
+    action: str,          # "join", "leave", "vjoin", "vleave"
+    accent: int,
+    banner_url: str = None,
+    extra_lines: list = None,
+    voice_channel: discord.abc.GuildChannel = None,
+    old_voice_channel: discord.abc.GuildChannel = None,
+):
+    """Constrói o LayoutView V2 premium para eventos de membro/voz."""
+    now_ts = int(datetime.datetime.now().timestamp())
+
+    # Avatar grande como imagem principal
+    avatar = member.display_avatar.with_size(512).url
+
+    comps = [
+        ui.TextDisplay(f"# {title}"),
+        ui.Section(
+            ui.TextDisplay(
+                f"### {member.display_name}\n"
+                f"-# {member.mention}"
+            ),
+            accessory=ui.Thumbnail(media=avatar),
+        ),
+    ]
+
+    # Banner (se existir) — mostra foto detalhada
+    if banner_url:
+        comps.append(ui.MediaGallery(ui.MediaGalleryItem(media=banner_url)))
+
+    comps.append(ui.Separator(spacing=discord.SeparatorSpacing.small))
+
+    # Informações detalhadas
+    info = []
+    info.append(f"**👤 Usuário:** {member.mention}")
+    info.append(f"**🏷️ Nome:** `{member.name}`")
+    info.append(f"**🆔 ID:** `{member.id}`")
+    info.append(f"**📅 Conta criada:** <t:{int(member.created_at.timestamp())}:R>")
+
+    if action == "join":
+        info.append(f"**👥 Membro nº:** `{member.guild.member_count}`")
+    elif action == "leave":
+        if member.joined_at:
+            delta = datetime.datetime.now(datetime.timezone.utc) - member.joined_at
+            dias = delta.days
+            info.append(f"**📥 Entrou em:** <t:{int(member.joined_at.timestamp())}:R>")
+            info.append(f"**⏳ Tempo no servidor:** `{dias} dias`")
+        info.append(f"**👥 Restam:** `{member.guild.member_count} membros`")
+    elif action == "vjoin":
+        info.append(f"**🔊 Canal:** {voice_channel.mention if voice_channel else '—'}")
+        info.append(f"**👥 Pessoas no canal:** `{len(voice_channel.members) if voice_channel else 0}`")
+    elif action == "vleave":
+        info.append(f"**🔊 Canal:** {voice_channel.mention if voice_channel else '—'}")
+        info.append(f"**📤 Saiu às:** <t:{now_ts}:T>")
+
+    if extra_lines:
+        info.extend(extra_lines)
+
+    comps.append(ui.TextDisplay("\n".join(info)))
+
+    comps.append(ui.Separator(spacing=discord.SeparatorSpacing.small))
+    comps.append(ui.TextDisplay(subtitle))
+    comps.append(ui.TextDisplay(f"-# {bfooter()} • <t:{now_ts}:f>"))
+
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(*comps, accent_color=accent))
+    return layout
+
+# ===================== ENVIO DE LOGS DE MEMBRO / VOZ =====================
+async def send_welcome_message(member: discord.Member):
+    cid = config.get("welcome_channel_id")
+    if not cid: return
+    ch = member.guild.get_channel(cid)
+    if not ch: return
+
+    banner_url = banner_welcome() or await _fetch_banner_url(member.id)
+    subtitle = config.get("welcome_message") or "Bem-vindo(a)!"
+
+    card = _build_member_card(
+        member,
+        title=f"{bemoji()} Bem-vindo(a) à {bname()}!",
+        subtitle=f"> {subtitle}",
+        action="join",
+        accent=color_success(),
+        banner_url=banner_url,
+    )
+    try:
+        await ch.send(view=card)
+    except Exception as e:
+        logger.error(f"Erro welcome: {e}")
+
+async def send_leave_message(member: discord.Member):
+    cid = config.get("leave_channel_id")
+    if not cid: return
+    ch = member.guild.get_channel(cid)
+    if not ch: return
+
+    banner_url = await _fetch_banner_url(member.id)
+    subtitle = config.get("leave_message") or "Até logo! 💜"
+
+    card = _build_member_card(
+        member,
+        title=f"{bemoji()} Até logo, {member.display_name}!",
+        subtitle=f"> {subtitle}",
+        action="leave",
+        accent=color_danger(),
+        banner_url=banner_url,
+    )
+    try:
+        await ch.send(view=card)
+    except Exception as e:
+        logger.error(f"Erro leave: {e}")
+
+async def send_voice_log(member: discord.Member, channel: discord.abc.GuildChannel, action: str):
+    """
+    action: "join" | "leave"
+    """
+    if action == "join":
+        cid = config.get("voice_join_log_channel_id")
+        title = f"🔊 {member.display_name} entrou na call"
+        subtitle = f"> Entrou em **{channel.name}**"
+        accent = color_success()
+        act = "vjoin"
+    else:
+        cid = config.get("voice_leave_log_channel_id")
+        title = f"🔇 {member.display_name} saiu da call"
+        subtitle = f"> Saiu de **{channel.name}**"
+        accent = color_danger()
+        act = "vleave"
+
+    if not cid: return
+    log_ch = member.guild.get_channel(cid)
+    if not log_ch: return
+
+    banner_url = await _fetch_banner_url(member.id)
+    card = _build_member_card(
+        member,
+        title=title,
+        subtitle=subtitle,
+        action=act,
+        accent=accent,
+        banner_url=banner_url,
+        voice_channel=channel,
+    )
+    try:
+        await log_ch.send(view=card)
+    except Exception as e:
+        logger.error(f"Erro voice log: {e}")
+
+# ===================== PAINEL PRINCIPAL =====================
 def painel_layout():
     layout = ui.LayoutView(timeout=None)
 
-    # Header premium
     header = [
         ui.TextDisplay(f"# {bemoji()} {bname()} — Central de Controle"),
         ui.Section(
@@ -277,9 +435,8 @@ def painel_layout():
     ]
     layout.add_item(ui.Container(*header, accent_color=color_primary()))
 
-    # Container do menu
     select = ui.Select(
-        placeholder=f"🖤 Escolha uma categoria para configurar...",
+        placeholder="🖤 Escolha uma categoria para configurar...",
         options=[
             discord.SelectOption(label="Identidade Visual", value="identity", emoji="🎨",
                                  description="Nome, emoji, cores e banners"),
@@ -287,8 +444,10 @@ def painel_layout():
                                  description="Cargos e canais de verificação"),
             discord.SelectOption(label="Verificação +18", value="age18", emoji="🔞",
                                  description="Sistema de idade com cargos múltiplos"),
-            discord.SelectOption(label="Boas-vindas", value="welcome", emoji="💌",
-                                 description="Mensagem e imagem de boas-vindas"),
+            discord.SelectOption(label="Boas-vindas & Saída", value="welcome", emoji="💌",
+                                 description="Mensagens de entrada e saída"),
+            discord.SelectOption(label="Logs de Voz", value="voicelogs", emoji="🎙️",
+                                 description="Canais de entrada/saída da call"),
             discord.SelectOption(label="Voz & Status", value="voice", emoji="🔊",
                                  description="Canal 24h, mute e presença"),
             discord.SelectOption(label="Cargos de Admin", value="admin", emoji="👑",
@@ -331,6 +490,7 @@ async def main_menu_callback(interaction: discord.Interaction):
         "captcha":      lambda: interaction.response.send_message(view=captcha_view(), ephemeral=True),
         "age18":        lambda: interaction.response.send_message(view=age_view(), ephemeral=True),
         "welcome":      lambda: interaction.response.send_message(view=welcome_view(), ephemeral=True),
+        "voicelogs":    lambda: interaction.response.send_message(view=voicelogs_view(), ephemeral=True),
         "voice":        lambda: interaction.response.send_message(view=voice_view(), ephemeral=True),
         "admin":        lambda: interaction.response.send_message(view=admin_view(), ephemeral=True),
         "painel_fixo":  lambda: interaction.response.send_message(view=painel_fixo_view(), ephemeral=True),
@@ -345,9 +505,8 @@ async def main_menu_callback(interaction: discord.Interaction):
     fn = routes.get(v)
     if fn: await fn()
 
-# ===================== SUBMENUS PREMIUM =====================
+# ===================== SUBMENUS =====================
 
-# ---------- IDENTIDADE VISUAL ----------
 def identity_view():
     return premium_submenu(
         "🎨 Identidade Visual",
@@ -366,12 +525,12 @@ def identity_view():
             ]]},
             {"title": "🖼️ Imagens & Banners", "rows": [
                 [
-                    _btn("Avatar",            "id_avatar", S, "👤"),
-                    _btn("Banner Painel",     "id_bp",     S, "🎴"),
+                    _btn("Avatar",             "id_avatar", S, "👤"),
+                    _btn("Banner Painel",      "id_bp",     S, "🎴"),
                 ],
                 [
-                    _btn("Banner Ticket",     "id_bt",     S, "🎫"),
-                    _btn("Banner Boas-vindas","id_bw",     S, "💌"),
+                    _btn("Banner Ticket",      "id_bt",     S, "🎫"),
+                    _btn("Banner Boas-vindas", "id_bw",     S, "💌"),
                 ],
             ]},
             {"title": "⚙️ Ações", "rows": [[
@@ -382,7 +541,6 @@ def identity_view():
         accent=color_primary(),
     )
 
-# ---------- CAPTCHA ----------
 def captcha_view():
     return premium_submenu(
         "✅ Verificação Captcha",
@@ -399,7 +557,6 @@ def captcha_view():
         accent=color_secondary(),
     )
 
-# ---------- +18 ----------
 def age_view():
     return premium_submenu(
         "🔞 Verificação +18",
@@ -411,12 +568,12 @@ def age_view():
             ]]},
             {"title": "👑 Cargos por Categoria", "rows": [
                 [
-                    _btn("+18 (Maiores)",       "age_adult",  SU, "✅"),
-                    _btn("-18 (Menores)",       "age_under",  P,  "🔻"),
+                    _btn("+18 (Maiores)",      "age_adult",  SU, "✅"),
+                    _btn("-18 (Menores)",      "age_under",  P,  "🔻"),
                 ],
                 [
-                    _btn("Não Verificado",      "age_unver",  P, "⏳"),
-                    _btn("Verificação Nativa",  "age_native", P, "🛡️"),
+                    _btn("Não Verificado",     "age_unver",  P, "⏳"),
+                    _btn("Verificação Nativa", "age_native", P, "🛡️"),
                 ],
             ]},
             {"title": "📢 Canais", "rows": [[
@@ -427,17 +584,32 @@ def age_view():
         accent=color_secondary(),
     )
 
-# ---------- BOAS-VINDAS ----------
+# ---------- 💌 BOAS-VINDAS & SAÍDA ----------
 def welcome_view():
     return premium_submenu(
-        "💌 Boas-vindas",
-        "Configure a mensagem, imagem e canal usados para receber novos membros.",
+        "💌 Boas-vindas & Saída",
+        "Configure as mensagens premium de **entrada** e **saída** do servidor.\n"
+        "-# Os cards mostram avatar, banner, ID, idade da conta e muito mais.",
         [
-            {"title": "📝 Configuração Padrão", "rows": [[
-                _btn("Mensagem Padrão", "wel_msg", P, "✏️"),
-                _btn("Imagem Padrão",   "wel_img", P, "🖼️"),
-                _btn("Canal",           "wel_ch",  P, "📢"),
-            ]]},
+            {"title": "🎉 Entrada no Servidor", "rows": [
+                [
+                    _btn("Canal de Boas-vindas", "wel_ch",  P, "📢"),
+                    _btn("Mensagem de Entrada",  "wel_msg", P, "✏️"),
+                ],
+                [
+                    _btn("Banner de Entrada",    "wel_img", S, "🖼️"),
+                    _btn("Testar Entrada",       "wel_test", SU, "🧪"),
+                ],
+            ]},
+            {"title": "👋 Saída do Servidor", "rows": [
+                [
+                    _btn("Canal de Saída",       "lev_ch",  P, "📢"),
+                    _btn("Mensagem de Saída",    "lev_msg", P, "✏️"),
+                ],
+                [
+                    _btn("Testar Saída",         "lev_test", SU, "🧪"),
+                ],
+            ]},
             {"title": "🎯 Personalização", "rows": [[
                 _btn("Personalizar por Usuário", "wel_user", S, "👤"),
             ]]},
@@ -445,7 +617,25 @@ def welcome_view():
         accent=color_primary(),
     )
 
-# ---------- VOZ & STATUS ----------
+# ---------- 🎙️ LOGS DE VOZ ----------
+def voicelogs_view():
+    return premium_submenu(
+        "🎙️ Logs de Voz",
+        "Escolha canais separados para registrar **quem entra** e **quem sai** das calls.\n"
+        "-# Cada log mostra avatar, banner, ID, canal e horário.",
+        [
+            {"title": "🔊 Entrada na Call", "rows": [[
+                _btn("Canal de Log — Entrou", "vl_join_ch", P, "🔊"),
+                _btn("Testar Entrada",        "vl_join_test", SU, "🧪"),
+            ]]},
+            {"title": "🔇 Saída da Call", "rows": [[
+                _btn("Canal de Log — Saiu",   "vl_leave_ch",  P, "🔇"),
+                _btn("Testar Saída",          "vl_leave_test", SU, "🧪"),
+            ]]},
+        ],
+        accent=color_secondary(),
+    )
+
 def voice_view():
     return premium_submenu(
         "🔊 Voz & Status",
@@ -455,14 +645,13 @@ def voice_view():
                 _btn("Canal de Voz 24h", "v_ch", P, "🔊"),
             ]]},
             {"title": "🎭 Presença", "rows": [[
-                _btn("Mute na Call",    "v_mute",   P, "🔇"),
-                _btn("Status do Bot",   "v_status", P, "🎭"),
+                _btn("Mute na Call",   "v_mute",   P, "🔇"),
+                _btn("Status do Bot",  "v_status", P, "🎭"),
             ]]},
         ],
         accent=color_primary(),
     )
 
-# ---------- ADMIN ----------
 def admin_view():
     return premium_submenu(
         "👑 Cargos de Admin",
@@ -475,7 +664,6 @@ def admin_view():
         accent=color_primary(),
     )
 
-# ---------- PAINEL FIXO ----------
 def painel_fixo_view():
     return premium_submenu(
         "📌 Painel Fixo",
@@ -488,29 +676,27 @@ def painel_fixo_view():
         accent=color_primary(),
     )
 
-# ---------- TICKETS ----------
 def tickets_view():
     return premium_submenu(
         "🎫 Sistema de Tickets",
         "Configure categorias, cargos de suporte e canais de log.",
         [
             {"title": "📂 Categorias", "rows": [[
-                _btn("Dúvidas",  "tk_cat_d", P, "❓"),
-                _btn("Compras",  "tk_cat_p", P, "🛒"),
+                _btn("Dúvidas", "tk_cat_d", P, "❓"),
+                _btn("Compras", "tk_cat_p", P, "🛒"),
             ]]},
             {"title": "👥 Suporte & Logs", "rows": [[
                 _btn("Cargos de Suporte (múltiplos)", "tk_sup",  P, "👥"),
                 _btn("Logs de Tickets",               "tk_logs", P, "📝"),
             ]]},
             {"title": "📢 Canais", "rows": [[
-                _btn("Painel de Tickets",  "tk_panel", P, "🎫"),
-                _btn("Logs de Moderação",  "tk_mod",   P, "🛡️"),
+                _btn("Painel de Tickets", "tk_panel", P, "🎫"),
+                _btn("Logs de Moderação", "tk_mod",   P, "🛡️"),
             ]]},
         ],
         accent=color_primary(),
     )
 
-# ---------- FEEDBACK ----------
 def feedback_view():
     return premium_submenu(
         "⭐ Avaliações",
@@ -523,7 +709,6 @@ def feedback_view():
         accent=color_primary(),
     )
 
-# ---------- SUGESTÕES ----------
 def suggestions_view():
     return premium_submenu(
         "💡 Sugestões",
@@ -559,10 +744,8 @@ async def on_cleanup_select(interaction: discord.Interaction):
         return
 
     await interaction.response.defer(ephemeral=True)
-
     total, erro = await perform_chat_cleanup(channel, interaction.guild)
 
-    # Log
     log_id = config.get("moderation_logs_channel_id")
     if log_id:
         log_ch = interaction.guild.get_channel(log_id)
@@ -578,23 +761,17 @@ async def on_cleanup_select(interaction: discord.Interaction):
 
     if erro:
         await interaction.followup.send(
-            f"⚠️ Limpeza concluída com avisos.\n"
-            f"• Canal: {channel.mention}\n"
-            f"• Apagadas: **{total}**\n"
-            f"• Erro: `{erro}`",
+            f"⚠️ Limpeza concluída com avisos.\n• Canal: {channel.mention}\n• Apagadas: **{total}**\n• Erro: `{erro}`",
             ephemeral=True
         )
     else:
         await interaction.followup.send(
-            f"✅ **Limpeza concluída!**\n"
-            f"• Canal: {channel.mention}\n"
-            f"• Mensagens apagadas: **{total}**",
+            f"✅ **Limpeza concluída!**\n• Canal: {channel.mention}\n• Mensagens apagadas: **{total}**",
             ephemeral=True
         )
 
 def chat_cleanup_view():
     layout = ui.LayoutView(timeout=300)
-
     channel_select = ui.Select(
         placeholder="🧹 Escolha o canal para apagar TUDO...",
         options=text_channel_options(),
@@ -620,7 +797,6 @@ def chat_cleanup_view():
     ))
     return layout
 
-# ---------- SHOW CONFIG ----------
 def show_config_view():
     layout = ui.LayoutView(timeout=300)
 
@@ -652,11 +828,16 @@ def show_config_view():
         f"**Verif. Nativa:** {role_list('age_native_verification_role_ids')}",
         f"**Canal Verif:** {ch('age_verification_channel_id')}",
         "",
-        f"### 💌 Boas-vindas",
-        f"**Canal:** {ch('welcome_channel_id')}",
+        f"### 💌 Boas-vindas & Saída",
+        f"**Entrada:** {ch('welcome_channel_id')}",
+        f"**Saída:** {ch('leave_channel_id')}",
+        "",
+        f"### 🎙️ Logs de Voz",
+        f"**Entrou na Call:** {ch('voice_join_log_channel_id')}",
+        f"**Saiu da Call:** {ch('voice_leave_log_channel_id')}",
         "",
         f"### 🔊 Voz & Status",
-        f"**Canal:** {ch('voice_channel_id')}",
+        f"**Canal 24h:** {ch('voice_channel_id')}",
         f"**Mute:** `{config.get('voice_mute')}`  |  **Status:** `{config.get('bot_status')}`",
         "",
         f"### 🎫 Tickets",
@@ -690,7 +871,6 @@ def show_config_view():
 # ===================== VIEWS DE SELEÇÃO =====================
 def multi_role_view(key, title, current_ids):
     layout = ui.LayoutView(timeout=180)
-
     selected = []
     for rid in current_ids[:25]:
         try:
@@ -700,8 +880,7 @@ def multi_role_view(key, title, current_ids):
 
     role_select = ui.RoleSelect(
         placeholder=f"Selecione cargos (múltiplos)",
-        min_values=0,
-        max_values=25,
+        min_values=0, max_values=25,
         default_values=selected if selected else None,
     )
 
@@ -809,7 +988,6 @@ def single_category_view(key, title):
     ))
     return layout
 
-# ===================== STATUS VIEW =====================
 def status_view():
     layout = ui.LayoutView(timeout=180)
     sel = ui.Select(placeholder="Escolha o status de presença", options=[
@@ -907,15 +1085,51 @@ async def on_interaction(interaction: discord.Interaction):
         elif cid == "age_pch":
             await interaction.response.send_message(view=single_channel_view("age_panel_channel_id", "Canal do Painel de Idade"), ephemeral=True)
 
-        # ---------- BOAS-VINDAS ----------
+        # ---------- BOAS-VINDAS & SAÍDA ----------
+        elif cid == "wel_ch":
+            await interaction.response.send_message(view=single_channel_view("welcome_channel_id", "Canal de Boas-vindas"), ephemeral=True)
         elif cid == "wel_msg":
             await interaction.response.send_modal(WelcomeDefaultMessageModal())
         elif cid == "wel_img":
             await interaction.response.send_modal(URLModal("welcome_image_url", "URL da Imagem de Boas-vindas"))
-        elif cid == "wel_ch":
-            await interaction.response.send_message(view=single_channel_view("welcome_channel_id", "Canal de Boas-vindas"), ephemeral=True)
         elif cid == "wel_user":
             await interaction.response.send_message(view=WelcomeUserSelectView(), ephemeral=True)
+        elif cid == "wel_test":
+            await interaction.response.defer(ephemeral=True)
+            await send_welcome_message(interaction.user)
+            await interaction.followup.send("✅ Teste de boas-vindas enviado!", ephemeral=True)
+        elif cid == "lev_ch":
+            await interaction.response.send_message(view=single_channel_view("leave_channel_id", "Canal de Saída"), ephemeral=True)
+        elif cid == "lev_msg":
+            await interaction.response.send_modal(LeaveMessageModal())
+        elif cid == "lev_test":
+            await interaction.response.defer(ephemeral=True)
+            await send_leave_message(interaction.user)
+            await interaction.followup.send("✅ Teste de saída enviado!", ephemeral=True)
+
+        # ---------- LOGS DE VOZ ----------
+        elif cid == "vl_join_ch":
+            await interaction.response.send_message(view=single_channel_view("voice_join_log_channel_id", "Canal de Log — Entrou"), ephemeral=True)
+        elif cid == "vl_leave_ch":
+            await interaction.response.send_message(view=single_channel_view("voice_leave_log_channel_id", "Canal de Log — Saiu"), ephemeral=True)
+        elif cid == "vl_join_test":
+            await interaction.response.defer(ephemeral=True)
+            vc = interaction.guild.voice_client
+            fake_channel = vc.channel if vc and vc.channel else (interaction.guild.voice_channels[0] if interaction.guild.voice_channels else None)
+            if fake_channel:
+                await send_voice_log(interaction.user, fake_channel, "join")
+                await interaction.followup.send("✅ Teste de log de entrada enviado!", ephemeral=True)
+            else:
+                await interaction.followup.send("❌ Nenhum canal de voz disponível.", ephemeral=True)
+        elif cid == "vl_leave_test":
+            await interaction.response.defer(ephemeral=True)
+            vc = interaction.guild.voice_client
+            fake_channel = vc.channel if vc and vc.channel else (interaction.guild.voice_channels[0] if interaction.guild.voice_channels else None)
+            if fake_channel:
+                await send_voice_log(interaction.user, fake_channel, "leave")
+                await interaction.followup.send("✅ Teste de log de saída enviado!", ephemeral=True)
+            else:
+                await interaction.followup.send("❌ Nenhum canal de voz disponível.", ephemeral=True)
 
         # ---------- VOZ ----------
         elif cid == "v_mute":
@@ -962,7 +1176,6 @@ async def on_interaction(interaction: discord.Interaction):
 
         # ---------- VOLTAR ----------
         elif cid == "back_main":
-            # ✅ FIX: edita a view diretamente (sem view=None)
             await interaction.response.edit_message(view=painel_layout())
 
         # ---------- BOTÕES DE AÇÃO ----------
@@ -996,31 +1209,26 @@ async def on_interaction(interaction: discord.Interaction):
 
 # ===================== LIMPEZA DE CHAT — CORE =====================
 async def perform_chat_cleanup(channel: discord.TextChannel, guild: discord.Guild):
-    """
-    Limpa TODAS as mensagens de um canal, respeitando rate limits.
-    Retorna (total_apagadas, erro_ou_None).
-    """
     total = 0
     erro = None
-
     cutoff = discord.utils.utcnow() - datetime.timedelta(days=13)
 
-    # ---------- FASE 1: bulk delete para mensagens < 14 dias ----------
+    # Fase 1: bulk delete < 14 dias
     try:
         while True:
             try:
                 deleted = await channel.purge(limit=100, after=cutoff, bulk=True)
             except discord.HTTPException as e:
-                logger.warning(f"Bulk delete falhou (fase 1): {e}")
+                logger.warning(f"Bulk delete falhou: {e}")
                 break
             if not deleted:
                 break
             total += len(deleted)
-            await asyncio.sleep(1.0)  # evita 429 em loop
+            await asyncio.sleep(1.0)
     except Exception as e:
-        logger.error(f"Erro fase 1 limpeza: {e}", exc_info=True)
+        logger.error(f"Erro fase 1: {e}", exc_info=True)
 
-    # ---------- FASE 2: delete individual para mensagens antigas ----------
+    # Fase 2: delete individual para antigas
     erros_consecutivos = 0
     try:
         async for msg in channel.history(limit=None, before=cutoff, oldest_first=False):
@@ -1028,7 +1236,6 @@ async def perform_chat_cleanup(channel: discord.TextChannel, guild: discord.Guil
                 await msg.delete()
                 total += 1
                 erros_consecutivos = 0
-                # Discord limita ~5 deletes/5s por canal em rotas não-bulk
                 await asyncio.sleep(1.2)
             except discord.NotFound:
                 continue
@@ -1037,13 +1244,13 @@ async def perform_chat_cleanup(channel: discord.TextChannel, guild: discord.Guil
                 break
             except discord.HTTPException as e:
                 erros_consecutivos += 1
-                logger.warning(f"Erro delete individual: {e}")
+                logger.warning(f"Erro delete: {e}")
                 if erros_consecutivos >= 5:
-                    erro = f"muitos erros consecutivos: {e}"
+                    erro = f"muitos erros: {e}"
                     break
                 await asyncio.sleep(2.5)
     except Exception as e:
-        logger.error(f"Erro fase 2 limpeza: {e}", exc_info=True)
+        logger.error(f"Erro fase 2: {e}", exc_info=True)
         erro = str(e)
 
     return total, erro
@@ -1099,11 +1306,17 @@ class URLModal(ui.Modal):
         config[self.key] = val; save_config(config)
         await interaction.response.send_message("✅ URL salva!", ephemeral=True)
 
-class WelcomeDefaultMessageModal(ui.Modal, title="Mensagem Padrão de Boas-vindas"):
+class WelcomeDefaultMessageModal(ui.Modal, title="Mensagem de Boas-vindas"):
     msg = ui.TextInput(label="Nova mensagem", style=discord.TextStyle.paragraph, required=True)
     async def on_submit(self, interaction):
         config["welcome_message"] = self.msg.value; save_config(config)
-        await interaction.response.send_message("✅ Mensagem atualizada!", ephemeral=True)
+        await interaction.response.send_message("✅ Mensagem de entrada atualizada!", ephemeral=True)
+
+class LeaveMessageModal(ui.Modal, title="Mensagem de Saída"):
+    msg = ui.TextInput(label="Nova mensagem", style=discord.TextStyle.paragraph, required=True)
+    async def on_submit(self, interaction):
+        config["leave_message"] = self.msg.value; save_config(config)
+        await interaction.response.send_message("✅ Mensagem de saída atualizada!", ephemeral=True)
 
 class EventModal(ui.Modal, title="📅 Agendar Evento"):
     mensagem = ui.TextInput(label="Mensagem", style=discord.TextStyle.paragraph, required=True)
@@ -1584,10 +1797,8 @@ async def cmd_limpar(interaction: discord.Interaction, canal: discord.TextChanne
     perms = canal.permissions_for(interaction.guild.me)
     if not perms.manage_messages or not perms.read_message_history:
         await interaction.response.send_message(f"❌ Sem permissão em {canal.mention}.", ephemeral=True); return
-
     await interaction.response.defer(ephemeral=True)
     total, erro = await perform_chat_cleanup(canal, interaction.guild)
-
     if erro:
         await interaction.followup.send(f"⚠️ Erro após **{total}** mensagens: `{erro}`", ephemeral=True)
     else:
@@ -1733,6 +1944,14 @@ async def on_ready():
 async def on_member_join(member):
     if member.bot: return
     guild = member.guild
+
+    # ---- Card premium de boas-vindas ----
+    try:
+        await send_welcome_message(member)
+    except Exception as e:
+        logger.error(f"Erro send_welcome: {e}")
+
+    # ---- Sistema de idade (inalterado) ----
     if config.get("age_verification_enabled", False):
         if any(r.id in config.get("age_verified_role_ids", []) for r in member.roles):
             return
@@ -1778,13 +1997,37 @@ async def on_member_join(member):
             v.add_item(CaptchaButton(n1 + n2, guild.id, ch.id))
             try: await ch.send(embed=e, view=v)
             except Exception: pass
+
     await update_voice_name_impl()
     await update_status()
 
 @bot.event
 async def on_member_remove(member):
+    if member.bot: return
+    # ---- Card premium de saída ----
+    try:
+        await send_leave_message(member)
+    except Exception as e:
+        logger.error(f"Erro send_leave: {e}")
     await update_voice_name_impl()
     await update_status()
+
+@bot.event
+async def on_voice_state_update(member, before, after):
+    if member.bot: return
+
+    # Entrou em call (não estava em nenhuma, agora está)
+    if before.channel is None and after.channel is not None:
+        try:
+            await send_voice_log(member, after.channel, "join")
+        except Exception as e:
+            logger.error(f"Erro voice join: {e}")
+    # Saiu de call (estava em uma, agora não está em nenhuma)
+    elif before.channel is not None and after.channel is None:
+        try:
+            await send_voice_log(member, before.channel, "leave")
+        except Exception as e:
+            logger.error(f"Erro voice leave: {e}")
 
 @bot.event
 async def on_guild_join(guild):
