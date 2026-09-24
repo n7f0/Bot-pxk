@@ -221,63 +221,107 @@ def category_options():
     return opts[:25] or [discord.SelectOption(label="Nenhuma categoria", value="none")]
 
 # ===================== COMPONENTS V2 — HELPERS =====================
-def v2_container(*components, accent=None):
-    return ui.Container(*components, accent_color=accent or color_primary())
+P  = discord.ButtonStyle.primary
+S  = discord.ButtonStyle.secondary
+SU = discord.ButtonStyle.success
+D  = discord.ButtonStyle.danger
 
-def v2_title(text):
-    return ui.TextDisplay(text)
+def _btn(label, cid, style=P, emoji=None):
+    return ui.Button(label=label, style=style, custom_id=cid, emoji=emoji)
 
-def v2_sep(large=False, visible=True):
-    return ui.Separator(
-        spacing=discord.SeparatorSpacing.large if large else discord.SeparatorSpacing.small,
-        visible=visible
-    )
+def _thumb():
+    """Thumbnail padrão — avatar do bot se houver."""
+    return avatar_url() or "https://cdn.discordapp.com/embed/avatars/0.png"
 
-# ===================== PAINEL PRINCIPAL (MENU DENTRO DO CONTAINER) =====================
+def premium_submenu(title, description, sections, accent=None):
+    """
+    Constrói um submenu premium V2.
+    sections: [{"title": "**🏷️ Marca**", "rows": [[btn, btn], [btn]]}, ...]
+    """
+    layout = ui.LayoutView(timeout=300)
+    comps = [
+        ui.TextDisplay(f"# {title}"),
+        ui.Section(
+            ui.TextDisplay(description),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+    ]
+
+    for sec in sections:
+        comps.append(ui.Separator(spacing=discord.SeparatorSpacing.small))
+        comps.append(ui.TextDisplay(f"### {sec['title']}"))
+        for row in sec["rows"]:
+            comps.append(ui.ActionRow(*row))
+
+    comps.append(ui.Separator(spacing=discord.SeparatorSpacing.large))
+    comps.append(ui.ActionRow(_btn("Voltar ao Menu", "back_main", D, "↩️")))
+
+    layout.add_item(ui.Container(*comps, accent_color=accent or color_primary()))
+    return layout
+
+# ===================== PAINEL PRINCIPAL PREMIUM =====================
 def painel_layout():
     layout = ui.LayoutView(timeout=None)
 
-    header_parts = [
-        ui.TextDisplay(f"# {bemoji()} Painel Administrativo — {bname()}"),
-        ui.TextDisplay(
-            f"**Bem-vindo(a) ao centro de configurações do servidor {bname()}!**\n\n"
-            "Use o menu abaixo para navegar entre as categorias. 🖤💜"
+    # Header premium
+    header = [
+        ui.TextDisplay(f"# {bemoji()} {bname()} — Central de Controle"),
+        ui.Section(
+            ui.TextDisplay(
+                "### ✨ Painel Administrativo Premium\n"
+                "Gerencie **todo o seu servidor** em um só lugar.\n"
+                "-# Selecione uma categoria no menu abaixo para começar."
+            ),
+            accessory=ui.Thumbnail(media=_thumb()),
         ),
     ]
-    if avatar_url():
-        header_parts.append(ui.Section(
-            ui.TextDisplay("**Sistema de Administração**"),
-            accessory=ui.Thumbnail(media=avatar_url()),
-        ))
+    layout.add_item(ui.Container(*header, accent_color=color_primary()))
 
-    header_parts.append(ui.Separator(spacing=discord.SeparatorSpacing.small))
-
-    # ✅ MENU SELECT DENTRO DO CONTAINER (V2)
+    # Container do menu
     select = ui.Select(
-        placeholder=f"🖤 Configurações do {bname()}",
+        placeholder=f"🖤 Escolha uma categoria para configurar...",
         options=[
-            discord.SelectOption(label="Identidade Visual", value="identity", emoji="🎨"),
-            discord.SelectOption(label="Verificação Captcha", value="captcha", emoji="✅"),
-            discord.SelectOption(label="Verificação +18", value="age18", emoji="🔞"),
-            discord.SelectOption(label="Boas-vindas", value="welcome", emoji="💌"),
-            discord.SelectOption(label="Voz & Status", value="voice", emoji="🔊"),
-            discord.SelectOption(label="Cargos de Admin", value="admin", emoji="👑"),
-            discord.SelectOption(label="Painel Fixo", value="painel_fixo", emoji="📌"),
-            discord.SelectOption(label="Tickets", value="tickets", emoji="🎫"),
-            discord.SelectOption(label="Avaliações", value="feedback", emoji="⭐"),
-            discord.SelectOption(label="Sugestões", value="suggestions", emoji="💡"),
-            discord.SelectOption(label="Eventos", value="events", emoji="📅"),
-            discord.SelectOption(label="Lembretes", value="reminder", emoji="⏰"),
-            discord.SelectOption(label="🧹 Limpeza de Chat", value="chat_cleanup", emoji="🧹"),
-            discord.SelectOption(label="Ver Configuração Atual", value="show_config", emoji="📋"),
+            discord.SelectOption(label="Identidade Visual", value="identity", emoji="🎨",
+                                 description="Nome, emoji, cores e banners"),
+            discord.SelectOption(label="Verificação Captcha", value="captcha", emoji="✅",
+                                 description="Cargos e canais de verificação"),
+            discord.SelectOption(label="Verificação +18", value="age18", emoji="🔞",
+                                 description="Sistema de idade com cargos múltiplos"),
+            discord.SelectOption(label="Boas-vindas", value="welcome", emoji="💌",
+                                 description="Mensagem e imagem de boas-vindas"),
+            discord.SelectOption(label="Voz & Status", value="voice", emoji="🔊",
+                                 description="Canal 24h, mute e presença"),
+            discord.SelectOption(label="Cargos de Admin", value="admin", emoji="👑",
+                                 description="Quem pode usar este painel"),
+            discord.SelectOption(label="Painel Fixo", value="painel_fixo", emoji="📌",
+                                 description="Canal onde o painel fica fixado"),
+            discord.SelectOption(label="Tickets", value="tickets", emoji="🎫",
+                                 description="Categorias, suporte e logs"),
+            discord.SelectOption(label="Avaliações", value="feedback", emoji="⭐",
+                                 description="Canal de feedback dos tickets"),
+            discord.SelectOption(label="Sugestões", value="suggestions", emoji="💡",
+                                 description="Painel e canal de sugestões"),
+            discord.SelectOption(label="Eventos", value="events", emoji="📅",
+                                 description="Agendar mensagens automáticas"),
+            discord.SelectOption(label="Lembretes", value="reminder", emoji="⏰",
+                                 description="Criar lembretes pessoais"),
+            discord.SelectOption(label="Limpeza de Chat", value="chat_cleanup", emoji="🧹",
+                                 description="Apagar TODAS as mensagens de um canal"),
+            discord.SelectOption(label="Ver Configuração Atual", value="show_config", emoji="📋",
+                                 description="Visualizar tudo que está configurado"),
         ],
         custom_id="pxk_main_menu",
     )
     select.callback = main_menu_callback
 
-    header_parts.append(ui.ActionRow(select))
+    layout.add_item(ui.Container(
+        ui.TextDisplay("## 🗂️ Categorias Disponíveis"),
+        ui.TextDisplay("-# Cada categoria abre um submenu com botões organizados por função."),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(select),
+        accent_color=color_secondary(),
+    ))
 
-    layout.add_item(ui.Container(*header_parts, accent_color=color_primary()))
     return layout
 
 async def main_menu_callback(interaction: discord.Interaction):
@@ -301,320 +345,277 @@ async def main_menu_callback(interaction: discord.Interaction):
     fn = routes.get(v)
     if fn: await fn()
 
-# ===================== VIEWS V2 — SUBMENUS =====================
+# ===================== SUBMENUS PREMIUM =====================
 
 # ---------- IDENTIDADE VISUAL ----------
 def identity_view():
-    layout = ui.LayoutView(timeout=300)
-    layout.add_item(ui.Container(
-        ui.TextDisplay("# 🎨 Identidade Visual"),
-        ui.TextDisplay("Configure nome, emoji, cores, avatar e banners."),
-        ui.Separator(),
-        ui.ActionRow(
-            ui.Button(label="Nome", style=discord.ButtonStyle.primary, custom_id="id_name"),
-            ui.Button(label="Emoji", style=discord.ButtonStyle.primary, custom_id="id_emoji"),
-            ui.Button(label="Rodapé", style=discord.ButtonStyle.primary, custom_id="id_footer"),
-        ),
-        ui.ActionRow(
-            ui.Button(label="Cor Primária", style=discord.ButtonStyle.primary, custom_id="id_c1"),
-            ui.Button(label="Cor Secundária", style=discord.ButtonStyle.primary, custom_id="id_c2"),
-            ui.Button(label="Cor Sucesso", style=discord.ButtonStyle.success, custom_id="id_c3"),
-            ui.Button(label="Cor Perigo", style=discord.ButtonStyle.danger, custom_id="id_c4"),
-        ),
-        ui.ActionRow(
-            ui.Button(label="Avatar (URL)", style=discord.ButtonStyle.secondary, custom_id="id_avatar"),
-            ui.Button(label="Banner Painel", style=discord.ButtonStyle.secondary, custom_id="id_bp"),
-            ui.Button(label="Banner Ticket", style=discord.ButtonStyle.secondary, custom_id="id_bt"),
-            ui.Button(label="Banner Boas-vindas", style=discord.ButtonStyle.secondary, custom_id="id_bw"),
-        ),
-        ui.ActionRow(
-            ui.Button(label="Aplicar Avatar", style=discord.ButtonStyle.success, custom_id="id_apply"),
-            ui.Button(label="Pré-visualizar", style=discord.ButtonStyle.secondary, custom_id="id_preview"),
-            ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main"),
-        ),
-        accent_color=color_primary(),
-    ))
-    return layout
+    return premium_submenu(
+        "🎨 Identidade Visual",
+        "Personalize o nome, emoji, cores e imagens que aparecem em **todo o bot**.",
+        [
+            {"title": "🏷️ Marca", "rows": [[
+                _btn("Nome",   "id_name",   P, "✏️"),
+                _btn("Emoji",  "id_emoji",  P, "✨"),
+                _btn("Rodapé", "id_footer", P, "📝"),
+            ]]},
+            {"title": "🎨 Paleta de Cores", "rows": [[
+                _btn("Primária",   "id_c1", P,  "🟣"),
+                _btn("Secundária", "id_c2", P,  "💜"),
+                _btn("Sucesso",    "id_c3", SU, "🟢"),
+                _btn("Perigo",     "id_c4", D,  "🔴"),
+            ]]},
+            {"title": "🖼️ Imagens & Banners", "rows": [
+                [
+                    _btn("Avatar",            "id_avatar", S, "👤"),
+                    _btn("Banner Painel",     "id_bp",     S, "🎴"),
+                ],
+                [
+                    _btn("Banner Ticket",     "id_bt",     S, "🎫"),
+                    _btn("Banner Boas-vindas","id_bw",     S, "💌"),
+                ],
+            ]},
+            {"title": "⚙️ Ações", "rows": [[
+                _btn("Aplicar Avatar", "id_apply",   SU, "✅"),
+                _btn("Pré-visualizar", "id_preview", S,  "👁️"),
+            ]]},
+        ],
+        accent=color_primary(),
+    )
 
 # ---------- CAPTCHA ----------
 def captcha_view():
-    layout = ui.LayoutView(timeout=300)
-    layout.add_item(ui.Container(
-        ui.TextDisplay("# ✅ Verificação Captcha"),
-        ui.TextDisplay("Configure **múltiplos cargos** de verificação e canais."),
-        ui.Separator(),
-        ui.ActionRow(
-            ui.Button(label="Cargos de Verificação (múltiplos)", style=discord.ButtonStyle.primary, custom_id="cap_roles"),
-        ),
-        ui.ActionRow(
-            ui.Button(label="Canal de Verificação", style=discord.ButtonStyle.primary, custom_id="cap_ch"),
-            ui.Button(label="Canal do Painel", style=discord.ButtonStyle.primary, custom_id="cap_pch"),
-        ),
-        ui.ActionRow(
-            ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main"),
-        ),
-        accent_color=color_secondary(),
-    ))
-    return layout
+    return premium_submenu(
+        "✅ Verificação Captcha",
+        "Configure os **cargos entregues** após o captcha e os **canais** onde o sistema funciona.",
+        [
+            {"title": "👑 Cargos Entregues", "rows": [[
+                _btn("Selecionar Cargos (múltiplos)", "cap_roles", P, "👥"),
+            ]]},
+            {"title": "📢 Canais", "rows": [[
+                _btn("Canal de Verificação", "cap_ch",  P, "✅"),
+                _btn("Canal do Painel",      "cap_pch", P, "📌"),
+            ]]},
+        ],
+        accent=color_secondary(),
+    )
 
-# ---------- VERIFICAÇÃO +18 ----------
+# ---------- +18 ----------
 def age_view():
-    layout = ui.LayoutView(timeout=300)
-    layout.add_item(ui.Container(
-        ui.TextDisplay("# 🔞 Verificação +18"),
-        ui.TextDisplay("Configure cargos múltiplos para cada categoria de idade."),
-        ui.Separator(),
-        ui.ActionRow(
-            ui.Button(label="Ativar/Desativar", style=discord.ButtonStyle.primary, custom_id="age_toggle"),
-            ui.Button(label="Expulsar Menores", style=discord.ButtonStyle.danger, custom_id="age_kick"),
-        ),
-        ui.ActionRow(
-            ui.Button(label="Cargos +18 (Maiores)", style=discord.ButtonStyle.success, custom_id="age_adult"),
-            ui.Button(label="Cargos -18 (Menores)", style=discord.ButtonStyle.primary, custom_id="age_under"),
-        ),
-        ui.ActionRow(
-            ui.Button(label="Cargos Não Verificado", style=discord.ButtonStyle.primary, custom_id="age_unver"),
-            ui.Button(label="Cargos Verificação Nativa", style=discord.ButtonStyle.primary, custom_id="age_native"),
-        ),
-        ui.ActionRow(
-            ui.Button(label="Canal de Verificação", style=discord.ButtonStyle.secondary, custom_id="age_ch"),
-            ui.Button(label="Canal do Painel", style=discord.ButtonStyle.secondary, custom_id="age_pch"),
-        ),
-        ui.ActionRow(
-            ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main"),
-        ),
-        accent_color=color_secondary(),
-    ))
-    return layout
+    return premium_submenu(
+        "🔞 Verificação +18",
+        "Sistema completo de verificação de idade com **cargos múltiplos** para cada categoria.",
+        [
+            {"title": "⚙️ Sistema", "rows": [[
+                _btn("Ativar / Desativar", "age_toggle", P, "🔁"),
+                _btn("Expulsar Menores",   "age_kick",   D, "🚪"),
+            ]]},
+            {"title": "👑 Cargos por Categoria", "rows": [
+                [
+                    _btn("+18 (Maiores)",       "age_adult",  SU, "✅"),
+                    _btn("-18 (Menores)",       "age_under",  P,  "🔻"),
+                ],
+                [
+                    _btn("Não Verificado",      "age_unver",  P, "⏳"),
+                    _btn("Verificação Nativa",  "age_native", P, "🛡️"),
+                ],
+            ]},
+            {"title": "📢 Canais", "rows": [[
+                _btn("Canal de Verificação", "age_ch",  S, "✅"),
+                _btn("Canal do Painel",      "age_pch", S, "📌"),
+            ]]},
+        ],
+        accent=color_secondary(),
+    )
 
 # ---------- BOAS-VINDAS ----------
 def welcome_view():
-    layout = ui.LayoutView(timeout=300)
-    layout.add_item(ui.Container(
-        ui.TextDisplay("# 💌 Boas-vindas"),
-        ui.TextDisplay("Configure a mensagem, imagem e canal de boas-vindas."),
-        ui.Separator(),
-        ui.ActionRow(
-            ui.Button(label="Mensagem Padrão", style=discord.ButtonStyle.primary, custom_id="wel_msg"),
-            ui.Button(label="Imagem Padrão", style=discord.ButtonStyle.primary, custom_id="wel_img"),
-            ui.Button(label="Canal", style=discord.ButtonStyle.primary, custom_id="wel_ch"),
-        ),
-        ui.ActionRow(
-            ui.Button(label="Personalizar por Usuário", style=discord.ButtonStyle.secondary, custom_id="wel_user"),
-            ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main"),
-        ),
-        accent_color=color_primary(),
-    ))
-    return layout
+    return premium_submenu(
+        "💌 Boas-vindas",
+        "Configure a mensagem, imagem e canal usados para receber novos membros.",
+        [
+            {"title": "📝 Configuração Padrão", "rows": [[
+                _btn("Mensagem Padrão", "wel_msg", P, "✏️"),
+                _btn("Imagem Padrão",   "wel_img", P, "🖼️"),
+                _btn("Canal",           "wel_ch",  P, "📢"),
+            ]]},
+            {"title": "🎯 Personalização", "rows": [[
+                _btn("Personalizar por Usuário", "wel_user", S, "👤"),
+            ]]},
+        ],
+        accent=color_primary(),
+    )
 
 # ---------- VOZ & STATUS ----------
 def voice_view():
-    layout = ui.LayoutView(timeout=300)
-    layout.add_item(ui.Container(
-        ui.TextDisplay("# 🔊 Voz & Status"),
-        ui.TextDisplay("Configure o canal de voz 24h, mute e status do bot."),
-        ui.Separator(),
-        ui.ActionRow(
-            ui.Button(label="Mute na Call", style=discord.ButtonStyle.primary, custom_id="v_mute"),
-            ui.Button(label="Status do Bot", style=discord.ButtonStyle.primary, custom_id="v_status"),
-            ui.Button(label="Canal de Voz 24h", style=discord.ButtonStyle.primary, custom_id="v_ch"),
-        ),
-        ui.ActionRow(
-            ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main"),
-        ),
-        accent_color=color_primary(),
-    ))
-    return layout
+    return premium_submenu(
+        "🔊 Voz & Status",
+        "Configure o canal de voz 24h, mute automático e status de presença do bot.",
+        [
+            {"title": "🎙️ Voz 24h", "rows": [[
+                _btn("Canal de Voz 24h", "v_ch", P, "🔊"),
+            ]]},
+            {"title": "🎭 Presença", "rows": [[
+                _btn("Mute na Call",    "v_mute",   P, "🔇"),
+                _btn("Status do Bot",   "v_status", P, "🎭"),
+            ]]},
+        ],
+        accent=color_primary(),
+    )
 
-# ---------- ADMIN ROLES ----------
+# ---------- ADMIN ----------
 def admin_view():
-    layout = ui.LayoutView(timeout=300)
-    layout.add_item(ui.Container(
-        ui.TextDisplay("# 👑 Cargos de Admin"),
-        ui.TextDisplay("Selecione **múltiplos cargos** que podem usar o painel administrativo.\nAdministradores do servidor já têm acesso por padrão."),
-        ui.Separator(),
-        ui.ActionRow(
-            ui.Button(label="Selecionar Cargos (múltiplos)", style=discord.ButtonStyle.primary, custom_id="adm_roles"),
-        ),
-        ui.ActionRow(
-            ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main"),
-        ),
-        accent_color=color_primary(),
-    ))
-    return layout
+    return premium_submenu(
+        "👑 Cargos de Admin",
+        "Defina **quais cargos** podem usar este painel.\n-# Administradores do servidor já têm acesso por padrão.",
+        [
+            {"title": "🔐 Permissões", "rows": [[
+                _btn("Selecionar Cargos (múltiplos)", "adm_roles", P, "👥"),
+            ]]},
+        ],
+        accent=color_primary(),
+    )
 
 # ---------- PAINEL FIXO ----------
 def painel_fixo_view():
-    layout = ui.LayoutView(timeout=300)
-    layout.add_item(ui.Container(
-        ui.TextDisplay("# 📌 Painel Fixo"),
-        ui.TextDisplay("Escolha o canal onde o painel principal ficará fixo."),
-        ui.Separator(),
-        ui.ActionRow(
-            ui.Button(label="Canal do Painel", style=discord.ButtonStyle.primary, custom_id="pf_ch"),
-        ),
-        ui.ActionRow(
-            ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main"),
-        ),
-        accent_color=color_primary(),
-    ))
-    return layout
+    return premium_submenu(
+        "📌 Painel Fixo",
+        "Escolha o canal onde o **painel administrativo** ficará fixado.",
+        [
+            {"title": "📢 Canal", "rows": [[
+                _btn("Definir Canal do Painel", "pf_ch", P, "📌"),
+            ]]},
+        ],
+        accent=color_primary(),
+    )
 
 # ---------- TICKETS ----------
 def tickets_view():
-    layout = ui.LayoutView(timeout=300)
-    layout.add_item(ui.Container(
-        ui.TextDisplay("# 🎫 Tickets"),
-        ui.TextDisplay("Configure categorias, cargos de suporte (múltiplos) e canais."),
-        ui.Separator(),
-        ui.ActionRow(
-            ui.Button(label="Categoria Dúvidas", style=discord.ButtonStyle.primary, custom_id="tk_cat_d"),
-            ui.Button(label="Categoria Compras", style=discord.ButtonStyle.primary, custom_id="tk_cat_p"),
-        ),
-        ui.ActionRow(
-            ui.Button(label="Cargos de Suporte (múltiplos)", style=discord.ButtonStyle.primary, custom_id="tk_sup"),
-            ui.Button(label="Logs de Tickets", style=discord.ButtonStyle.primary, custom_id="tk_logs"),
-        ),
-        ui.ActionRow(
-            ui.Button(label="Canal do Painel", style=discord.ButtonStyle.primary, custom_id="tk_panel"),
-            ui.Button(label="Logs de Moderação", style=discord.ButtonStyle.primary, custom_id="tk_mod"),
-        ),
-        ui.ActionRow(
-            ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main"),
-        ),
-        accent_color=color_primary(),
-    ))
-    return layout
+    return premium_submenu(
+        "🎫 Sistema de Tickets",
+        "Configure categorias, cargos de suporte e canais de log.",
+        [
+            {"title": "📂 Categorias", "rows": [[
+                _btn("Dúvidas",  "tk_cat_d", P, "❓"),
+                _btn("Compras",  "tk_cat_p", P, "🛒"),
+            ]]},
+            {"title": "👥 Suporte & Logs", "rows": [[
+                _btn("Cargos de Suporte (múltiplos)", "tk_sup",  P, "👥"),
+                _btn("Logs de Tickets",               "tk_logs", P, "📝"),
+            ]]},
+            {"title": "📢 Canais", "rows": [[
+                _btn("Painel de Tickets",  "tk_panel", P, "🎫"),
+                _btn("Logs de Moderação",  "tk_mod",   P, "🛡️"),
+            ]]},
+        ],
+        accent=color_primary(),
+    )
 
 # ---------- FEEDBACK ----------
 def feedback_view():
-    layout = ui.LayoutView(timeout=300)
-    layout.add_item(ui.Container(
-        ui.TextDisplay("# ⭐ Avaliações (Feedback)"),
-        ui.TextDisplay("Canal onde as avaliações dos tickets serão enviadas."),
-        ui.Separator(),
-        ui.ActionRow(
-            ui.Button(label="Canal de Feedback", style=discord.ButtonStyle.primary, custom_id="fb_ch"),
-        ),
-        ui.ActionRow(
-            ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main"),
-        ),
-        accent_color=color_primary(),
-    ))
-    return layout
+    return premium_submenu(
+        "⭐ Avaliações",
+        "Canal onde as **avaliações dos tickets** serão enviadas.",
+        [
+            {"title": "📢 Canal", "rows": [[
+                _btn("Canal de Feedback", "fb_ch", P, "⭐"),
+            ]]},
+        ],
+        accent=color_primary(),
+    )
 
 # ---------- SUGESTÕES ----------
 def suggestions_view():
-    layout = ui.LayoutView(timeout=300)
-    layout.add_item(ui.Container(
-        ui.TextDisplay("# 💡 Sugestões"),
-        ui.TextDisplay("Configure o painel e o canal onde as sugestões são enviadas."),
-        ui.Separator(),
-        ui.ActionRow(
-            ui.Button(label="Canal do Painel", style=discord.ButtonStyle.primary, custom_id="sg_pch"),
-            ui.Button(label="Canal de Sugestões", style=discord.ButtonStyle.primary, custom_id="sg_ch"),
-        ),
-        ui.ActionRow(
-            ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main"),
-        ),
-        accent_color=color_primary(),
-    ))
-    return layout
+    return premium_submenu(
+        "💡 Sugestões",
+        "Configure o painel e o canal onde as **sugestões dos membros** são enviadas.",
+        [
+            {"title": "📢 Canais", "rows": [[
+                _btn("Canal do Painel",    "sg_pch", P, "🎛️"),
+                _btn("Canal de Sugestões", "sg_ch",  P, "💡"),
+            ]]},
+        ],
+        accent=color_primary(),
+    )
 
-# ---------- 🧹 LIMPEZA DE CHAT (NOVO!) ----------
+# ---------- 🧹 LIMPEZA DE CHAT ----------
+async def on_cleanup_select(interaction: discord.Interaction):
+    val = interaction.data["values"][0]
+    if val == "none":
+        await interaction.response.send_message("❌ Nenhum canal disponível.", ephemeral=True)
+        return
+
+    channel = interaction.guild.get_channel(int(val))
+    if not channel or not isinstance(channel, discord.TextChannel):
+        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True)
+        return
+
+    me = interaction.guild.me
+    perms = channel.permissions_for(me)
+    if not perms.manage_messages or not perms.read_message_history:
+        await interaction.response.send_message(
+            f"❌ Preciso de **Gerenciar Mensagens** e **Ler Histórico** em {channel.mention}.",
+            ephemeral=True
+        )
+        return
+
+    await interaction.response.defer(ephemeral=True)
+
+    total, erro = await perform_chat_cleanup(channel, interaction.guild)
+
+    # Log
+    log_id = config.get("moderation_logs_channel_id")
+    if log_id:
+        log_ch = interaction.guild.get_channel(log_id)
+        if log_ch:
+            try:
+                await log_ch.send(
+                    f"🧹 **Limpeza de Chat** — {channel.mention}\n"
+                    f"• Executado por: {interaction.user.mention}\n"
+                    f"• Mensagens apagadas: **{total}**"
+                )
+            except Exception:
+                pass
+
+    if erro:
+        await interaction.followup.send(
+            f"⚠️ Limpeza concluída com avisos.\n"
+            f"• Canal: {channel.mention}\n"
+            f"• Apagadas: **{total}**\n"
+            f"• Erro: `{erro}`",
+            ephemeral=True
+        )
+    else:
+        await interaction.followup.send(
+            f"✅ **Limpeza concluída!**\n"
+            f"• Canal: {channel.mention}\n"
+            f"• Mensagens apagadas: **{total}**",
+            ephemeral=True
+        )
+
 def chat_cleanup_view():
     layout = ui.LayoutView(timeout=300)
 
     channel_select = ui.Select(
-        placeholder="🧹 Escolha o canal para apagar TODAS as mensagens...",
+        placeholder="🧹 Escolha o canal para apagar TUDO...",
         options=text_channel_options(),
         custom_id="cleanup_channel_select",
     )
-
-    async def on_select(interaction: discord.Interaction):
-        val = channel_select.values[0]
-        if val == "none":
-            await interaction.response.send_message("❌ Nenhum canal disponível.", ephemeral=True)
-            return
-
-        channel = interaction.guild.get_channel(int(val))
-        if not channel or not isinstance(channel, discord.TextChannel):
-            await interaction.response.send_message("❌ Canal inválido.", ephemeral=True)
-            return
-
-        # Confere permissões
-        me = interaction.guild.me
-        if not channel.permissions_for(me).manage_messages:
-            await interaction.response.send_message(
-                f"❌ Não tenho permissão de **Gerenciar Mensagens** em {channel.mention}.",
-                ephemeral=True
-            )
-            return
-
-        await interaction.response.defer(ephemeral=True)
-
-        total_apagadas = 0
-        erros = 0
-        try:
-            while True:
-                try:
-                    deleted = await channel.purge(limit=100, check=lambda m: True, bulk=True)
-                except discord.HTTPException:
-                    # Fallback para mensagens antigas
-                    deleted = await channel.purge(limit=100, check=lambda m: True, bulk=False)
-                if not deleted:
-                    break
-                total_apagadas += len(deleted)
-                await asyncio.sleep(0.5)  # evita rate limit
-        except discord.Forbidden:
-            await interaction.followup.send(
-                f"❌ Permissão negada durante a limpeza. Apagadas: **{total_apagadas}**.",
-                ephemeral=True
-            )
-            return
-        except Exception as e:
-            logger.error(f"Erro limpeza: {e}", exc_info=True)
-            await interaction.followup.send(
-                f"⚠️ Erro após apagar **{total_apagadas}** mensagens: `{e}`",
-                ephemeral=True
-            )
-            return
-
-        # Log opcional
-        log_id = config.get("moderation_logs_channel_id")
-        if log_id:
-            log_ch = interaction.guild.get_channel(log_id)
-            if log_ch:
-                try:
-                    await log_ch.send(
-                        f"🧹 **Limpeza de Chat** — {channel.mention}\n"
-                        f"• Executado por: {interaction.user.mention}\n"
-                        f"• Mensagens apagadas: **{total_apagadas}**"
-                    )
-                except Exception:
-                    pass
-
-        await interaction.followup.send(
-            f"✅ **Limpeza concluída!**\n"
-            f"• Canal: {channel.mention}\n"
-            f"• Mensagens apagadas: **{total_apagadas}**",
-            ephemeral=True
-        )
-
-    channel_select.callback = on_select
+    channel_select.callback = on_cleanup_select
 
     layout.add_item(ui.Container(
         ui.TextDisplay("# 🧹 Limpeza de Chat"),
-        ui.TextDisplay(
-            "Selecione um canal abaixo para **apagar TODAS as mensagens** (antigas ou recentes).\n\n"
-            "⚠️ **Ação irreversível!** O bot precisa da permissão **Gerenciar Mensagens** no canal escolhido."
+        ui.Section(
+            ui.TextDisplay(
+                "Apaga **TODAS** as mensagens de um canal, **independente da idade**.\n"
+                "-# ⚠️ Esta ação é irreversível. O bot precisa de `Gerenciar Mensagens`."
+            ),
+            accessory=ui.Thumbnail(media=_thumb()),
         ),
-        ui.Separator(),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.TextDisplay("### 📂 Selecione o canal"),
         ui.ActionRow(channel_select),
-        ui.Separator(),
-        ui.ActionRow(
-            ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main"),
-        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(_btn("Voltar ao Menu", "back_main", D, "↩️")),
         accent_color=color_danger(),
     ))
     return layout
@@ -622,7 +623,6 @@ def chat_cleanup_view():
 # ---------- SHOW CONFIG ----------
 def show_config_view():
     layout = ui.LayoutView(timeout=300)
-    guild = get_guild()
 
     def role_list(key):
         ids = config.get(key, [])
@@ -634,57 +634,60 @@ def show_config_view():
         return f"<#{cid}>" if cid else "—"
 
     lines = [
-        f"**Marca:** {bname()} {bemoji()}",
+        f"### 🏷️ Marca",
+        f"**Nome:** {bname()} {bemoji()}",
         f"**Guild ID:** `{config.get('guild_id')}`",
         f"**Admin Roles:** {role_list('admin_role_ids')}",
         "",
-        f"**Captcha — Cargos:** {role_list('verified_role_ids')}",
-        f"**Captcha — Canal Verif:** {ch('verification_channel_id')}",
-        f"**Captcha — Canal Painel:** {ch('verification_panel_channel_id')}",
+        f"### ✅ Captcha",
+        f"**Cargos:** {role_list('verified_role_ids')}",
+        f"**Canal Verif:** {ch('verification_channel_id')}",
+        f"**Canal Painel:** {ch('verification_panel_channel_id')}",
         "",
-        f"**+18 Ativo:** `{config.get('age_verification_enabled')}`",
-        f"**+18 — Cargos Maiores:** {role_list('age_verified_role_ids')}",
-        f"**+18 — Cargos Menores:** {role_list('age_underage_role_ids')}",
-        f"**+18 — Não Verificado:** {role_list('age_unverified_role_ids')}",
-        f"**+18 — Verif. Nativa:** {role_list('age_native_verification_role_ids')}",
-        f"**+18 — Expulsar Menores:** `{config.get('age_kick_underage')}`",
-        f"**+18 — Canal Verif:** {ch('age_verification_channel_id')}",
+        f"### 🔞 +18",
+        f"**Ativo:** `{config.get('age_verification_enabled')}`  |  **Kick menores:** `{config.get('age_kick_underage')}`",
+        f"**Maiores:** {role_list('age_verified_role_ids')}",
+        f"**Menores:** {role_list('age_underage_role_ids')}",
+        f"**Não Verif:** {role_list('age_unverified_role_ids')}",
+        f"**Verif. Nativa:** {role_list('age_native_verification_role_ids')}",
+        f"**Canal Verif:** {ch('age_verification_channel_id')}",
         "",
-        f"**Boas-vindas — Canal:** {ch('welcome_channel_id')}",
-        f"**Voz — Canal:** {ch('voice_channel_id')}",
-        f"**Voz — Mute:** `{config.get('voice_mute')}`",
-        f"**Status:** `{config.get('bot_status')}`",
+        f"### 💌 Boas-vindas",
+        f"**Canal:** {ch('welcome_channel_id')}",
         "",
-        f"**Tickets — Suporte:** {role_list('ticket_support_role_ids')}",
-        f"**Tickets — Painel:** {ch('ticket_panel_channel_id')}",
-        f"**Tickets — Logs:** {ch('ticket_logs_channel_id')}",
-        f"**Tickets — Cat Dúvidas:** {ch('ticket_category_doubt_id')}",
-        f"**Tickets — Cat Compras:** {ch('ticket_category_purchase_id')}",
+        f"### 🔊 Voz & Status",
+        f"**Canal:** {ch('voice_channel_id')}",
+        f"**Mute:** `{config.get('voice_mute')}`  |  **Status:** `{config.get('bot_status')}`",
         "",
+        f"### 🎫 Tickets",
+        f"**Suporte:** {role_list('ticket_support_role_ids')}",
+        f"**Painel:** {ch('ticket_panel_channel_id')}",
+        f"**Logs:** {ch('ticket_logs_channel_id')}",
+        f"**Cat Dúvidas:** {ch('ticket_category_doubt_id')}",
+        f"**Cat Compras:** {ch('ticket_category_purchase_id')}",
+        "",
+        f"### 💬 Comunidade",
         f"**Feedback:** {ch('feedback_channel_id')}",
-        f"**Sugestões — Painel:** {ch('suggestions_panel_channel_id')}",
-        f"**Sugestões — Canal:** {ch('suggestions_channel_id')}",
+        f"**Sugestões Painel:** {ch('suggestions_panel_channel_id')}",
+        f"**Sugestões Canal:** {ch('suggestions_channel_id')}",
         f"**Logs Moderação:** {ch('moderation_logs_channel_id')}",
     ]
+
     layout.add_item(ui.Container(
         ui.TextDisplay("# 📋 Configuração Atual"),
+        ui.Section(
+            ui.TextDisplay("Tudo que está configurado no bot **agora mesmo**."),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
         ui.TextDisplay("\n".join(lines)),
-        ui.Separator(),
-        ui.ActionRow(ui.Button(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main")),
+        ui.Separator(spacing=discord.SeparatorSpacing.large),
+        ui.ActionRow(_btn("Voltar ao Menu", "back_main", D, "↩️")),
         accent_color=color_primary(),
     ))
     return layout
 
-# ===================== BOTÃO "VOLTAR AO MENU" =====================
-class BackToMainButton(ui.Button):
-    def __init__(self):
-        super().__init__(label="Voltar", style=discord.ButtonStyle.danger, custom_id="back_main")
-
-    async def callback(self, interaction: discord.Interaction):
-        await interaction.response.edit_message(view=None)
-        await interaction.followup.send(view=painel_layout(), ephemeral=True)
-
-# ===================== VIEWS DE SELEÇÃO (múltiplos cargos) =====================
+# ===================== VIEWS DE SELEÇÃO =====================
 def multi_role_view(key, title, current_ids):
     layout = ui.LayoutView(timeout=180)
 
@@ -696,7 +699,7 @@ def multi_role_view(key, title, current_ids):
         except Exception: pass
 
     role_select = ui.RoleSelect(
-        placeholder=f"Selecione cargos (múltiplos) — {title}",
+        placeholder=f"Selecione cargos (múltiplos)",
         min_values=0,
         max_values=25,
         default_values=selected if selected else None,
@@ -708,8 +711,8 @@ def multi_role_view(key, title, current_ids):
         save_config(config)
         if ids:
             await interaction.response.send_message(
-                f"✅ **{title}:** {len(ids)} cargo(s) definido(s).\n" +
-                "\n".join(f"• <@&{i}>" for i in ids), ephemeral=True
+                f"✅ **{title}:** {len(ids)} cargo(s).\n" + "\n".join(f"• <@&{i}>" for i in ids),
+                ephemeral=True
             )
         else:
             await interaction.response.send_message(f"✅ **{title}:** nenhum cargo definido.", ephemeral=True)
@@ -718,15 +721,15 @@ def multi_role_view(key, title, current_ids):
 
     layout.add_item(ui.Container(
         ui.TextDisplay(f"# 👑 {title}"),
-        ui.TextDisplay("Selecione um ou mais cargos. Depois de escolher, clique fora do menu para confirmar."),
-        ui.Separator(),
+        ui.Section(
+            ui.TextDisplay("Selecione **um ou mais cargos**. Depois de escolher, feche esta mensagem."),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
         ui.ActionRow(role_select),
         accent_color=color_primary(),
     ))
     return layout
-
-def multi_role_selector_options(key, title):
-    return multi_role_view(key, title, config.get(key, []))
 
 def single_channel_view(key, title):
     layout = ui.LayoutView(timeout=180)
@@ -741,7 +744,11 @@ def single_channel_view(key, title):
     sel.callback = cb
     layout.add_item(ui.Container(
         ui.TextDisplay(f"# 📌 {title}"),
-        ui.Separator(),
+        ui.Section(
+            ui.TextDisplay("Escolha o canal desejado no menu abaixo."),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
         ui.ActionRow(sel),
         accent_color=color_primary(),
     ))
@@ -769,7 +776,11 @@ def single_voice_view(key, title):
     sel.callback = cb
     layout.add_item(ui.Container(
         ui.TextDisplay(f"# 🔊 {title}"),
-        ui.Separator(),
+        ui.Section(
+            ui.TextDisplay("Escolha o canal de voz desejado no menu abaixo."),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
         ui.ActionRow(sel),
         accent_color=color_primary(),
     ))
@@ -788,7 +799,37 @@ def single_category_view(key, title):
     sel.callback = cb
     layout.add_item(ui.Container(
         ui.TextDisplay(f"# 📂 {title}"),
-        ui.Separator(),
+        ui.Section(
+            ui.TextDisplay("Escolha a categoria no menu abaixo."),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(sel),
+        accent_color=color_primary(),
+    ))
+    return layout
+
+# ===================== STATUS VIEW =====================
+def status_view():
+    layout = ui.LayoutView(timeout=180)
+    sel = ui.Select(placeholder="Escolha o status de presença", options=[
+        discord.SelectOption(label="Online",        value="online",    emoji="🟢"),
+        discord.SelectOption(label="Ausente",       value="idle",      emoji="🟡"),
+        discord.SelectOption(label="Não perturbar", value="dnd",       emoji="🔴"),
+        discord.SelectOption(label="Invisível",     value="invisible", emoji="⚫"),
+    ])
+    async def cb(interaction):
+        config["bot_status"] = sel.values[0]; save_config(config)
+        await update_status()
+        await interaction.response.send_message(f"✅ Status: **{sel.values[0]}**", ephemeral=True)
+    sel.callback = cb
+    layout.add_item(ui.Container(
+        ui.TextDisplay("# 🎭 Status do Bot"),
+        ui.Section(
+            ui.TextDisplay("Escolha como o bot aparecerá na lista de membros."),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
         ui.ActionRow(sel),
         accent_color=color_primary(),
     ))
@@ -921,8 +962,8 @@ async def on_interaction(interaction: discord.Interaction):
 
         # ---------- VOLTAR ----------
         elif cid == "back_main":
-            await interaction.response.edit_message(view=None)
-            await interaction.followup.send(view=painel_layout(), ephemeral=True)
+            # ✅ FIX: edita a view diretamente (sem view=None)
+            await interaction.response.edit_message(view=painel_layout())
 
         # ---------- BOTÕES DE AÇÃO ----------
         elif cid == "ticket_open_doubt":
@@ -953,27 +994,59 @@ async def on_interaction(interaction: discord.Interaction):
     except Exception as e:
         logger.error(f"Erro interaction {cid}: {e}", exc_info=True)
 
-# ===================== STATUS VIEW =====================
-def status_view():
-    layout = ui.LayoutView(timeout=180)
-    sel = ui.Select(placeholder="Escolha o status", options=[
-        discord.SelectOption(label="Online", value="online", emoji="🟢"),
-        discord.SelectOption(label="Ausente", value="idle", emoji="🟡"),
-        discord.SelectOption(label="Não perturbar", value="dnd", emoji="🔴"),
-        discord.SelectOption(label="Invisível", value="invisible", emoji="⚫"),
-    ])
-    async def cb(interaction):
-        config["bot_status"] = sel.values[0]; save_config(config)
-        await update_status()
-        await interaction.response.send_message(f"✅ Status: **{sel.values[0]}**", ephemeral=True)
-    sel.callback = cb
-    layout.add_item(ui.Container(
-        ui.TextDisplay("# 🎭 Status do Bot"),
-        ui.Separator(),
-        ui.ActionRow(sel),
-        accent_color=color_primary(),
-    ))
-    return layout
+# ===================== LIMPEZA DE CHAT — CORE =====================
+async def perform_chat_cleanup(channel: discord.TextChannel, guild: discord.Guild):
+    """
+    Limpa TODAS as mensagens de um canal, respeitando rate limits.
+    Retorna (total_apagadas, erro_ou_None).
+    """
+    total = 0
+    erro = None
+
+    cutoff = discord.utils.utcnow() - datetime.timedelta(days=13)
+
+    # ---------- FASE 1: bulk delete para mensagens < 14 dias ----------
+    try:
+        while True:
+            try:
+                deleted = await channel.purge(limit=100, after=cutoff, bulk=True)
+            except discord.HTTPException as e:
+                logger.warning(f"Bulk delete falhou (fase 1): {e}")
+                break
+            if not deleted:
+                break
+            total += len(deleted)
+            await asyncio.sleep(1.0)  # evita 429 em loop
+    except Exception as e:
+        logger.error(f"Erro fase 1 limpeza: {e}", exc_info=True)
+
+    # ---------- FASE 2: delete individual para mensagens antigas ----------
+    erros_consecutivos = 0
+    try:
+        async for msg in channel.history(limit=None, before=cutoff, oldest_first=False):
+            try:
+                await msg.delete()
+                total += 1
+                erros_consecutivos = 0
+                # Discord limita ~5 deletes/5s por canal em rotas não-bulk
+                await asyncio.sleep(1.2)
+            except discord.NotFound:
+                continue
+            except discord.Forbidden as e:
+                erro = f"Forbidden: {e}"
+                break
+            except discord.HTTPException as e:
+                erros_consecutivos += 1
+                logger.warning(f"Erro delete individual: {e}")
+                if erros_consecutivos >= 5:
+                    erro = f"muitos erros consecutivos: {e}"
+                    break
+                await asyncio.sleep(2.5)
+    except Exception as e:
+        logger.error(f"Erro fase 2 limpeza: {e}", exc_info=True)
+        erro = str(e)
+
+    return total, erro
 
 # ===================== MODAIS =====================
 class BrandNameModal(ui.Modal, title="✏️ Nome da Marca"):
@@ -1508,23 +1581,17 @@ async def cmd_rev(interaction, membro: discord.Member):
 @app_commands.default_permissions(administrator=True)
 @app_commands.describe(canal="Canal que será totalmente limpo")
 async def cmd_limpar(interaction: discord.Interaction, canal: discord.TextChannel):
-    if not canal.permissions_for(interaction.guild.me).manage_messages:
+    perms = canal.permissions_for(interaction.guild.me)
+    if not perms.manage_messages or not perms.read_message_history:
         await interaction.response.send_message(f"❌ Sem permissão em {canal.mention}.", ephemeral=True); return
+
     await interaction.response.defer(ephemeral=True)
-    total = 0
-    try:
-        while True:
-            try:
-                deleted = await canal.purge(limit=100, check=lambda m: True, bulk=True)
-            except discord.HTTPException:
-                deleted = await canal.purge(limit=100, check=lambda m: True, bulk=False)
-            if not deleted:
-                break
-            total += len(deleted)
-            await asyncio.sleep(0.5)
-    except Exception as e:
-        await interaction.followup.send(f"⚠️ Erro após {total} mensagens: `{e}`", ephemeral=True); return
-    await interaction.followup.send(f"✅ **{total}** mensagens apagadas de {canal.mention}!", ephemeral=True)
+    total, erro = await perform_chat_cleanup(canal, interaction.guild)
+
+    if erro:
+        await interaction.followup.send(f"⚠️ Erro após **{total}** mensagens: `{erro}`", ephemeral=True)
+    else:
+        await interaction.followup.send(f"✅ **{total}** mensagens apagadas de {canal.mention}!", ephemeral=True)
 
 @bot.tree.command(name="mutar", description="🔇 Muta o bot na call")
 async def cmd_mutar(interaction):
