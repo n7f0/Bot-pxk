@@ -29,20 +29,16 @@ DEFAULT_CONFIG = {
     "banner_welcome_url": "",
     "guild_id": None,
 
+    # ---- Verificação Captcha (melhorado) ----
+    "verification_method": "math",           # "math" | "button"
+    "verification_difficulty": 1,            # 1 fácil, 2 médio, 3 difícil
+    "verification_kick_minutes": 0,          # 0 = desativado
     "verified_role_ids": [],
+    "verification_unverified_role_ids": [],
     "verification_channel_id": None,
     "verification_panel_channel_id": None,
     "verification_panel_message_id": None,
-
-    "age_verification_enabled": False,
-    "age_verified_role_ids": [],
-    "age_underage_role_ids": [],
-    "age_unverified_role_ids": [],
-    "age_native_verification_role_ids": [],
-    "age_kick_underage": True,
-    "age_verification_channel_id": None,
-    "age_panel_channel_id": None,
-    "age_panel_message_id": None,
+    "verification_log_channel_id": None,
 
     "welcome_channel_id": None,
     "welcome_message": "Bem-vindo(a) ao servidor!",
@@ -75,7 +71,6 @@ DEFAULT_CONFIG = {
     "suggestions_panel_message_id": None,
 
     "moderation_logs_channel_id": None,
-    "reminders": []
 }
 
 def load_config():
@@ -95,12 +90,10 @@ def load_config():
     return data
 
 def _migrate_ids(data):
+    # migração de campos antigos -> novos
     pairs = [
         ("verified_role_id", "verified_role_ids"),
         ("age_verified_role_id", "age_verified_role_ids"),
-        ("age_underage_role_id", "age_underage_role_ids"),
-        ("age_unverified_role_id", "age_unverified_role_ids"),
-        ("age_native_verification_role_id", "age_native_verification_role_ids"),
     ]
     for old, new in pairs:
         if old in data and data[old] and not data.get(new):
@@ -179,14 +172,6 @@ async def update_voice_mute():
     try: await guild.me.edit(mute=config.get("voice_mute", True))
     except Exception as e: logger.error(f"Erro mute: {e}")
 
-def calcular_idade(data_nasc):
-    try:
-        nasc = datetime.datetime.strptime(data_nasc, "%d/%m/%Y")
-        hoje = datetime.datetime.now()
-        return hoje.year - nasc.year - ((hoje.month, hoje.day) < (nasc.month, nasc.day))
-    except ValueError:
-        return None
-
 def text_channel_options(max_items=25):
     guild = get_guild()
     opts = []
@@ -226,9 +211,7 @@ def _btn(label, cid, style=P, emoji=None):
 def _thumb():
     return avatar_url() or "https://cdn.discordapp.com/embed/avatars/0.png"
 
-# ✅ NOVO: builder seguro para MediaGallery (fallback se não existir na lib)
 def _safe_media_gallery(media_url):
-    """Retorna MediaGallery se a classe existir, senão None."""
     if not media_url:
         return None
     MG  = getattr(ui, "MediaGallery", None) or getattr(discord, "MediaGallery", None)
@@ -237,8 +220,7 @@ def _safe_media_gallery(media_url):
         return None
     try:
         return MG(MGI(media=media_url))
-    except Exception as e:
-        logger.warning(f"MediaGallery indisponível: {e}")
+    except Exception:
         return None
 
 def premium_submenu(title, description, sections, accent=None):
@@ -260,6 +242,61 @@ def premium_submenu(title, description, sections, accent=None):
     layout.add_item(ui.Container(*comps, accent_color=accent or color_primary()))
     return layout
 
+# ===================== BARRA DE PROGRESSO =====================
+def _progress_bar(current, total, length=22):
+    if total <= 0:
+        return f"`[{'█' * length}]` **100%**"
+    current = max(0, min(current, total))
+    pct = int(current / total * 100)
+    filled = int(length * current / total)
+    empty = length - filled
+    return f"`[{'█' * filled}{'░' * empty}]` **{pct}%**"
+
+def _fmt_elapsed(start_time):
+    elapsed = (datetime.datetime.now() - start_time).total_seconds()
+    m = int(elapsed // 60)
+    s = int(elapsed % 60)
+    return f"{m:02d}:{s:02d}"
+
+def _build_cleanup_progress_view(channels_done, total_channels, current_channel,
+                                  current_deleted, start_time, phase=""):
+    overall_bar = _progress_bar(channels_done, total_channels)
+    status = "✅ Concluído" if channels_done >= total_channels else "🔄 Em andamento..."
+
+    lines = [
+        f"### 📊 Progresso Geral",
+        f"{overall_bar}",
+        f"**Canais concluídos:** `{channels_done}/{total_channels}`",
+        f"**Status:** {status}",
+        f"**Tempo decorrido:** `{_fmt_elapsed(start_time)}`",
+    ]
+    if current_channel is not None:
+        lines.append("")
+        lines.append(f"### 📂 Canal Atual ({channels_done + 1}/{total_channels})")
+        lines.append(f"**{current_channel.mention}**")
+        lines.append(f"**Mensagens apagadas:** `{current_deleted}`")
+        if phase:
+            lines.append(f"**Fase:** {phase}")
+
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(
+        ui.TextDisplay("# 🧹 Limpeza de Chat"),
+        ui.TextDisplay("\n".join(lines)),
+        accent_color=color_danger(),
+    ))
+    return layout
+
+def _build_cleanup_final_view(summary):
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(
+        ui.TextDisplay("# ✅ Limpeza Concluída"),
+        ui.TextDisplay(summary),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(_btn("Voltar ao Menu", "back_main", D, "↩️")),
+        accent_color=color_success(),
+    ))
+    return layout
+
 # ===================== CARD DE MEMBRO / VOZ =====================
 async def _fetch_banner_url(user_id: int):
     try:
@@ -270,31 +307,18 @@ async def _fetch_banner_url(user_id: int):
         pass
     return None
 
-def _build_member_card(
-    member: discord.Member,
-    title: str,
-    subtitle: str,
-    action: str,
-    accent: int,
-    banner_url: str = None,
-    extra_lines: list = None,
-    voice_channel: discord.abc.GuildChannel = None,
-):
+def _build_member_card(member, title, subtitle, action, accent,
+                        banner_url=None, voice_channel=None):
     now_ts = int(datetime.datetime.now().timestamp())
     avatar = member.display_avatar.with_size(512).url
 
     comps = [
         ui.TextDisplay(f"# {title}"),
         ui.Section(
-            ui.TextDisplay(
-                f"### {member.display_name}\n"
-                f"-# {member.mention}"
-            ),
+            ui.TextDisplay(f"### {member.display_name}\n-# {member.mention}"),
             accessory=ui.Thumbnail(media=avatar),
         ),
     ]
-
-    # Banner via MediaGallery (só se a lib suportar)
     if banner_url:
         mg = _safe_media_gallery(banner_url)
         if mg is not None:
@@ -308,7 +332,6 @@ def _build_member_card(
         f"**🆔 ID:** `{member.id}`",
         f"**📅 Conta criada:** <t:{int(member.created_at.timestamp())}:R>",
     ]
-
     if action == "join":
         info.append(f"**👥 Membro nº:** `{member.guild.member_count}`")
     elif action == "leave":
@@ -324,9 +347,6 @@ def _build_member_card(
         info.append(f"**🔊 Canal:** {voice_channel.mention if voice_channel else '—'}")
         info.append(f"**📤 Saiu às:** <t:{now_ts}:T>")
 
-    if extra_lines:
-        info.extend(extra_lines)
-
     comps.append(ui.TextDisplay("\n".join(info)))
     comps.append(ui.Separator(spacing=discord.SeparatorSpacing.small))
     comps.append(ui.TextDisplay(subtitle))
@@ -336,52 +356,31 @@ def _build_member_card(
     layout.add_item(ui.Container(*comps, accent_color=accent))
     return layout
 
-# ===================== ENVIO DE LOGS =====================
-async def send_welcome_message(member: discord.Member):
+async def send_welcome_message(member):
     cid = config.get("welcome_channel_id")
     if not cid: return
     ch = member.guild.get_channel(cid)
     if not ch: return
-
     banner_url = banner_welcome() or await _fetch_banner_url(member.id)
     subtitle = config.get("welcome_message") or "Bem-vindo(a)!"
+    card = _build_member_card(member, f"{bemoji()} Bem-vindo(a) à {bname()}!",
+                              f"> {subtitle}", "join", color_success(), banner_url)
+    try: await ch.send(view=card)
+    except Exception as e: logger.error(f"Erro welcome: {e}")
 
-    card = _build_member_card(
-        member,
-        title=f"{bemoji()} Bem-vindo(a) à {bname()}!",
-        subtitle=f"> {subtitle}",
-        action="join",
-        accent=color_success(),
-        banner_url=banner_url,
-    )
-    try:
-        await ch.send(view=card)
-    except Exception as e:
-        logger.error(f"Erro welcome: {e}")
-
-async def send_leave_message(member: discord.Member):
+async def send_leave_message(member):
     cid = config.get("leave_channel_id")
     if not cid: return
     ch = member.guild.get_channel(cid)
     if not ch: return
-
     banner_url = await _fetch_banner_url(member.id)
     subtitle = config.get("leave_message") or "Até logo! 💜"
+    card = _build_member_card(member, f"{bemoji()} Até logo, {member.display_name}!",
+                              f"> {subtitle}", "leave", color_danger(), banner_url)
+    try: await ch.send(view=card)
+    except Exception as e: logger.error(f"Erro leave: {e}")
 
-    card = _build_member_card(
-        member,
-        title=f"{bemoji()} Até logo, {member.display_name}!",
-        subtitle=f"> {subtitle}",
-        action="leave",
-        accent=color_danger(),
-        banner_url=banner_url,
-    )
-    try:
-        await ch.send(view=card)
-    except Exception as e:
-        logger.error(f"Erro leave: {e}")
-
-async def send_voice_log(member: discord.Member, channel: discord.abc.GuildChannel, action: str):
+async def send_voice_log(member, channel, action):
     if action == "join":
         cid = config.get("voice_join_log_channel_id")
         title = f"🔊 {member.display_name} entrou na call"
@@ -394,25 +393,31 @@ async def send_voice_log(member: discord.Member, channel: discord.abc.GuildChann
         subtitle = f"> Saiu de **{channel.name}**"
         accent = color_danger()
         act = "vleave"
-
     if not cid: return
     log_ch = member.guild.get_channel(cid)
     if not log_ch: return
-
     banner_url = await _fetch_banner_url(member.id)
-    card = _build_member_card(
-        member,
-        title=title,
-        subtitle=subtitle,
-        action=act,
-        accent=accent,
-        banner_url=banner_url,
-        voice_channel=channel,
-    )
+    card = _build_member_card(member, title, subtitle, act, accent, banner_url, channel)
+    try: await log_ch.send(view=card)
+    except Exception as e: logger.error(f"Erro voice log: {e}")
+
+# ===================== APLICAR PERMISSÕES ADMIN-ONLY =====================
+async def make_channel_admin_only(channel: discord.TextChannel):
+    """Define permissões para que só admins vejam o canal."""
+    guild = channel.guild
     try:
-        await log_ch.send(view=card)
+        # @everyone sem ver
+        await channel.set_permissions(guild.default_role, view_channel=False, reason="Logs admin-only")
+        # Cargos configurados como admin ganham acesso
+        for rid in config.get("admin_role_ids", []):
+            role = guild.get_role(rid)
+            if role:
+                try:
+                    await channel.set_permissions(role, view_channel=True, read_message_history=True,
+                                                  reason="Logs admin-only")
+                except Exception: pass
     except Exception as e:
-        logger.error(f"Erro voice log: {e}")
+        logger.warning(f"Não foi possível restringir {channel.name}: {e}")
 
 # ===================== PAINEL PRINCIPAL =====================
 def painel_layout():
@@ -437,13 +442,11 @@ def painel_layout():
             discord.SelectOption(label="Identidade Visual", value="identity", emoji="🎨",
                                  description="Nome, emoji, cores e banners"),
             discord.SelectOption(label="Verificação Captcha", value="captcha", emoji="✅",
-                                 description="Cargos e canais de verificação"),
-            discord.SelectOption(label="Verificação +18", value="age18", emoji="🔞",
-                                 description="Sistema de idade com cargos múltiplos"),
+                                 description="Sistema de verificação avançado"),
             discord.SelectOption(label="Boas-vindas & Saída", value="welcome", emoji="💌",
                                  description="Mensagens de entrada e saída"),
             discord.SelectOption(label="Logs de Voz", value="voicelogs", emoji="🎙️",
-                                 description="Canais de entrada/saída da call"),
+                                 description="Canais de entrada/saída da call (admin-only)"),
             discord.SelectOption(label="Voz & Status", value="voice", emoji="🔊",
                                  description="Canal 24h, mute e presença"),
             discord.SelectOption(label="Cargos de Admin", value="admin", emoji="👑",
@@ -456,12 +459,8 @@ def painel_layout():
                                  description="Canal de feedback dos tickets"),
             discord.SelectOption(label="Sugestões", value="suggestions", emoji="💡",
                                  description="Painel e canal de sugestões"),
-            discord.SelectOption(label="Eventos", value="events", emoji="📅",
-                                 description="Agendar mensagens automáticas"),
-            discord.SelectOption(label="Lembretes", value="reminder", emoji="⏰",
-                                 description="Criar lembretes pessoais"),
             discord.SelectOption(label="Limpeza de Chat", value="chat_cleanup", emoji="🧹",
-                                 description="Apagar TODAS as mensagens de um canal"),
+                                 description="Apagar mensagens de vários canais"),
             discord.SelectOption(label="Ver Configuração Atual", value="show_config", emoji="📋",
                                  description="Visualizar tudo que está configurado"),
         ],
@@ -476,7 +475,6 @@ def painel_layout():
         ui.ActionRow(select),
         accent_color=color_secondary(),
     ))
-
     return layout
 
 async def main_menu_callback(interaction: discord.Interaction):
@@ -484,7 +482,6 @@ async def main_menu_callback(interaction: discord.Interaction):
     routes = {
         "identity":     lambda: interaction.response.send_message(view=identity_view(), ephemeral=True),
         "captcha":      lambda: interaction.response.send_message(view=captcha_view(), ephemeral=True),
-        "age18":        lambda: interaction.response.send_message(view=age_view(), ephemeral=True),
         "welcome":      lambda: interaction.response.send_message(view=welcome_view(), ephemeral=True),
         "voicelogs":    lambda: interaction.response.send_message(view=voicelogs_view(), ephemeral=True),
         "voice":        lambda: interaction.response.send_message(view=voice_view(), ephemeral=True),
@@ -493,8 +490,6 @@ async def main_menu_callback(interaction: discord.Interaction):
         "tickets":      lambda: interaction.response.send_message(view=tickets_view(), ephemeral=True),
         "feedback":     lambda: interaction.response.send_message(view=feedback_view(), ephemeral=True),
         "suggestions":  lambda: interaction.response.send_message(view=suggestions_view(), ephemeral=True),
-        "events":       lambda: interaction.response.send_modal(EventModal()),
-        "reminder":     lambda: interaction.response.send_modal(ReminderModal()),
         "chat_cleanup": lambda: interaction.response.send_message(view=chat_cleanup_view(), ephemeral=True),
         "show_config":  lambda: interaction.response.send_message(view=show_config_view(), ephemeral=True),
     }
@@ -536,45 +531,44 @@ def identity_view():
         accent=color_primary(),
     )
 
+# ---------- ✅ CAPTCHA MELHORADO ----------
 def captcha_view():
+    method = config.get("verification_method", "math")
+    diff   = config.get("verification_difficulty", 1)
+    kick   = config.get("verification_kick_minutes", 0)
+    method_label = "🧮 Matemática" if method == "math" else "🔘 Botão"
+    diff_labels = {1: "Fácil", 2: "Médio", 3: "Difícil"}
+    kick_label = "Desativado" if not kick else f"{kick} min"
+
     return premium_submenu(
         "✅ Verificação Captcha",
-        "Configure os **cargos entregues** após o captcha e os **canais** onde o sistema funciona.",
+        f"Sistema avançado com método, dificuldade e expulsão automática.\n\n"
+        f"**Método atual:** `{method_label}`\n"
+        f"**Dificuldade:** `{diff_labels.get(diff, 'Fácil')}`\n"
+        f"**Kick automático:** `{kick_label}`",
         [
-            {"title": "👑 Cargos Entregues", "rows": [[
-                _btn("Selecionar Cargos (múltiplos)", "cap_roles", P, "👥"),
-            ]]},
-            {"title": "📢 Canais", "rows": [[
-                _btn("Canal de Verificação", "cap_ch",  P, "✅"),
-                _btn("Canal do Painel",      "cap_pch", P, "📌"),
-            ]]},
-        ],
-        accent=color_secondary(),
-    )
-
-def age_view():
-    return premium_submenu(
-        "🔞 Verificação +18",
-        "Sistema completo de verificação de idade com **cargos múltiplos** para cada categoria.",
-        [
-            {"title": "⚙️ Sistema", "rows": [[
-                _btn("Ativar / Desativar", "age_toggle", P, "🔁"),
-                _btn("Expulsar Menores",   "age_kick",   D, "🚪"),
-            ]]},
-            {"title": "👑 Cargos por Categoria", "rows": [
+            {"title": "👑 Cargos", "rows": [
+                [_btn("Cargos Entregues (verificados)", "cap_roles", P, "✅")],
+                [_btn("Cargos Não Verificado", "cap_unver", P, "⏳")],
+            ]},
+            {"title": "⚙️ Método & Dificuldade", "rows": [
                 [
-                    _btn("+18 (Maiores)",      "age_adult",  SU, "✅"),
-                    _btn("-18 (Menores)",      "age_under",  P,  "🔻"),
-                ],
-                [
-                    _btn("Não Verificado",     "age_unver",  P, "⏳"),
-                    _btn("Verificação Nativa", "age_native", P, "🛡️"),
+                    _btn("Mudar Método",      "cap_method", P, "🔀"),
+                    _btn("Mudar Dificuldade", "cap_diff",   P, "🎚️"),
                 ],
             ]},
-            {"title": "📢 Canais", "rows": [[
-                _btn("Canal de Verificação", "age_ch",  S, "✅"),
-                _btn("Canal do Painel",      "age_pch", S, "📌"),
-            ]]},
+            {"title": "⏰ Expulsão Automática", "rows": [
+                [_btn("Configurar Tempo", "cap_kick", D, "⏰")],
+            ]},
+            {"title": "📢 Canais", "rows": [
+                [
+                    _btn("Canal de Verificação", "cap_ch",   P, "✅"),
+                    _btn("Canal do Painel",      "cap_pch",  P, "📌"),
+                ],
+                [
+                    _btn("Canal de Log",         "cap_log",  P, "📝"),
+                ],
+            ]},
         ],
         accent=color_secondary(),
     )
@@ -603,9 +597,6 @@ def welcome_view():
                     _btn("Testar Saída",      "lev_test", SU, "🧪"),
                 ],
             ]},
-            {"title": "🎯 Personalização", "rows": [[
-                _btn("Personalizar por Usuário", "wel_user", S, "👤"),
-            ]]},
         ],
         accent=color_primary(),
     )
@@ -613,7 +604,8 @@ def welcome_view():
 def voicelogs_view():
     return premium_submenu(
         "🎙️ Logs de Voz",
-        "Escolha canais separados para registrar **quem entra** e **quem sai** das calls.",
+        "Escolha canais separados para registrar **quem entra** e **quem sai** das calls.\n"
+        "-# 🔒 Os canais serão automaticamente restritos a **admins**.",
         [
             {"title": "🔊 Entrada na Call", "rows": [[
                 _btn("Canal de Log — Entrou", "vl_join_ch",   P, "🔊"),
@@ -713,69 +705,215 @@ def suggestions_view():
         accent=color_primary(),
     )
 
-async def on_cleanup_select(interaction: discord.Interaction):
-    val = interaction.data["values"][0]
-    if val == "none":
-        await interaction.response.send_message("❌ Nenhum canal disponível.", ephemeral=True)
+# ===================== 🧹 LIMPEZA DE CHAT (MULTI-SELECT) =====================
+_cleanup_selection = {}  # user_id -> list[int]
+
+async def _on_cleanup_select(interaction: discord.Interaction):
+    sel = interaction.data.get("values", [])
+    _cleanup_selection[interaction.user.id] = [int(v) for v in sel if v != "none"]
+    ids = _cleanup_selection[interaction.user.id]
+    if not ids:
+        await interaction.response.send_message("❌ Nenhum canal selecionado.", ephemeral=True)
         return
-    channel = interaction.guild.get_channel(int(val))
-    if not channel or not isinstance(channel, discord.TextChannel):
-        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
-    perms = channel.permissions_for(interaction.guild.me)
-    if not perms.manage_messages or not perms.read_message_history:
+    mentions = "\n".join(f"• <#{c}>" for c in ids)
+    await interaction.response.send_message(
+        f"✅ **{len(ids)} canal(is)** selecionado(s):\n{mentions}\n\n"
+        f"-# Clique em **🧹 Iniciar Limpeza** para começar.",
+        ephemeral=True
+    )
+
+def chat_cleanup_view():
+    layout = ui.LayoutView(timeout=600)
+
+    channel_select = ui.Select(
+        placeholder="🧹 Selecione um ou mais canais para limpar...",
+        options=text_channel_options(),
+        min_values=1,
+        max_values=25,
+        custom_id="cleanup_multi_select",
+    )
+    channel_select.callback = _on_cleanup_select
+
+    start_btn = ui.Button(label="Iniciar Limpeza", style=D, emoji="🧹", custom_id="cleanup_start")
+    async def on_start(interaction: discord.Interaction):
+        await run_multi_cleanup(interaction)
+    start_btn.callback = on_start
+
+    back_btn = _btn("Voltar ao Menu", "back_main", S, "↩️")
+
+    layout.add_item(ui.Container(
+        ui.TextDisplay("# 🧹 Limpeza de Chat"),
+        ui.Section(
+            ui.TextDisplay(
+                "**Selecione vários canais** no menu abaixo e clique em **🧹 Iniciar Limpeza**.\n"
+                "Uma **barra de progresso detalhada** mostrará o andamento em tempo real.\n"
+                "-# ⚠️ Ação irreversível. O bot precisa de `Gerenciar Mensagens` em cada canal."
+            ),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.TextDisplay("### 📂 Canais (selecione um ou mais)"),
+        ui.ActionRow(channel_select),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(start_btn, back_btn),
+        accent_color=color_danger(),
+    ))
+    return layout
+
+async def _purge_channel(channel, guild, on_progress):
+    """
+    Limpa TODAS as mensagens de um canal.
+    on_progress(deleted_so_far, phase_str) é chamado periodicamente.
+    Retorna (total_deleted, erro).
+    """
+    total = 0
+    erro = None
+    cutoff = discord.utils.utcnow() - datetime.timedelta(days=13)
+
+    # Fase 1: bulk delete < 14 dias
+    try:
+        while True:
+            try:
+                deleted = await channel.purge(limit=100, after=cutoff, bulk=True)
+            except discord.HTTPException as e:
+                logger.warning(f"Bulk falhou em {channel.name}: {e}")
+                break
+            if not deleted:
+                break
+            total += len(deleted)
+            await on_progress(total, "🟢 Bulk delete")
+            await asyncio.sleep(0.9)
+    except Exception as e:
+        logger.error(f"Erro fase 1 {channel.name}: {e}")
+
+    # Fase 2: individual delete para antigas
+    erros_consec = 0
+    try:
+        async for msg in channel.history(limit=None, before=cutoff, oldest_first=False):
+            try:
+                await msg.delete()
+                total += 1
+                erros_consec = 0
+                await on_progress(total, "🟡 Delete individual (antigas)")
+                await asyncio.sleep(1.1)
+            except discord.NotFound:
+                continue
+            except discord.Forbidden as e:
+                erro = f"Forbidden: {e}"
+                break
+            except discord.HTTPException as e:
+                erros_consec += 1
+                if erros_consec >= 5:
+                    erro = f"muitos erros: {e}"
+                    break
+                await asyncio.sleep(2.0)
+    except Exception as e:
+        logger.error(f"Erro fase 2 {channel.name}: {e}")
+        erro = str(e)
+
+    return total, erro
+
+async def run_multi_cleanup(interaction: discord.Interaction):
+    user_id = interaction.user.id
+    ids = _cleanup_selection.get(user_id, [])
+    if not ids:
+        await interaction.response.send_message("❌ Nenhum canal selecionado. Use o menu antes.", ephemeral=True)
+        return
+
+    # Valida canais
+    channels = []
+    for cid in ids:
+        ch = interaction.guild.get_channel(cid)
+        if not ch or not isinstance(ch, discord.TextChannel):
+            continue
+        perms = ch.permissions_for(interaction.guild.me)
+        if perms.manage_messages and perms.read_message_history:
+            channels.append(ch)
+
+    if not channels:
         await interaction.response.send_message(
-            f"❌ Preciso de **Gerenciar Mensagens** e **Ler Histórico** em {channel.mention}.",
+            "❌ Nenhum canal válido para limpar (verifique permissões `Gerenciar Mensagens` + `Ler Histórico`).",
             ephemeral=True
-        ); return
+        )
+        return
+
     await interaction.response.defer(ephemeral=True)
-    total, erro = await perform_chat_cleanup(channel, interaction.guild)
+
+    start_time = datetime.datetime.now()
+    total_deleted = 0
+    results = []
+
+    # Mensagem de progresso inicial
+    init_view = _build_cleanup_progress_view(0, len(channels), None, 0, start_time)
+    progress_msg = await interaction.edit_original_response(view=init_view)
+
+    for idx, ch in enumerate(channels, start=1):
+        last_update = {"t": datetime.datetime.now()}
+        ch_deleted_holder = {"n": 0}
+
+        async def on_progress(deleted_so_far, phase):
+            ch_deleted_holder["n"] = deleted_so_far
+            now = datetime.datetime.now()
+            # Atualiza no máximo a cada 1.8s para não floodar
+            if (now - last_update["t"]).total_seconds() < 1.8:
+                return
+            last_update["t"] = now
+            view = _build_cleanup_progress_view(
+                idx - 1, len(channels), ch, deleted_so_far, start_time, phase
+            )
+            try:
+                await progress_msg.edit(view=view)
+            except Exception:
+                pass
+
+        ch_deleted, _err = await _purge_channel(ch, interaction.guild, on_progress)
+        total_deleted += ch_deleted
+        results.append((ch, ch_deleted))
+
+        # Update final do canal
+        view = _build_cleanup_progress_view(idx, len(channels), None, 0, start_time)
+        try:
+            await progress_msg.edit(view=view)
+        except Exception:
+            pass
+
+    # Resumo final
+    elapsed = (datetime.datetime.now() - start_time).total_seconds()
+    m, s = int(elapsed // 60), int(elapsed % 60)
+
+    lines = [
+        f"### ✅ Resumo",
+        f"**Tempo total:** `{m:02d}m {s:02d}s`",
+        f"**Canais limpos:** `{len(results)}`",
+        f"**Total apagado:** `{total_deleted}` mensagens",
+        "",
+        "### 📋 Por canal",
+    ]
+    for ch, cnt in results:
+        lines.append(f"• {ch.mention} — `{cnt}` mensagens")
+
+    summary = "\n".join(lines)
+    final_view = _build_cleanup_final_view(summary)
+    try:
+        await progress_msg.edit(view=final_view)
+    except Exception:
+        pass
+
+    # Log em moderation_logs
     log_id = config.get("moderation_logs_channel_id")
     if log_id:
         log_ch = interaction.guild.get_channel(log_id)
         if log_ch:
             try:
                 await log_ch.send(
-                    f"🧹 **Limpeza de Chat** — {channel.mention}\n"
-                    f"• Executado por: {interaction.user.mention}\n"
-                    f"• Mensagens apagadas: **{total}**"
+                    f"🧹 **Limpeza Múltipla** por {interaction.user.mention}\n"
+                    f"**Canais:** {len(results)} | **Total:** `{total_deleted}`\n" +
+                    "\n".join(f"• {ch.mention} — `{cnt}`" for ch, cnt in results)
                 )
-            except Exception: pass
-    if erro:
-        await interaction.followup.send(
-            f"⚠️ Limpeza concluída com avisos.\n• Canal: {channel.mention}\n• Apagadas: **{total}**\n• Erro: `{erro}`",
-            ephemeral=True
-        )
-    else:
-        await interaction.followup.send(
-            f"✅ **Limpeza concluída!**\n• Canal: {channel.mention}\n• Mensagens apagadas: **{total}**",
-            ephemeral=True
-        )
+            except Exception:
+                pass
 
-def chat_cleanup_view():
-    layout = ui.LayoutView(timeout=300)
-    channel_select = ui.Select(
-        placeholder="🧹 Escolha o canal para apagar TUDO...",
-        options=text_channel_options(),
-        custom_id="cleanup_channel_select",
-    )
-    channel_select.callback = on_cleanup_select
-    layout.add_item(ui.Container(
-        ui.TextDisplay("# 🧹 Limpeza de Chat"),
-        ui.Section(
-            ui.TextDisplay(
-                "Apaga **TODAS** as mensagens de um canal, **independente da idade**.\n"
-                "-# ⚠️ Esta ação é irreversível. O bot precisa de `Gerenciar Mensagens`."
-            ),
-            accessory=ui.Thumbnail(media=_thumb()),
-        ),
-        ui.Separator(spacing=discord.SeparatorSpacing.small),
-        ui.TextDisplay("### 📂 Selecione o canal"),
-        ui.ActionRow(channel_select),
-        ui.Separator(spacing=discord.SeparatorSpacing.small),
-        ui.ActionRow(_btn("Voltar ao Menu", "back_main", D, "↩️")),
-        accent_color=color_danger(),
-    ))
-    return layout
+    _cleanup_selection.pop(user_id, None)
 
 def show_config_view():
     layout = ui.LayoutView(timeout=300)
@@ -787,6 +925,10 @@ def show_config_view():
         cid = config.get(key)
         return f"<#{cid}>" if cid else "—"
 
+    method_labels = {"math": "🧮 Matemática", "button": "🔘 Botão"}
+    diff_labels = {1: "Fácil", 2: "Médio", 3: "Difícil"}
+    kick = config.get("verification_kick_minutes", 0)
+
     lines = [
         f"### 🏷️ Marca",
         f"**Nome:** {bname()} {bemoji()}",
@@ -794,17 +936,14 @@ def show_config_view():
         f"**Admin Roles:** {role_list('admin_role_ids')}",
         "",
         f"### ✅ Captcha",
-        f"**Cargos:** {role_list('verified_role_ids')}",
+        f"**Método:** `{method_labels.get(config.get('verification_method','math'),'—')}`",
+        f"**Dificuldade:** `{diff_labels.get(config.get('verification_difficulty',1),'—')}`",
+        f"**Kick auto:** `{'Desativado' if not kick else f'{kick} min'}`",
+        f"**Cargos Verificados:** {role_list('verified_role_ids')}",
+        f"**Cargos Não Verificado:** {role_list('verification_unverified_role_ids')}",
         f"**Canal Verif:** {ch('verification_channel_id')}",
         f"**Canal Painel:** {ch('verification_panel_channel_id')}",
-        "",
-        f"### 🔞 +18",
-        f"**Ativo:** `{config.get('age_verification_enabled')}`  |  **Kick menores:** `{config.get('age_kick_underage')}`",
-        f"**Maiores:** {role_list('age_verified_role_ids')}",
-        f"**Menores:** {role_list('age_underage_role_ids')}",
-        f"**Não Verif:** {role_list('age_unverified_role_ids')}",
-        f"**Verif. Nativa:** {role_list('age_native_verification_role_ids')}",
-        f"**Canal Verif:** {ch('age_verification_channel_id')}",
+        f"**Canal Log:** {ch('verification_log_channel_id')}",
         "",
         f"### 💌 Boas-vindas & Saída",
         f"**Entrada:** {ch('welcome_channel_id')}",
@@ -884,7 +1023,7 @@ def multi_role_view(key, title, current_ids):
     ))
     return layout
 
-def single_channel_view(key, title):
+def single_channel_view(key, title, admin_only=False):
     layout = ui.LayoutView(timeout=180)
     opts = text_channel_options()
     sel = ui.Select(placeholder=title, options=opts)
@@ -893,7 +1032,12 @@ def single_channel_view(key, title):
         if val == "none":
             await interaction.response.send_message("❌ Nenhum canal.", ephemeral=True); return
         config[key] = int(val); save_config(config)
-        await interaction.response.send_message(f"✅ **{title}:** <#{val}>", ephemeral=True)
+        ch = interaction.guild.get_channel(int(val))
+        msg = f"✅ **{title}:** <#{val}>"
+        if admin_only and ch:
+            await make_channel_admin_only(ch)
+            msg += "\n🔒 Canal restrito a **admins**."
+        await interaction.response.send_message(msg, ephemeral=True)
     sel.callback = cb
     layout.add_item(ui.Container(
         ui.TextDisplay(f"# 📌 {title}"),
@@ -987,6 +1131,51 @@ def status_view():
     ))
     return layout
 
+def verification_method_view():
+    layout = ui.LayoutView(timeout=180)
+    sel = ui.Select(placeholder="Escolha o método de verificação", options=[
+        discord.SelectOption(label="🧮 Matemática", value="math", description="Resolver conta para verificar"),
+        discord.SelectOption(label="🔘 Botão",      value="button", description="Apenas clicar em verificar"),
+    ])
+    async def cb(interaction):
+        config["verification_method"] = sel.values[0]; save_config(config)
+        await interaction.response.send_message(f"✅ Método: **{sel.values[0]}**", ephemeral=True)
+    sel.callback = cb
+    layout.add_item(ui.Container(
+        ui.TextDisplay("# 🔀 Método de Verificação"),
+        ui.Section(
+            ui.TextDisplay("Escolha como os usuários irão se verificar."),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(sel),
+        accent_color=color_secondary(),
+    ))
+    return layout
+
+def verification_diff_view():
+    layout = ui.LayoutView(timeout=180)
+    sel = ui.Select(placeholder="Escolha a dificuldade da matemática", options=[
+        discord.SelectOption(label="Fácil",   value="1", description="Números de 1 a 10"),
+        discord.SelectOption(label="Médio",   value="2", description="Números de 10 a 50 + multiplicação"),
+        discord.SelectOption(label="Difícil", value="3", description="Números de 100 a 500"),
+    ])
+    async def cb(interaction):
+        config["verification_difficulty"] = int(sel.values[0]); save_config(config)
+        await interaction.response.send_message(f"✅ Dificuldade: **{sel.values[0]}**", ephemeral=True)
+    sel.callback = cb
+    layout.add_item(ui.Container(
+        ui.TextDisplay("# 🎚️ Dificuldade"),
+        ui.Section(
+            ui.TextDisplay("Escolha a dificuldade do desafio de matemática."),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(sel),
+        accent_color=color_secondary(),
+    ))
+    return layout
+
 # ===================== HANDLER GLOBAL =====================
 @bot.event
 async def on_interaction(interaction: discord.Interaction):
@@ -995,7 +1184,8 @@ async def on_interaction(interaction: discord.Interaction):
     cid = interaction.data.get("custom_id", "")
     if not cid:
         return
-    if cid in ("pxk_main_menu", "cleanup_channel_select"):
+    # esses têm callback próprio
+    if cid in ("pxk_main_menu", "cleanup_multi_select", "cleanup_start"):
         return
 
     try:
@@ -1031,33 +1221,21 @@ async def on_interaction(interaction: discord.Interaction):
 
         # ---------- CAPTCHA ----------
         elif cid == "cap_roles":
-            await interaction.response.send_message(view=multi_role_view("verified_role_ids", "Cargos de Verificação", config.get("verified_role_ids", [])), ephemeral=True)
+            await interaction.response.send_message(view=multi_role_view("verified_role_ids", "Cargos Entregues (verificados)", config.get("verified_role_ids", [])), ephemeral=True)
+        elif cid == "cap_unver":
+            await interaction.response.send_message(view=multi_role_view("verification_unverified_role_ids", "Cargos Não Verificado", config.get("verification_unverified_role_ids", [])), ephemeral=True)
+        elif cid == "cap_method":
+            await interaction.response.send_message(view=verification_method_view(), ephemeral=True)
+        elif cid == "cap_diff":
+            await interaction.response.send_message(view=verification_diff_view(), ephemeral=True)
+        elif cid == "cap_kick":
+            await interaction.response.send_modal(KickTimeModal())
         elif cid == "cap_ch":
             await interaction.response.send_message(view=single_channel_view("verification_channel_id", "Canal de Verificação"), ephemeral=True)
         elif cid == "cap_pch":
             await interaction.response.send_message(view=single_channel_view("verification_panel_channel_id", "Canal do Painel"), ephemeral=True)
-
-        # ---------- +18 ----------
-        elif cid == "age_toggle":
-            config["age_verification_enabled"] = not config.get("age_verification_enabled", False)
-            save_config(config)
-            await interaction.response.send_message(f"✅ Sistema +18 {'ativado' if config['age_verification_enabled'] else 'desativado'}.", ephemeral=True)
-        elif cid == "age_kick":
-            config["age_kick_underage"] = not config.get("age_kick_underage", True)
-            save_config(config)
-            await interaction.response.send_message(f"✅ Expulsão de menores {'ativada' if config['age_kick_underage'] else 'desativada'}.", ephemeral=True)
-        elif cid == "age_adult":
-            await interaction.response.send_message(view=multi_role_view("age_verified_role_ids", "Cargos +18 (Maiores)", config.get("age_verified_role_ids", [])), ephemeral=True)
-        elif cid == "age_under":
-            await interaction.response.send_message(view=multi_role_view("age_underage_role_ids", "Cargos -18 (Menores)", config.get("age_underage_role_ids", [])), ephemeral=True)
-        elif cid == "age_unver":
-            await interaction.response.send_message(view=multi_role_view("age_unverified_role_ids", "Cargos Não Verificado", config.get("age_unverified_role_ids", [])), ephemeral=True)
-        elif cid == "age_native":
-            await interaction.response.send_message(view=multi_role_view("age_native_verification_role_ids", "Cargos Verificação Nativa", config.get("age_native_verification_role_ids", [])), ephemeral=True)
-        elif cid == "age_ch":
-            await interaction.response.send_message(view=single_channel_view("age_verification_channel_id", "Canal de Verificação +18"), ephemeral=True)
-        elif cid == "age_pch":
-            await interaction.response.send_message(view=single_channel_view("age_panel_channel_id", "Canal do Painel de Idade"), ephemeral=True)
+        elif cid == "cap_log":
+            await interaction.response.send_message(view=single_channel_view("verification_log_channel_id", "Canal de Log", admin_only=True), ephemeral=True)
 
         # ---------- BOAS-VINDAS & SAÍDA ----------
         elif cid == "wel_ch":
@@ -1066,8 +1244,6 @@ async def on_interaction(interaction: discord.Interaction):
             await interaction.response.send_modal(WelcomeDefaultMessageModal())
         elif cid == "wel_img":
             await interaction.response.send_modal(URLModal("welcome_image_url", "URL da Imagem de Boas-vindas"))
-        elif cid == "wel_user":
-            await interaction.response.send_message(view=WelcomeUserSelectView(), ephemeral=True)
         elif cid == "wel_test":
             await interaction.response.defer(ephemeral=True)
             await send_welcome_message(interaction.user)
@@ -1081,11 +1257,11 @@ async def on_interaction(interaction: discord.Interaction):
             await send_leave_message(interaction.user)
             await interaction.followup.send("✅ Teste de saída enviado!", ephemeral=True)
 
-        # ---------- LOGS DE VOZ ----------
+        # ---------- LOGS DE VOZ (admin-only) ----------
         elif cid == "vl_join_ch":
-            await interaction.response.send_message(view=single_channel_view("voice_join_log_channel_id", "Canal de Log — Entrou"), ephemeral=True)
+            await interaction.response.send_message(view=single_channel_view("voice_join_log_channel_id", "Canal de Log — Entrou", admin_only=True), ephemeral=True)
         elif cid == "vl_leave_ch":
-            await interaction.response.send_message(view=single_channel_view("voice_leave_log_channel_id", "Canal de Log — Saiu"), ephemeral=True)
+            await interaction.response.send_message(view=single_channel_view("voice_leave_log_channel_id", "Canal de Log — Saiu", admin_only=True), ephemeral=True)
         elif cid == "vl_join_test":
             await interaction.response.defer(ephemeral=True)
             vc = interaction.guild.voice_client
@@ -1161,12 +1337,10 @@ async def on_interaction(interaction: discord.Interaction):
             await interaction.response.send_modal(SuggestionModal())
         elif cid == "verify_now":
             await handle_captcha_start(interaction)
-        elif cid == "captcha_verify":
+        elif cid == "captcha_solve":
             await interaction.response.send_modal(CaptchaModal.from_button(interaction))
-        elif cid == "age_panel_verify":
-            if not config.get("age_verification_enabled", False):
-                await interaction.response.send_message("❌ Sistema desativado.", ephemeral=True); return
-            await interaction.response.send_modal(AgeVerificationModal(interaction.user.id))
+        elif cid == "captcha_button_verify":
+            await handle_button_verify(interaction)
         elif cid == "rate_ticket":
             await interaction.response.send_modal(TicketRatingModal(interaction.channel.name))
         elif cid == "close_ticket":
@@ -1180,52 +1354,6 @@ async def on_interaction(interaction: discord.Interaction):
         pass
     except Exception as e:
         logger.error(f"Erro interaction {cid}: {e}", exc_info=True)
-
-# ===================== LIMPEZA DE CHAT — CORE =====================
-async def perform_chat_cleanup(channel: discord.TextChannel, guild: discord.Guild):
-    total = 0
-    erro = None
-    cutoff = discord.utils.utcnow() - datetime.timedelta(days=13)
-
-    try:
-        while True:
-            try:
-                deleted = await channel.purge(limit=100, after=cutoff, bulk=True)
-            except discord.HTTPException as e:
-                logger.warning(f"Bulk delete falhou: {e}")
-                break
-            if not deleted:
-                break
-            total += len(deleted)
-            await asyncio.sleep(1.0)
-    except Exception as e:
-        logger.error(f"Erro fase 1: {e}", exc_info=True)
-
-    erros_consecutivos = 0
-    try:
-        async for msg in channel.history(limit=None, before=cutoff, oldest_first=False):
-            try:
-                await msg.delete()
-                total += 1
-                erros_consecutivos = 0
-                await asyncio.sleep(1.2)
-            except discord.NotFound:
-                continue
-            except discord.Forbidden as e:
-                erro = f"Forbidden: {e}"
-                break
-            except discord.HTTPException as e:
-                erros_consecutivos += 1
-                logger.warning(f"Erro delete: {e}")
-                if erros_consecutivos >= 5:
-                    erro = f"muitos erros: {e}"
-                    break
-                await asyncio.sleep(2.5)
-    except Exception as e:
-        logger.error(f"Erro fase 2: {e}", exc_info=True)
-        erro = str(e)
-
-    return total, erro
 
 # ===================== MODAIS =====================
 class BrandNameModal(ui.Modal, title="✏️ Nome da Marca"):
@@ -1290,36 +1418,26 @@ class LeaveMessageModal(ui.Modal, title="Mensagem de Saída"):
         config["leave_message"] = self.msg.value; save_config(config)
         await interaction.response.send_message("✅ Mensagem de saída atualizada!", ephemeral=True)
 
-class EventModal(ui.Modal, title="📅 Agendar Evento"):
-    mensagem = ui.TextInput(label="Mensagem", style=discord.TextStyle.paragraph, required=True)
-    canal_id = ui.TextInput(label="ID do Canal", required=True)
-    data = ui.TextInput(label="Data (AAAA-MM-DD)", required=True)
-    hora = ui.TextInput(label="Hora (HH:MM)", required=True)
+class KickTimeModal(ui.Modal, title="⏰ Tempo para Verificar"):
+    def __init__(self):
+        super().__init__()
+        cur = config.get("verification_kick_minutes", 0)
+        self.v = ui.TextInput(
+            label="Minutos (0 = desativar)",
+            default=str(cur),
+            required=True, min_length=1, max_length=4
+        )
+        self.add_item(self.v)
     async def on_submit(self, interaction):
         try:
-            channel_id = int(self.canal_id.value)
-            dt = datetime.datetime.strptime(f"{self.data.value} {self.hora.value}", "%Y-%m-%d %H:%M")
-        except Exception:
-            await interaction.response.send_message("❌ Formato inválido.", ephemeral=True); return
-        if dt < datetime.datetime.now():
-            await interaction.response.send_message("❌ Data no futuro.", ephemeral=True); return
-        add_scheduled_event("once", channel_id, self.mensagem.value, dt.isoformat())
-        await interaction.response.send_message(f"✅ Evento agendado para {dt.strftime('%d/%m/%Y %H:%M')}.", ephemeral=True)
-
-class ReminderModal(ui.Modal, title="⏰ Lembrete"):
-    msg = ui.TextInput(label="Mensagem", style=discord.TextStyle.paragraph, required=True)
-    data = ui.TextInput(label="Data (AAAA-MM-DD)", required=True)
-    hora = ui.TextInput(label="Hora (HH:MM)", required=True)
-    async def on_submit(self, interaction):
-        try:
-            dt = datetime.datetime.strptime(f"{self.data.value} {self.hora.value}", "%Y-%m-%d %H:%M")
-        except Exception:
-            await interaction.response.send_message("❌ Formato inválido.", ephemeral=True); return
-        if dt < datetime.datetime.now():
-            await interaction.response.send_message("❌ Data futura.", ephemeral=True); return
-        config["reminders"].append({"user_id": interaction.user.id, "message": self.msg.value, "datetime_iso": dt.isoformat()})
+            val = int(self.v.value.strip())
+            if val < 0: raise ValueError
+        except ValueError:
+            await interaction.response.send_message("❌ Número inválido.", ephemeral=True); return
+        config["verification_kick_minutes"] = val
         save_config(config)
-        await interaction.response.send_message(f"✅ Lembrete para {dt.strftime('%d/%m/%Y %H:%M')}", ephemeral=True)
+        msg = "✅ Kick automático desativado." if val == 0 else f"✅ Kick em **{val} min**."
+        await interaction.response.send_message(msg, ephemeral=True)
 
 class SuggestionModal(ui.Modal, title="💡 Enviar Sugestão"):
     sugestao = ui.TextInput(label="Sua sugestão", style=discord.TextStyle.paragraph, required=True)
@@ -1336,85 +1454,6 @@ class SuggestionModal(ui.Modal, title="💡 Enviar Sugestão"):
         msg = await channel.send(embed=e)
         await msg.add_reaction("👍"); await msg.add_reaction("👎")
         await interaction.response.send_message("✅ Sugestão enviada!", ephemeral=True)
-
-class AgeVerificationModal(ui.Modal, title="🔞 Verificação de Idade"):
-    def __init__(self, user_id):
-        super().__init__()
-        self.user_id = user_id
-        self.nascimento = ui.TextInput(label="Data de nascimento", placeholder="DD/MM/AAAA", required=True, min_length=10, max_length=10)
-        self.add_item(self.nascimento)
-    async def on_submit(self, interaction):
-        guild = interaction.guild
-        member = guild.get_member(self.user_id)
-        if not member:
-            await interaction.response.send_message("❌ Usuário não encontrado.", ephemeral=True); return
-        idade = calcular_idade(self.nascimento.value)
-        if idade is None:
-            await interaction.response.send_message("❌ Data inválida. Use DD/MM/AAAA.", ephemeral=True); return
-
-        adult = config.get("age_verified_role_ids", [])
-        under = config.get("age_underage_role_ids", [])
-        unver = config.get("age_unverified_role_ids", [])
-        kick = config.get("age_kick_underage", True)
-
-        async def add_roles(ids):
-            for rid in ids:
-                r = guild.get_role(rid)
-                if r and r not in member.roles:
-                    try: await member.add_roles(r)
-                    except Exception: pass
-        async def rm_roles(ids):
-            for rid in ids:
-                r = guild.get_role(rid)
-                if r and r in member.roles:
-                    try: await member.remove_roles(r)
-                    except Exception: pass
-
-        if idade >= 18:
-            await add_roles(adult)
-            await rm_roles(unver + under)
-            await interaction.response.send_message("✅ **Verificado!** Bem-vindo(a)! 🖤", ephemeral=True)
-        else:
-            if kick:
-                try:
-                    await guild.kick(member, reason=f"Menor ({idade})")
-                    await interaction.response.send_message("❌ Expulso por idade.", ephemeral=True)
-                except discord.Forbidden:
-                    await add_roles(under); await rm_roles(unver + adult)
-                    await interaction.response.send_message("⚠️ Não foi possível expulsar. Cargo restrito aplicado.", ephemeral=True)
-            else:
-                await add_roles(under); await rm_roles(unver + adult)
-                await interaction.response.send_message(f"🔞 **Menor de idade ({idade} anos).** Cargo restrito aplicado.", ephemeral=True)
-
-class CaptchaModal(ui.Modal, title="🔐 Verificação Captcha"):
-    def __init__(self, answer, guild_id, user_id, channel_id):
-        super().__init__()
-        self.answer = answer
-        self.guild_id = guild_id
-        self.user_id = user_id
-        self.channel_id = channel_id
-        self.resposta = ui.TextInput(label="Resultado", required=True)
-        self.add_item(self.resposta)
-    @classmethod
-    def from_button(cls, interaction):
-        return cls(answer="0", guild_id=interaction.guild.id, user_id=interaction.user.id, channel_id=interaction.channel.id)
-    async def on_submit(self, interaction):
-        guild = bot.get_guild(self.guild_id)
-        if not guild:
-            await interaction.response.send_message("❌ Servidor não encontrado.", ephemeral=True); return
-        member = guild.get_member(self.user_id)
-        for rid in config.get("verified_role_ids", []):
-            r = guild.get_role(rid)
-            if r and member and r not in member.roles:
-                try: await member.add_roles(r)
-                except Exception: pass
-        if config.get("age_verification_enabled", False):
-            ch = guild.get_channel(self.channel_id)
-            if ch and member:
-                await iniciar_verificacao_idade(member, ch)
-                await interaction.response.send_message("✅ Captcha resolvido! Agora verifique sua idade.", ephemeral=True)
-        else:
-            await interaction.response.send_message("✅ Verificação concluída!", ephemeral=True)
 
 class TicketRatingModal(ui.Modal, title="⭐ Avaliar Atendimento"):
     def __init__(self, ticket_name):
@@ -1446,39 +1485,6 @@ class TicketRatingModal(ui.Modal, title="⭐ Avaliar Atendimento"):
         await interaction.response.send_message("✅ Obrigado!", ephemeral=True)
 
 # ===================== VIEWS SIMPLES =====================
-class WelcomeUserSelectView(ui.View):
-    def __init__(self):
-        super().__init__(timeout=60)
-        self.add_item(WelcomeUserSelect())
-
-class WelcomeUserSelect(ui.Select):
-    def __init__(self):
-        guild = get_guild()
-        opts = []
-        if guild:
-            for m in guild.members:
-                if not m.bot:
-                    opts.append(discord.SelectOption(label=m.display_name[:100], value=str(m.id), description=f"@{m.name}"))
-        if not opts: opts = [discord.SelectOption(label="Nenhum", value="none")]
-        super().__init__(placeholder="Selecione um usuário", options=opts[:25])
-    async def callback(self, interaction):
-        val = self.values[0]
-        if val == "none":
-            await interaction.response.send_message("❌ Nenhum usuário.", ephemeral=True); return
-        await interaction.response.send_modal(WelcomeUserMessageModal(int(val)))
-
-class WelcomeUserMessageModal(ui.Modal, title="Mensagem Personalizada"):
-    def __init__(self, user_id):
-        super().__init__()
-        self.user_id = user_id
-        self.msg = ui.TextInput(label="Mensagem", style=discord.TextStyle.paragraph, required=True)
-        self.add_item(self.msg)
-        self.img = ui.TextInput(label="URL da imagem (opcional)", required=False)
-        self.add_item(self.img)
-    async def on_submit(self, interaction):
-        set_welcome_message(self.user_id, self.msg.value, self.img.value.strip() or None)
-        await interaction.response.send_message("✅ Personalizado!", ephemeral=True)
-
 class ConfirmCloseView(ui.View):
     def __init__(self, channel_id):
         super().__init__(timeout=60)
@@ -1580,57 +1586,201 @@ async def handle_ticket_open(interaction, tipo, nome):
 
     await interaction.response.send_message(f"✅ Ticket criado em {channel.mention}!", ephemeral=True)
 
-async def handle_captcha_start(interaction):
-    num1, num2 = random.randint(1, 10), random.randint(1, 10)
-    answer = num1 + num2
-    e = discord.Embed(
-        title=f"🔐 Verificação para {interaction.user.display_name}",
-        description=f"Resolva: **{num1} + {num2} = ?**\n\nClique abaixo para responder.",
-        color=color_secondary()
-    )
-    view = ui.View(timeout=300)
-    view.add_item(CaptchaButton(answer, interaction.guild.id, interaction.channel.id))
-    await interaction.channel.send(embed=e, view=view)
-    await interaction.response.send_message("✅ Desafio enviado!", ephemeral=True)
+# ===================== CAPTCHA (MELHORADO) =====================
+_pending_kicks = {}  # (guild_id, user_id) -> asyncio.Task
 
-class CaptchaButton(ui.Button):
-    def __init__(self, answer, guild_id, channel_id):
-        super().__init__(label="✅ Verificar", style=discord.ButtonStyle.success)
-        self.answer = answer
-        self.guild_id = guild_id
-        self.channel_id = channel_id
-    async def callback(self, interaction):
-        await interaction.response.send_modal(CaptchaModal(self.answer, self.guild_id, interaction.user.id, self.channel_id))
-
-# ===================== VERIFICAÇÃO +18 =====================
-async def iniciar_verificacao_idade(member, channel):
-    if any(r.id in config.get("age_verified_role_ids", []) for r in member.roles):
+def schedule_verification_kick(guild, member):
+    minutes = config.get("verification_kick_minutes", 0)
+    if minutes <= 0:
         return
+    key = (guild.id, member.id)
+    if key in _pending_kicks:
+        _pending_kicks[key].cancel()
+
+    async def _kick_later():
+        try:
+            await asyncio.sleep(minutes * 60)
+            m = guild.get_member(member.id)
+            if not m:
+                return
+            unver_ids = config.get("verification_unverified_role_ids", [])
+            if any(r.id in unver_ids for r in m.roles):
+                try:
+                    await guild.kick(m, reason="Não completou a verificação a tempo")
+                    logger.info(f"Kickado {m} por timeout de verificação")
+                except Exception as e:
+                    logger.error(f"Falha ao kickar {m}: {e}")
+        except asyncio.CancelledError:
+            pass
+        finally:
+            _pending_kicks.pop(key, None)
+
+    _pending_kicks[key] = asyncio.create_task(_kick_later())
+
+def cancel_verification_kick(guild_id, user_id):
+    key = (guild_id, user_id)
+    task = _pending_kicks.pop(key, None)
+    if task:
+        task.cancel()
+
+def _generate_math_challenge():
+    diff = config.get("verification_difficulty", 1)
+    if diff == 1:
+        a, b = random.randint(1, 10), random.randint(1, 10)
+        op = "+"
+        answer = a + b
+    elif diff == 2:
+        if random.random() < 0.5:
+            a, b = random.randint(10, 50), random.randint(10, 50)
+            op = "+"
+            answer = a + b
+        else:
+            a, b = random.randint(2, 12), random.randint(2, 12)
+            op = "×"
+            answer = a * b
+    else:
+        if random.random() < 0.5:
+            a, b = random.randint(100, 500), random.randint(100, 500)
+            op = "+"
+            answer = a + b
+        else:
+            a, b = random.randint(2, 15), random.randint(2, 15)
+            op = "×"
+            answer = a * b
+    return f"{a} {op} {b}", answer
+
+async def _log_verification(guild, member, success, extra=""):
+    cid = config.get("verification_log_channel_id")
+    if not cid: return
+    ch = guild.get_channel(cid)
+    if not ch: return
+    icon = "✅" if success else "❌"
+    try:
+        await ch.send(f"{icon} **{member}** (`{member.id}`) — {extra or ('verificado' if success else 'falhou')}")
+    except Exception: pass
+
+async def send_captcha_challenge(member, channel):
+    """Envia o desafio no canal escolhido."""
+    method = config.get("verification_method", "math")
+
+    if method == "button":
+        e = discord.Embed(
+            title=f"✅ Verificação — {bname()}",
+            description=f"Olá {member.mention}! Clique no botão abaixo para se verificar.",
+            color=color_secondary()
+        )
+        view = ui.View(timeout=3600)
+        btn = ui.Button(label="✅ Verificar Agora", style=SU, custom_id="captcha_button_verify")
+        # Nota: custom_id distinto por usuário não é permitido, então usamos o botão genérico
+        view.add_item(btn)
+        # Armazenamos o alvo esperado
+        _button_verification_target[member.id] = True
+        try: await channel.send(content=member.mention, embed=e, view=view)
+        except Exception as e: logger.error(f"Erro enviando verif botão: {e}")
+        return
+
+    # método math (padrão)
+    question, answer = _generate_math_challenge()
+    _math_answers[member.id] = answer
+
     e = discord.Embed(
-        title=f"🔞 Verificação de Idade — {bname()}",
-        description=f"Olá {member.mention}! Confirme que tem **18 anos ou mais** clicando abaixo.",
+        title=f"🧮 Verificação — {bname()}",
+        description=(
+            f"Olá {member.mention}!\n\n"
+            f"Resolva o desafio abaixo clicando em **🔐 Resolver**:\n\n"
+            f"# `{question}`"
+        ),
         color=color_secondary()
     )
-    view = ui.View(timeout=300)
-    view.add_item(AgeVerifyButton(member.id))
-    try: await channel.send(embed=e, view=view)
-    except Exception as e: logger.error(f"Erro verif idade: {e}")
+    view = ui.View(timeout=3600)
+    btn = ui.Button(label="🔐 Resolver", style=SU, custom_id="captcha_solve")
+    view.add_item(btn)
+    try: await channel.send(content=member.mention, embed=e, view=view)
+    except Exception as e: logger.error(f"Erro enviando verif math: {e}")
 
-class AgeVerifyButton(ui.Button):
-    def __init__(self, user_id):
-        super().__init__(label="🔞 Verificar Idade", style=discord.ButtonStyle.danger)
-        self.user_id = user_id
-    async def callback(self, interaction):
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message("❌ Este botão não é para você.", ephemeral=True); return
-        await interaction.response.send_modal(AgeVerificationModal(self.user_id))
+_math_answers = {}            # user_id -> resposta correta
+_button_verification_target = {}  # user_id -> True (aguardando clique)
 
-class AgePanelView(ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-    @ui.button(label="🔞 Verificar Idade", style=discord.ButtonStyle.danger, custom_id="age_panel_verify")
-    async def verify(self, interaction, button):
+async def _grant_verification(guild, member):
+    """Aplica cargos de verificado, remove não-verificado, cancela kick, loga."""
+    # Adiciona cargos verificados
+    for rid in config.get("verified_role_ids", []):
+        r = guild.get_role(rid)
+        if r and r not in member.roles:
+            try: await member.add_roles(r)
+            except Exception: pass
+    # Remove cargos não-verificado
+    for rid in config.get("verification_unverified_role_ids", []):
+        r = guild.get_role(rid)
+        if r and r in member.roles:
+            try: await member.remove_roles(r)
+            except Exception: pass
+    cancel_verification_kick(guild.id, member.id)
+    _math_answers.pop(member.id, None)
+    _button_verification_target.pop(member.id, None)
+    await _log_verification(guild, member, True, "verificado")
+
+async def handle_captcha_start(interaction):
+    """Botão do painel de verificação."""
+    member = interaction.user
+    # Envia o desafio no canal de verificação
+    ch_id = config.get("verification_channel_id")
+    ch = interaction.guild.get_channel(ch_id) if ch_id else interaction.channel
+    if not ch:
+        await interaction.response.send_message("❌ Canal de verificação não configurado.", ephemeral=True); return
+    await send_captcha_challenge(member, ch)
+    await interaction.response.send_message("✅ Desafio enviado! Verifique o canal.", ephemeral=True)
+
+async def handle_button_verify(interaction):
+    """Botão do tipo button (clique direto)."""
+    member = interaction.user
+    if not _button_verification_target.get(member.id):
+        # Ainda assim, permite se os cargos estão configurados
         pass
+    await _grant_verification(interaction.guild, member)
+    await interaction.response.send_message("✅ **Verificado!** Bem-vindo(a)! 🖤", ephemeral=True)
+
+class CaptchaModal(ui.Modal, title="🧮 Verificação"):
+    def __init__(self, guild_id, user_id):
+        super().__init__()
+        self.guild_id = guild_id
+        self.user_id = user_id
+        self.resposta = ui.TextInput(label="Resposta", required=True, max_length=10)
+        self.add_item(self.resposta)
+
+    @classmethod
+    def from_button(cls, interaction):
+        return cls(guild_id=interaction.guild.id, user_id=interaction.user.id)
+
+    async def on_submit(self, interaction):
+        guild = bot.get_guild(self.guild_id)
+        if not guild:
+            await interaction.response.send_message("❌ Servidor não encontrado.", ephemeral=True); return
+        member = guild.get_member(self.user_id) or interaction.user
+
+        expected = _math_answers.get(self.user_id)
+        if expected is None:
+            # Não há desafio pendente — permite passar (fallback)
+            await _grant_verification(guild, member)
+            await interaction.response.send_message("✅ Verificado!", ephemeral=True)
+            return
+
+        try:
+            val = int(self.resposta.value.strip())
+        except ValueError:
+            await interaction.response.send_message("❌ Digite apenas números.", ephemeral=True); return
+
+        if val == expected:
+            await _grant_verification(guild, member)
+            await interaction.response.send_message("✅ **Verificado com sucesso!** 🖤", ephemeral=True)
+        else:
+            await _log_verification(guild, member, False, "errou o desafio")
+            await interaction.response.send_message("❌ Resposta incorreta. Tente novamente.", ephemeral=True)
+            # Reenvia novo desafio
+            ch_id = config.get("verification_channel_id")
+            ch = guild.get_channel(ch_id)
+            if ch:
+                await send_captcha_challenge(member, ch)
 
 class VerificationPanelView(ui.View):
     def __init__(self):
@@ -1639,6 +1789,7 @@ class VerificationPanelView(ui.View):
     async def verify(self, interaction, button):
         pass
 
+# ===================== OUTRAS VIEWS DE PAINEL =====================
 class TicketPanelView(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -1654,7 +1805,7 @@ class SuggestionButtonView(ui.View):
     async def s(self, interaction, button): pass
 
 # ===================== COMANDOS =====================
-@bot.tree.command(name="painelpxkadmin", description="🖤 Painel administrativo do servidor 𝚙𝚡𝚔")
+@bot.tree.command(name="painelpxkadmin", description="🖤 Painel administrativo do servidor")
 @app_commands.default_permissions(administrator=True)
 async def cmd_painel(interaction: discord.Interaction):
     cid = config.get("painel_channel_id")
@@ -1685,7 +1836,7 @@ async def cmd_pt(interaction):
         await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
     e = discord.Embed(
         title=f"🎫 Central de Tickets — {bname()}",
-        description=f"Clique no botão correspondente:\n\n❓ **Dúvidas**\n🛒 **Compras**",
+        description="Clique no botão correspondente:\n\n❓ **Dúvidas**\n🛒 **Compras**",
         color=color_primary()
     )
     if banner_ticket(): e.set_image(url=banner_ticket())
@@ -1724,44 +1875,6 @@ async def cmd_pv(interaction):
     config["verification_panel_message_id"] = msg.id; save_config(config)
     await interaction.response.send_message(f"✅ Enviado em {ch.mention}", ephemeral=True)
 
-@bot.tree.command(name="painelidade", description="🔞 Envia o painel de idade")
-@app_commands.default_permissions(administrator=True)
-async def cmd_pi(interaction):
-    cid = config.get("age_panel_channel_id")
-    if not cid:
-        await interaction.response.send_message("❌ Configure em +18 > Canal do Painel.", ephemeral=True); return
-    ch = interaction.guild.get_channel(cid)
-    if not ch:
-        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
-    e = discord.Embed(
-        title=f"🔞 Verificação de Idade — {bname()}",
-        description="Clique abaixo e informe sua data de nascimento.",
-        color=color_secondary()
-    )
-    msg = await ch.send(embed=e, view=AgePanelView())
-    config["age_panel_message_id"] = msg.id; save_config(config)
-    await interaction.response.send_message(f"✅ Enviado em {ch.mention}", ephemeral=True)
-
-@bot.tree.command(name="reverificar", description="🔄 Força reverificação +18")
-@app_commands.default_permissions(administrator=True)
-async def cmd_rev(interaction, membro: discord.Member):
-    for key in ("age_verified_role_ids", "age_underage_role_ids"):
-        for rid in config.get(key, []):
-            r = interaction.guild.get_role(rid)
-            if r and r in membro.roles:
-                try: await membro.remove_roles(r)
-                except Exception: pass
-    for rid in config.get("age_unverified_role_ids", []):
-        r = interaction.guild.get_role(rid)
-        if r:
-            try: await membro.add_roles(r)
-            except Exception: pass
-    ch_id = config.get("age_verification_channel_id")
-    if ch_id:
-        ch = interaction.guild.get_channel(ch_id)
-        if ch: await iniciar_verificacao_idade(membro, ch)
-    await interaction.response.send_message(f"✅ {membro.mention} colocado para reverificar.", ephemeral=True)
-
 @bot.tree.command(name="limparchat", description="🧹 Apaga TODAS as mensagens de um canal")
 @app_commands.default_permissions(administrator=True)
 @app_commands.describe(canal="Canal que será totalmente limpo")
@@ -1770,11 +1883,30 @@ async def cmd_limpar(interaction: discord.Interaction, canal: discord.TextChanne
     if not perms.manage_messages or not perms.read_message_history:
         await interaction.response.send_message(f"❌ Sem permissão em {canal.mention}.", ephemeral=True); return
     await interaction.response.defer(ephemeral=True)
-    total, erro = await perform_chat_cleanup(canal, interaction.guild)
-    if erro:
-        await interaction.followup.send(f"⚠️ Erro após **{total}** mensagens: `{erro}`", ephemeral=True)
-    else:
-        await interaction.followup.send(f"✅ **{total}** mensagens apagadas de {canal.mention}!", ephemeral=True)
+    start_time = datetime.datetime.now()
+    init_view = _build_cleanup_progress_view(0, 1, None, 0, start_time)
+    progress_msg = await interaction.edit_original_response(view=init_view)
+
+    last_update = {"t": datetime.datetime.now()}
+    async def on_progress(d, phase):
+        now = datetime.datetime.now()
+        if (now - last_update["t"]).total_seconds() < 1.8: return
+        last_update["t"] = now
+        v = _build_cleanup_progress_view(0, 1, canal, d, start_time, phase)
+        try: await progress_msg.edit(view=v)
+        except Exception: pass
+
+    total, erro = await _purge_channel(canal, interaction.guild, on_progress)
+    elapsed = (datetime.datetime.now() - start_time).total_seconds()
+    m, s = int(elapsed // 60), int(elapsed % 60)
+    summary = (
+        f"### ✅ Resumo\n"
+        f"**Tempo:** `{m:02d}m {s:02d}s`\n"
+        f"**Apagadas:** `{total}`\n"
+        f"**Canal:** {canal.mention}"
+        + (f"\n**Erro:** `{erro}`" if erro else "")
+    )
+    await progress_msg.edit(view=_build_cleanup_final_view(summary))
 
 @bot.tree.command(name="mutar", description="🔇 Muta o bot na call")
 async def cmd_mutar(interaction):
@@ -1810,56 +1942,9 @@ async def cmd_status(interaction, modo: str):
     await update_status()
     await interaction.response.send_message(f"✅ Status: **{modo}**", ephemeral=True)
 
-@bot.tree.command(name="lembrete", description="⏰ Agende um lembrete")
-async def cmd_lembrete(interaction, mensagem: str, data: str, hora: str):
-    try:
-        dt = datetime.datetime.strptime(f"{data} {hora}", "%Y-%m-%d %H:%M")
-    except Exception:
-        await interaction.response.send_message("❌ Formato inválido.", ephemeral=True); return
-    if dt < datetime.datetime.now():
-        await interaction.response.send_message("❌ Data futura.", ephemeral=True); return
-    config["reminders"].append({"user_id": interaction.user.id, "message": mensagem, "datetime_iso": dt.isoformat()})
-    save_config(config)
-    await interaction.response.send_message(f"✅ Lembrete para {dt.strftime('%d/%m/%Y %H:%M')}", ephemeral=True)
-
 # ===================== TASKS =====================
 @tasks.loop(minutes=1)
 async def task_voice(): await update_voice_name_impl()
-
-@tasks.loop(seconds=30)
-async def task_reminders():
-    now = datetime.datetime.now()
-    rems = config.get("reminders", [])
-    to_rm = []
-    for i, r in enumerate(rems):
-        try:
-            if datetime.datetime.fromisoformat(r["datetime_iso"]) <= now:
-                u = bot.get_user(r["user_id"])
-                if u:
-                    try: await u.send(f"⏰ **Lembrete {bname()}**: {r['message']}")
-                    except Exception: pass
-                to_rm.append(i)
-        except Exception: to_rm.append(i)
-    if to_rm:
-        for i in reversed(to_rm): del rems[i]
-        save_config(config)
-
-@tasks.loop(seconds=60)
-async def task_events():
-    now = datetime.datetime.now()
-    try: events = get_active_events()
-    except Exception: return
-    for ev in events:
-        try: dt = datetime.datetime.fromisoformat(ev["schedule_time"])
-        except Exception: continue
-        if dt <= now:
-            ch = bot.get_channel(ev["channel_id"])
-            if ch:
-                try: await ch.send(ev["message"])
-                except Exception: pass
-            if ev["event_type"] == "once":
-                try: deactivate_event(ev["id"])
-                except Exception: pass
 
 @tasks.loop(minutes=5)
 async def task_status(): await update_status()
@@ -1909,7 +1994,7 @@ async def on_ready():
     await apply_avatar_if_needed()
     await bot_join_voice()
     await update_status()
-    for t in (task_voice, task_reminders, task_events, task_status):
+    for t in (task_voice, task_status):
         if not t.is_running(): t.start()
 
 @bot.event
@@ -1917,56 +2002,31 @@ async def on_member_join(member):
     if member.bot: return
     guild = member.guild
 
+    # Card de boas-vindas
     try:
         await send_welcome_message(member)
     except Exception as e:
         logger.error(f"Erro send_welcome: {e}")
 
-    if config.get("age_verification_enabled", False):
-        if any(r.id in config.get("age_verified_role_ids", []) for r in member.roles):
-            return
-        if config.get("age_native_verification_role_ids"):
-            for rid in config["age_native_verification_role_ids"]:
-                r = guild.get_role(rid)
-                if r and r in member.roles:
-                    for rid2 in config.get("age_verified_role_ids", []):
-                        r2 = guild.get_role(rid2)
-                        if r2:
-                            try: await member.add_roles(r2)
-                            except Exception: pass
-                    return
-        for rid in config.get("age_unverified_role_ids", []):
-            r = guild.get_role(rid)
-            if r:
-                try: await member.add_roles(r)
-                except Exception: pass
-        ch_id = config.get("age_verification_channel_id")
-        if ch_id:
-            ch = guild.get_channel(ch_id)
-            if ch:
-                n1, n2 = random.randint(1, 10), random.randint(1, 10)
-                e = discord.Embed(
-                    title=f"🔐 Verificação para {member.display_name}",
-                    description=f"Resolva: **{n1} + {n2} = ?**",
-                    color=color_secondary()
-                )
-                v = ui.View(timeout=300)
-                v.add_item(CaptchaButton(n1 + n2, guild.id, ch.id))
-                try: await ch.send(embed=e, view=v)
-                except Exception: pass
-    elif config.get("verification_channel_id"):
-        ch = guild.get_channel(config["verification_channel_id"])
-        if ch:
-            n1, n2 = random.randint(1, 10), random.randint(1, 10)
-            e = discord.Embed(
-                title=f"🔐 Verificação para {member.display_name}",
-                description=f"Resolva: **{n1} + {n2} = ?**",
-                color=color_secondary()
-            )
-            v = ui.View(timeout=300)
-            v.add_item(CaptchaButton(n1 + n2, guild.id, ch.id))
-            try: await ch.send(embed=e, view=v)
+    # Cargo de não-verificado
+    for rid in config.get("verification_unverified_role_ids", []):
+        r = guild.get_role(rid)
+        if r:
+            try: await member.add_roles(r)
             except Exception: pass
+
+    # Envia desafio no canal de verificação
+    ch_id = config.get("verification_channel_id")
+    if ch_id:
+        ch = guild.get_channel(ch_id)
+        if ch:
+            try:
+                await send_captcha_challenge(member, ch)
+            except Exception as e:
+                logger.error(f"Erro enviando desafio: {e}")
+
+    # Agenda kick se configurado
+    schedule_verification_kick(guild, member)
 
     await update_voice_name_impl()
     await update_status()
@@ -1978,6 +2038,7 @@ async def on_member_remove(member):
         await send_leave_message(member)
     except Exception as e:
         logger.error(f"Erro send_leave: {e}")
+    cancel_verification_kick(member.guild.id, member.id)
     await update_voice_name_impl()
     await update_status()
 
