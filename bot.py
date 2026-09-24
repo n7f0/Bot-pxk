@@ -12,7 +12,6 @@ if not TOKEN:
 CONFIG_FILE = "/app/data/config.json"
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-# Reduz spam de logs de voice do discord.py
 logging.getLogger("discord.voice_state").setLevel(logging.WARNING)
 
 # ===================== CONFIG PADRÃO =====================
@@ -31,7 +30,6 @@ DEFAULT_CONFIG = {
     "banner_welcome_url": "",
     "guild_id": None,
 
-    # ---- Verificação Captcha ----
     "verification_method": "math",
     "verification_difficulty": 1,
     "verification_kick_minutes": 0,
@@ -42,18 +40,15 @@ DEFAULT_CONFIG = {
     "verification_panel_message_id": None,
     "verification_log_channel_id": None,
 
-    # ---- Boas-vindas ----
     "welcome_channel_id": None,
     "welcome_message": "Bem-vindo(a) ao servidor!",
     "welcome_image_url": "",
     "leave_channel_id": None,
     "leave_message": "Até logo! Sentiremos sua falta. 💜",
 
-    # ---- Logs de voz ----
     "voice_join_log_channel_id": None,
     "voice_leave_log_channel_id": None,
 
-    # ---- Voz & Status ----
     "voice_channel_id": None,
     "voice_mute": True,
     "bot_status": "online",
@@ -63,7 +58,6 @@ DEFAULT_CONFIG = {
     "painel_channel_id": None,
     "painel_message_id": None,
 
-    # ---- Tickets ----
     "ticket_category_doubt_id": None,
     "ticket_category_purchase_id": None,
     "ticket_logs_channel_id": None,
@@ -71,7 +65,6 @@ DEFAULT_CONFIG = {
     "ticket_panel_message_id": None,
     "ticket_support_role_ids": [],
 
-    # ---- Feedback / Sugestões ----
     "feedback_channel_id": None,
     "suggestions_channel_id": None,
     "suggestions_panel_channel_id": None,
@@ -105,16 +98,8 @@ def load_config():
     for k, v in DEFAULT_CONFIG.items():
         if k not in data:
             data[k] = v
-    _migrate_ids(data)
     save_config(data)
     return data
-
-def _migrate_ids(data):
-    pairs = [("verified_role_id", "verified_role_ids")]
-    for old, new in pairs:
-        if old in data and data[old] and not data.get(new):
-            data[new] = [data[old]]
-        data.pop(old, None)
 
 def save_config(data):
     os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
@@ -198,7 +183,7 @@ def text_channel_options(max_items=25):
                 if c.permissions_for(guild.me).send_messages:
                     opts.append(discord.SelectOption(label=f"#{c.name}"[:100], value=str(c.id)))
             except Exception: continue
-    return opts[:max_items] or [discord.SelectOption(label="Nenhum canal", value="none")]
+    return opts[:max_items] or [discord.SelectOption(label="Nenhum canal disponível", value="none")]
 
 def voice_channel_options():
     guild = get_guild()
@@ -237,9 +222,27 @@ def _safe_media_gallery(media_url):
         return None
     try:
         return MG(MGI(media=media_url))
-    except Exception as e:
-        logger.debug(f"MediaGallery indisponível: {e}")
+    except Exception:
         return None
+
+# ✅ FIX: cria Select com min/max_values clampados ao tamanho de options
+def _safe_select(placeholder, options, custom_id=None,
+                  min_values=1, max_values=1):
+    if not options:
+        options = [discord.SelectOption(label="Nenhuma opção", value="none")]
+    options = options[:25]
+    n = len(options)
+    safe_max = max(1, min(max_values, n))
+    safe_min = max(0, min(min_values, safe_max))
+    kwargs = dict(
+        placeholder=placeholder,
+        options=options,
+        min_values=safe_min,
+        max_values=safe_max,
+    )
+    if custom_id:
+        kwargs["custom_id"] = custom_id
+    return ui.Select(**kwargs)
 
 def premium_submenu(title, description, sections, accent=None):
     layout = ui.LayoutView(timeout=300)
@@ -436,7 +439,6 @@ async def make_channel_admin_only(channel: discord.TextChannel):
 
 # ===================== ANTI-BOT — PAINEL =====================
 def antibot_panel_view():
-    """Réplica visual do painel da imagem."""
     count = get_antibot_count()
 
     comps = []
@@ -446,7 +448,6 @@ def antibot_panel_view():
         if mg is not None:
             comps.append(mg)
         else:
-            # Fallback visual: usa a imagem como Thumbnail em Section
             comps.append(ui.Section(
                 ui.TextDisplay(""),
                 accessory=ui.Thumbnail(media=banner),
@@ -462,7 +463,6 @@ def antibot_panel_view():
     comps.append(ui.TextDisplay(f"> {desc_txt.replace(chr(10), chr(10) + '> ')}"))
     comps.append(ui.Separator(spacing=discord.SeparatorSpacing.small))
 
-    # Botão contador (desabilitado, só para exibir)
     counter_btn = ui.Button(
         label=f"Punidos: {count}",
         style=S,
@@ -476,7 +476,6 @@ def antibot_panel_view():
     return layout
 
 async def refresh_antibot_panel():
-    """Atualiza o contador do painel AntiBot."""
     cid = config.get("antibot_channel_id")
     mid = config.get("antibot_panel_message_id")
     if not cid or not mid: return
@@ -491,8 +490,7 @@ async def refresh_antibot_panel():
         logger.debug(f"Refresh antibot panel: {e}")
 
 # ===================== ANTI-BOT — PUNIÇÃO =====================
-async def _delete_all_user_messages(guild: discord.Guild, user_id: int, limit_per_channel=300):
-    """Apaga mensagens do usuário em todos os canais possíveis."""
+async def _delete_all_user_messages(guild, user_id, limit_per_channel=300):
     deleted = 0
     for channel in guild.text_channels:
         try:
@@ -516,16 +514,13 @@ async def _delete_all_user_messages(guild: discord.Guild, user_id: int, limit_pe
 async def handle_antibot_punish(message: discord.Message):
     guild = message.guild
     member = message.author
+    logger.info(f"🚫 AntiBot: {member} ({member.id}) em #{message.channel.name}")
 
-    logger.info(f"🚫 AntiBot: {member} ({member.id}) enviou mensagem em {message.channel}")
-
-    # Apaga a mensagem dele primeiro
     try:
         await message.delete()
     except Exception:
         pass
 
-    # Apaga TODAS as mensagens dele no servidor
     deleted_count = 0
     if config.get("antibot_delete_messages", True):
         try:
@@ -533,7 +528,6 @@ async def handle_antibot_punish(message: discord.Message):
         except Exception as e:
             logger.error(f"Erro apagando mensagens: {e}")
 
-    # Bane
     banned = False
     if config.get("antibot_punish_ban", True):
         try:
@@ -544,17 +538,15 @@ async def handle_antibot_punish(message: discord.Message):
         except Exception as e:
             logger.error(f"Erro ban: {e}")
 
-    # Registra no banco
     try:
         add_antibot_punishment(member.id, guild.id, "Mensagem em canal protegido",
                                 banned=banned, deleted_count=deleted_count)
     except Exception as e:
         logger.error(f"Erro registrando punição: {e}")
 
-    # Atualiza o painel
+    # ✅ Auto-refresh do contador (imediato)
     await refresh_antibot_panel()
 
-    # Log
     log_id = config.get("antibot_log_channel_id")
     if log_id:
         log_ch = guild.get_channel(log_id)
@@ -586,7 +578,7 @@ def painel_layout():
     ]
     layout.add_item(ui.Container(*header, accent_color=color_primary()))
 
-    select = ui.Select(
+    select = _safe_select(
         placeholder="🖤 Escolha uma categoria para configurar...",
         options=[
             discord.SelectOption(label="Identidade Visual", value="identity", emoji="🎨",
@@ -617,6 +609,7 @@ def painel_layout():
                                  description="Visualizar tudo que está configurado"),
         ],
         custom_id="pxk_main_menu",
+        min_values=1, max_values=1,
     )
     select.callback = main_menu_callback
 
@@ -684,12 +677,12 @@ def identity_view():
         accent=color_primary(),
     )
 
-# ---------- 🚫 ANTI-BOT ----------
 def antibot_view():
     ban_on = config.get("antibot_punish_ban", True)
     del_on = config.get("antibot_delete_messages", True)
     ch_set = "✅" if config.get("antibot_channel_id") else "❌"
     log_set = "✅" if config.get("antibot_log_channel_id") else "❌"
+    total = get_antibot_count()
 
     return premium_submenu(
         "🚫 Anti-Bot",
@@ -697,7 +690,8 @@ def antibot_view():
         f"**Canal protegido:** {ch_set}\n"
         f"**Canal de log:** {log_set}\n"
         f"**Banir:** `{'Ativo' if ban_on else 'Desativado'}`  |  "
-        f"**Apagar msgs:** `{'Ativo' if del_on else 'Desativado'}`",
+        f"**Apagar msgs:** `{'Ativo' if del_on else 'Desativado'}`\n"
+        f"**Total punidos:** `{total}`",
         [
             {"title": "📢 Canal Protegido", "rows": [
                 [_btn("Definir Canal Anti-Bot", "ab_ch", P, "🚫")],
@@ -717,14 +711,8 @@ def antibot_view():
                 ],
             ]},
             {"title": "🎛️ Painel", "rows": [
-                [
-                    _btn("Postar Painel Aqui",   "ab_post",   SU, "📤"),
-                    _btn("Atualizar Contador",   "ab_refresh", P, "🔄"),
-                ],
-                [
-                    _btn("Zerar Contador",       "ab_reset",  D, "🗑️"),
-                    _btn("Preview do Painel",    "ab_preview", S, "👁️"),
-                ],
+                [_btn("Postar Painel Aqui", "ab_post", SU, "📤")],
+                [_btn("Preview do Painel",  "ab_preview", S, "👁️")],
             ]},
         ],
         accent=color_danger(),
@@ -918,11 +906,17 @@ async def _on_cleanup_select(interaction: discord.Interaction):
 
 def chat_cleanup_view():
     layout = ui.LayoutView(timeout=600)
-    channel_select = ui.Select(
+    opts = text_channel_options()
+    # ✅ FIX: clamp max_values ao tamanho real das opções
+    n = len([o for o in opts if o.value != "none"])
+    max_vals = max(1, min(25, n))
+
+    channel_select = _safe_select(
         placeholder="🧹 Selecione um ou mais canais para limpar...",
-        options=text_channel_options(),
-        min_values=1, max_values=25,
+        options=opts,
         custom_id="cleanup_multi_select",
+        min_values=1,
+        max_values=max_vals,
     )
     channel_select.callback = _on_cleanup_select
 
@@ -1208,7 +1202,7 @@ def multi_role_view(key, title, current_ids):
 def single_channel_view(key, title, admin_only=False):
     layout = ui.LayoutView(timeout=180)
     opts = text_channel_options()
-    sel = ui.Select(placeholder=title, options=opts)
+    sel = _safe_select(placeholder=title, options=opts, min_values=1, max_values=1)
     async def cb(interaction):
         val = sel.values[0]
         if val == "none":
@@ -1236,7 +1230,7 @@ def single_channel_view(key, title, admin_only=False):
 def single_voice_view(key, title):
     layout = ui.LayoutView(timeout=180)
     opts = voice_channel_options()
-    sel = ui.Select(placeholder=title, options=opts)
+    sel = _safe_select(placeholder=title, options=opts, min_values=1, max_values=1)
     async def cb(interaction):
         val = sel.values[0]
         if val == "none":
@@ -1268,7 +1262,7 @@ def single_voice_view(key, title):
 def single_category_view(key, title):
     layout = ui.LayoutView(timeout=180)
     opts = category_options()
-    sel = ui.Select(placeholder=title, options=opts)
+    sel = _safe_select(placeholder=title, options=opts, min_values=1, max_values=1)
     async def cb(interaction):
         val = sel.values[0]
         if val == "none":
@@ -1290,12 +1284,16 @@ def single_category_view(key, title):
 
 def status_view():
     layout = ui.LayoutView(timeout=180)
-    sel = ui.Select(placeholder="Escolha o status de presença", options=[
-        discord.SelectOption(label="Online",        value="online",    emoji="🟢"),
-        discord.SelectOption(label="Ausente",       value="idle",      emoji="🟡"),
-        discord.SelectOption(label="Não perturbar", value="dnd",       emoji="🔴"),
-        discord.SelectOption(label="Invisível",     value="invisible", emoji="⚫"),
-    ])
+    sel = _safe_select(
+        placeholder="Escolha o status de presença",
+        options=[
+            discord.SelectOption(label="Online",        value="online",    emoji="🟢"),
+            discord.SelectOption(label="Ausente",       value="idle",      emoji="🟡"),
+            discord.SelectOption(label="Não perturbar", value="dnd",       emoji="🔴"),
+            discord.SelectOption(label="Invisível",     value="invisible", emoji="⚫"),
+        ],
+        min_values=1, max_values=1,
+    )
     async def cb(interaction):
         config["bot_status"] = sel.values[0]; save_config(config)
         await update_status()
@@ -1315,10 +1313,14 @@ def status_view():
 
 def verification_method_view():
     layout = ui.LayoutView(timeout=180)
-    sel = ui.Select(placeholder="Escolha o método de verificação", options=[
-        discord.SelectOption(label="🧮 Matemática", value="math", description="Resolver conta para verificar"),
-        discord.SelectOption(label="🔘 Botão",      value="button", description="Apenas clicar em verificar"),
-    ])
+    sel = _safe_select(
+        placeholder="Escolha o método de verificação",
+        options=[
+            discord.SelectOption(label="🧮 Matemática", value="math", description="Resolver conta para verificar"),
+            discord.SelectOption(label="🔘 Botão",      value="button", description="Apenas clicar em verificar"),
+        ],
+        min_values=1, max_values=1,
+    )
     async def cb(interaction):
         config["verification_method"] = sel.values[0]; save_config(config)
         await interaction.response.send_message(f"✅ Método: **{sel.values[0]}**", ephemeral=True)
@@ -1337,11 +1339,15 @@ def verification_method_view():
 
 def verification_diff_view():
     layout = ui.LayoutView(timeout=180)
-    sel = ui.Select(placeholder="Escolha a dificuldade da matemática", options=[
-        discord.SelectOption(label="Fácil",   value="1", description="Números de 1 a 10"),
-        discord.SelectOption(label="Médio",   value="2", description="Números de 10 a 50 + multiplicação"),
-        discord.SelectOption(label="Difícil", value="3", description="Números de 100 a 500"),
-    ])
+    sel = _safe_select(
+        placeholder="Escolha a dificuldade da matemática",
+        options=[
+            discord.SelectOption(label="Fácil",   value="1", description="Números de 1 a 10"),
+            discord.SelectOption(label="Médio",   value="2", description="Números de 10 a 50 + multiplicação"),
+            discord.SelectOption(label="Difícil", value="3", description="Números de 100 a 500"),
+        ],
+        min_values=1, max_values=1,
+    )
     async def cb(interaction):
         config["verification_difficulty"] = int(sel.values[0]); save_config(config)
         await interaction.response.send_message(f"✅ Dificuldade atualizada!", ephemeral=True)
@@ -1427,15 +1433,6 @@ async def on_interaction(interaction: discord.Interaction):
             )
         elif cid == "ab_post":
             await post_antibot_panel(interaction)
-        elif cid == "ab_refresh":
-            await refresh_antibot_panel()
-            await interaction.response.send_message("✅ Contador atualizado.", ephemeral=True)
-        elif cid == "ab_reset":
-            await interaction.response.send_message(
-                "⚠️ **Zerar o contador?** Essa ação não pode ser desfeita.",
-                view=ConfirmResetAntibotView(),
-                ephemeral=True
-            )
         elif cid == "ab_preview":
             await interaction.response.send_message(view=antibot_panel_view(), ephemeral=True)
 
@@ -1641,10 +1638,12 @@ class URLModal(ui.Modal):
         val = self.v.value.strip()
         if val.lower() in ("limpar", "clear", "none", "remover"):
             config[self.key] = ""; save_config(config)
+            await refresh_antibot_panel()
             await interaction.response.send_message("✅ URL removida.", ephemeral=True); return
         if not (val.startswith("http://") or val.startswith("https://")):
             await interaction.response.send_message("❌ URL inválida.", ephemeral=True); return
         config[self.key] = val; save_config(config)
+        await refresh_antibot_panel()
         await interaction.response.send_message("✅ URL salva!", ephemeral=True)
 
 class AntibotTitleModal(ui.Modal, title="✏️ Título do Painel AntiBot"):
@@ -1773,21 +1772,6 @@ class ConfirmCloseView(ui.View):
             try: await ch.delete()
             except Exception: pass
         await interaction.response.send_message("✅ Ticket fechado.", ephemeral=True)
-
-class ConfirmResetAntibotView(ui.View):
-    def __init__(self):
-        super().__init__(timeout=60)
-    @ui.button(label="✅ Sim, zerar", style=discord.ButtonStyle.danger)
-    async def confirm(self, interaction, button):
-        try:
-            conn = get_db()
-            c = conn.cursor()
-            c.execute("DELETE FROM antibot_punishments")
-            conn.commit(); conn.close()
-        except Exception as e:
-            await interaction.response.send_message(f"❌ Erro: {e}", ephemeral=True); return
-        await refresh_antibot_panel()
-        await interaction.response.send_message("✅ Contador zerado!", ephemeral=True)
 
 class AddMemberView(ui.View):
     def __init__(self):
@@ -2224,7 +2208,6 @@ async def task_status(): await update_status()
 
 @tasks.loop(minutes=2)
 async def task_voice_watchdog():
-    """Tenta reconectar o canal 24h caso caia (DNS etc)."""
     guild = get_guild()
     if not guild: return
     cid = config.get("voice_channel_id")
@@ -2242,6 +2225,14 @@ async def task_voice_watchdog():
         await update_voice_mute()
     except Exception as e:
         logger.debug(f"Voice watchdog: {e}")
+
+# ✅ NOVA TASK: auto-refresh do contador AntiBot
+@tasks.loop(minutes=2)
+async def task_antibot_refresh():
+    try:
+        await refresh_antibot_panel()
+    except Exception as e:
+        logger.debug(f"Antibot refresh: {e}")
 
 # ===================== AUX =====================
 async def bot_join_voice():
@@ -2291,16 +2282,19 @@ async def on_ready():
     await apply_avatar_if_needed()
     await bot_join_voice()
     await update_status()
-    for t in (task_voice, task_status, task_voice_watchdog):
+    for t in (task_voice, task_status, task_voice_watchdog, task_antibot_refresh):
         if not t.is_running(): t.start()
+    # Refresh inicial do painel AntiBot
+    try:
+        await refresh_antibot_panel()
+    except Exception:
+        pass
 
 @bot.event
 async def on_message(message: discord.Message):
-    # Ignora DMs e bots
     if message.author.bot: return
     if not message.guild: return
 
-    # ----- AntiBot -----
     ab_cid = config.get("antibot_channel_id")
     if ab_cid and message.channel.id == ab_cid:
         await handle_antibot_punish(message)
