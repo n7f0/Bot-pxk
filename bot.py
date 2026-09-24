@@ -12,6 +12,8 @@ if not TOKEN:
 CONFIG_FILE = "/app/data/config.json"
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+# Reduz spam de logs de voice do discord.py
+logging.getLogger("discord.voice_state").setLevel(logging.WARNING)
 
 # ===================== CONFIG PADRÃO =====================
 DEFAULT_CONFIG = {
@@ -29,10 +31,10 @@ DEFAULT_CONFIG = {
     "banner_welcome_url": "",
     "guild_id": None,
 
-    # ---- Verificação Captcha (melhorado) ----
-    "verification_method": "math",           # "math" | "button"
-    "verification_difficulty": 1,            # 1 fácil, 2 médio, 3 difícil
-    "verification_kick_minutes": 0,          # 0 = desativado
+    # ---- Verificação Captcha ----
+    "verification_method": "math",
+    "verification_difficulty": 1,
+    "verification_kick_minutes": 0,
     "verified_role_ids": [],
     "verification_unverified_role_ids": [],
     "verification_channel_id": None,
@@ -40,15 +42,18 @@ DEFAULT_CONFIG = {
     "verification_panel_message_id": None,
     "verification_log_channel_id": None,
 
+    # ---- Boas-vindas ----
     "welcome_channel_id": None,
     "welcome_message": "Bem-vindo(a) ao servidor!",
     "welcome_image_url": "",
     "leave_channel_id": None,
     "leave_message": "Até logo! Sentiremos sua falta. 💜",
 
+    # ---- Logs de voz ----
     "voice_join_log_channel_id": None,
     "voice_leave_log_channel_id": None,
 
+    # ---- Voz & Status ----
     "voice_channel_id": None,
     "voice_mute": True,
     "bot_status": "online",
@@ -58,6 +63,7 @@ DEFAULT_CONFIG = {
     "painel_channel_id": None,
     "painel_message_id": None,
 
+    # ---- Tickets ----
     "ticket_category_doubt_id": None,
     "ticket_category_purchase_id": None,
     "ticket_logs_channel_id": None,
@@ -65,12 +71,26 @@ DEFAULT_CONFIG = {
     "ticket_panel_message_id": None,
     "ticket_support_role_ids": [],
 
+    # ---- Feedback / Sugestões ----
     "feedback_channel_id": None,
     "suggestions_channel_id": None,
     "suggestions_panel_channel_id": None,
     "suggestions_panel_message_id": None,
 
     "moderation_logs_channel_id": None,
+
+    # ---- ANTI-BOT ----
+    "antibot_channel_id": None,
+    "antibot_panel_message_id": None,
+    "antibot_banner_url": "",
+    "antibot_title": "• Não envie mensagem nesse canal!",
+    "antibot_description": (
+        "Sistema criado para prevenir bots de divulgação e outros SelfBots.\n"
+        "Quem enviar mensagem aqui será punido imediatamente."
+    ),
+    "antibot_punish_ban": True,
+    "antibot_delete_messages": True,
+    "antibot_log_channel_id": None,
 }
 
 def load_config():
@@ -90,11 +110,7 @@ def load_config():
     return data
 
 def _migrate_ids(data):
-    # migração de campos antigos -> novos
-    pairs = [
-        ("verified_role_id", "verified_role_ids"),
-        ("age_verified_role_id", "age_verified_role_ids"),
-    ]
+    pairs = [("verified_role_id", "verified_role_ids")]
     for old, new in pairs:
         if old in data and data[old] and not data.get(new):
             data[new] = [data[old]]
@@ -126,6 +142,7 @@ intents.members = True
 intents.voice_states = True
 intents.message_content = True
 intents.guilds = True
+intents.messages = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -170,7 +187,7 @@ async def update_voice_mute():
     vc = guild.voice_client
     if not vc or not vc.is_connected(): return
     try: await guild.me.edit(mute=config.get("voice_mute", True))
-    except Exception as e: logger.error(f"Erro mute: {e}")
+    except Exception as e: logger.debug(f"Mute: {e}")
 
 def text_channel_options(max_items=25):
     guild = get_guild()
@@ -220,7 +237,8 @@ def _safe_media_gallery(media_url):
         return None
     try:
         return MG(MGI(media=media_url))
-    except Exception:
+    except Exception as e:
+        logger.debug(f"MediaGallery indisponível: {e}")
         return None
 
 def premium_submenu(title, description, sections, accent=None):
@@ -401,14 +419,11 @@ async def send_voice_log(member, channel, action):
     try: await log_ch.send(view=card)
     except Exception as e: logger.error(f"Erro voice log: {e}")
 
-# ===================== APLICAR PERMISSÕES ADMIN-ONLY =====================
+# ===================== PERMISSÕES ADMIN-ONLY =====================
 async def make_channel_admin_only(channel: discord.TextChannel):
-    """Define permissões para que só admins vejam o canal."""
     guild = channel.guild
     try:
-        # @everyone sem ver
         await channel.set_permissions(guild.default_role, view_channel=False, reason="Logs admin-only")
-        # Cargos configurados como admin ganham acesso
         for rid in config.get("admin_role_ids", []):
             role = guild.get_role(rid)
             if role:
@@ -418,6 +433,141 @@ async def make_channel_admin_only(channel: discord.TextChannel):
                 except Exception: pass
     except Exception as e:
         logger.warning(f"Não foi possível restringir {channel.name}: {e}")
+
+# ===================== ANTI-BOT — PAINEL =====================
+def antibot_panel_view():
+    """Réplica visual do painel da imagem."""
+    count = get_antibot_count()
+
+    comps = []
+    banner = config.get("antibot_banner_url")
+    if banner:
+        mg = _safe_media_gallery(banner)
+        if mg is not None:
+            comps.append(mg)
+        else:
+            # Fallback visual: usa a imagem como Thumbnail em Section
+            comps.append(ui.Section(
+                ui.TextDisplay(""),
+                accessory=ui.Thumbnail(media=banner),
+            ))
+
+    title_txt = config.get("antibot_title") or "• Não envie mensagem nesse canal!"
+    desc_txt  = config.get("antibot_description") or (
+        "Sistema criado para prevenir bots de divulgação e outros SelfBots.\n"
+        "Quem enviar mensagem aqui será punido imediatamente."
+    )
+
+    comps.append(ui.TextDisplay(f"# {title_txt}"))
+    comps.append(ui.TextDisplay(f"> {desc_txt.replace(chr(10), chr(10) + '> ')}"))
+    comps.append(ui.Separator(spacing=discord.SeparatorSpacing.small))
+
+    # Botão contador (desabilitado, só para exibir)
+    counter_btn = ui.Button(
+        label=f"Punidos: {count}",
+        style=S,
+        disabled=True,
+        custom_id="antibot_counter_display",
+    )
+    comps.append(ui.ActionRow(counter_btn))
+
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(*comps, accent_color=color_danger()))
+    return layout
+
+async def refresh_antibot_panel():
+    """Atualiza o contador do painel AntiBot."""
+    cid = config.get("antibot_channel_id")
+    mid = config.get("antibot_panel_message_id")
+    if not cid or not mid: return
+    guild = get_guild()
+    if not guild: return
+    ch = guild.get_channel(cid)
+    if not ch: return
+    try:
+        msg = await ch.fetch_message(mid)
+        await msg.edit(view=antibot_panel_view())
+    except Exception as e:
+        logger.debug(f"Refresh antibot panel: {e}")
+
+# ===================== ANTI-BOT — PUNIÇÃO =====================
+async def _delete_all_user_messages(guild: discord.Guild, user_id: int, limit_per_channel=300):
+    """Apaga mensagens do usuário em todos os canais possíveis."""
+    deleted = 0
+    for channel in guild.text_channels:
+        try:
+            perms = channel.permissions_for(guild.me)
+            if not perms.manage_messages or not perms.read_message_history:
+                continue
+            async for msg in channel.history(limit=limit_per_channel):
+                if msg.author.id == user_id:
+                    try:
+                        await msg.delete()
+                        deleted += 1
+                        await asyncio.sleep(0.35)
+                    except discord.NotFound:
+                        continue
+                    except discord.HTTPException:
+                        await asyncio.sleep(1.5)
+        except Exception:
+            continue
+    return deleted
+
+async def handle_antibot_punish(message: discord.Message):
+    guild = message.guild
+    member = message.author
+
+    logger.info(f"🚫 AntiBot: {member} ({member.id}) enviou mensagem em {message.channel}")
+
+    # Apaga a mensagem dele primeiro
+    try:
+        await message.delete()
+    except Exception:
+        pass
+
+    # Apaga TODAS as mensagens dele no servidor
+    deleted_count = 0
+    if config.get("antibot_delete_messages", True):
+        try:
+            deleted_count = await _delete_all_user_messages(guild, member.id)
+        except Exception as e:
+            logger.error(f"Erro apagando mensagens: {e}")
+
+    # Bane
+    banned = False
+    if config.get("antibot_punish_ban", True):
+        try:
+            await guild.ban(member, reason="AntiBot: mensagem em canal protegido", delete_message_seconds=0)
+            banned = True
+        except discord.Forbidden:
+            logger.warning(f"Sem permissão para banir {member}")
+        except Exception as e:
+            logger.error(f"Erro ban: {e}")
+
+    # Registra no banco
+    try:
+        add_antibot_punishment(member.id, guild.id, "Mensagem em canal protegido",
+                                banned=banned, deleted_count=deleted_count)
+    except Exception as e:
+        logger.error(f"Erro registrando punição: {e}")
+
+    # Atualiza o painel
+    await refresh_antibot_panel()
+
+    # Log
+    log_id = config.get("antibot_log_channel_id")
+    if log_id:
+        log_ch = guild.get_channel(log_id)
+        if log_ch:
+            try:
+                await log_ch.send(
+                    f"🚫 **AntiBot** — punição aplicada\n"
+                    f"**Usuário:** {member} (`{member.id}`)\n"
+                    f"**Canal:** {message.channel.mention}\n"
+                    f"**Mensagens apagadas:** `{deleted_count}`\n"
+                    f"**Banido:** `{'Sim' if banned else 'Não'}`"
+                )
+            except Exception: pass
 
 # ===================== PAINEL PRINCIPAL =====================
 def painel_layout():
@@ -441,6 +591,8 @@ def painel_layout():
         options=[
             discord.SelectOption(label="Identidade Visual", value="identity", emoji="🎨",
                                  description="Nome, emoji, cores e banners"),
+            discord.SelectOption(label="Anti-Bot", value="antibot", emoji="🚫",
+                                 description="Canal protegido e punições automáticas"),
             discord.SelectOption(label="Verificação Captcha", value="captcha", emoji="✅",
                                  description="Sistema de verificação avançado"),
             discord.SelectOption(label="Boas-vindas & Saída", value="welcome", emoji="💌",
@@ -481,6 +633,7 @@ async def main_menu_callback(interaction: discord.Interaction):
     v = interaction.data["values"][0]
     routes = {
         "identity":     lambda: interaction.response.send_message(view=identity_view(), ephemeral=True),
+        "antibot":      lambda: interaction.response.send_message(view=antibot_view(), ephemeral=True),
         "captcha":      lambda: interaction.response.send_message(view=captcha_view(), ephemeral=True),
         "welcome":      lambda: interaction.response.send_message(view=welcome_view(), ephemeral=True),
         "voicelogs":    lambda: interaction.response.send_message(view=voicelogs_view(), ephemeral=True),
@@ -531,7 +684,52 @@ def identity_view():
         accent=color_primary(),
     )
 
-# ---------- ✅ CAPTCHA MELHORADO ----------
+# ---------- 🚫 ANTI-BOT ----------
+def antibot_view():
+    ban_on = config.get("antibot_punish_ban", True)
+    del_on = config.get("antibot_delete_messages", True)
+    ch_set = "✅" if config.get("antibot_channel_id") else "❌"
+    log_set = "✅" if config.get("antibot_log_channel_id") else "❌"
+
+    return premium_submenu(
+        "🚫 Anti-Bot",
+        "Configure o canal protegido onde **qualquer mensagem** resulta em banimento e deleção total.\n\n"
+        f"**Canal protegido:** {ch_set}\n"
+        f"**Canal de log:** {log_set}\n"
+        f"**Banir:** `{'Ativo' if ban_on else 'Desativado'}`  |  "
+        f"**Apagar msgs:** `{'Ativo' if del_on else 'Desativado'}`",
+        [
+            {"title": "📢 Canal Protegido", "rows": [
+                [_btn("Definir Canal Anti-Bot", "ab_ch", P, "🚫")],
+                [_btn("Canal de Log",           "ab_log", P, "📝")],
+            ]},
+            {"title": "🖼️ Aparência do Painel", "rows": [
+                [
+                    _btn("Banner do Painel", "ab_banner", P, "🖼️"),
+                    _btn("Título",           "ab_title",  P, "✏️"),
+                ],
+                [_btn("Descrição", "ab_desc", P, "📝")],
+            ]},
+            {"title": "⚙️ Ações de Punição", "rows": [
+                [
+                    _btn(f"Banir: {'ON' if ban_on else 'OFF'}", "ab_toggle_ban", SU if ban_on else D, "🔨"),
+                    _btn(f"Apagar Msgs: {'ON' if del_on else 'OFF'}", "ab_toggle_del", SU if del_on else D, "🧹"),
+                ],
+            ]},
+            {"title": "🎛️ Painel", "rows": [
+                [
+                    _btn("Postar Painel Aqui",   "ab_post",   SU, "📤"),
+                    _btn("Atualizar Contador",   "ab_refresh", P, "🔄"),
+                ],
+                [
+                    _btn("Zerar Contador",       "ab_reset",  D, "🗑️"),
+                    _btn("Preview do Painel",    "ab_preview", S, "👁️"),
+                ],
+            ]},
+        ],
+        accent=color_danger(),
+    )
+
 def captcha_view():
     method = config.get("verification_method", "math")
     diff   = config.get("verification_difficulty", 1)
@@ -565,9 +763,7 @@ def captcha_view():
                     _btn("Canal de Verificação", "cap_ch",   P, "✅"),
                     _btn("Canal do Painel",      "cap_pch",  P, "📌"),
                 ],
-                [
-                    _btn("Canal de Log",         "cap_log",  P, "📝"),
-                ],
+                [_btn("Canal de Log", "cap_log", P, "📝")],
             ]},
         ],
         accent=color_secondary(),
@@ -584,8 +780,8 @@ def welcome_view():
                     _btn("Mensagem de Entrada",  "wel_msg", P, "✏️"),
                 ],
                 [
-                    _btn("Banner de Entrada",    "wel_img", S, "🖼️"),
-                    _btn("Testar Entrada",       "wel_test", SU, "🧪"),
+                    _btn("Banner de Entrada", "wel_img", S, "🖼️"),
+                    _btn("Testar Entrada",    "wel_test", SU, "🧪"),
                 ],
             ]},
             {"title": "👋 Saída do Servidor", "rows": [
@@ -593,9 +789,7 @@ def welcome_view():
                     _btn("Canal de Saída",    "lev_ch",  P, "📢"),
                     _btn("Mensagem de Saída", "lev_msg", P, "✏️"),
                 ],
-                [
-                    _btn("Testar Saída",      "lev_test", SU, "🧪"),
-                ],
+                [_btn("Testar Saída", "lev_test", SU, "🧪")],
             ]},
         ],
         accent=color_primary(),
@@ -628,8 +822,8 @@ def voice_view():
                 _btn("Canal de Voz 24h", "v_ch", P, "🔊"),
             ]]},
             {"title": "🎭 Presença", "rows": [[
-                _btn("Mute na Call",   "v_mute",   P, "🔇"),
-                _btn("Status do Bot",  "v_status", P, "🎭"),
+                _btn("Mute na Call",  "v_mute",   P, "🔇"),
+                _btn("Status do Bot", "v_status", P, "🎭"),
             ]]},
         ],
         accent=color_primary(),
@@ -705,8 +899,8 @@ def suggestions_view():
         accent=color_primary(),
     )
 
-# ===================== 🧹 LIMPEZA DE CHAT (MULTI-SELECT) =====================
-_cleanup_selection = {}  # user_id -> list[int]
+# ===================== LIMPEZA MULTI-SELECT =====================
+_cleanup_selection = {}
 
 async def _on_cleanup_select(interaction: discord.Interaction):
     sel = interaction.data.get("values", [])
@@ -724,12 +918,10 @@ async def _on_cleanup_select(interaction: discord.Interaction):
 
 def chat_cleanup_view():
     layout = ui.LayoutView(timeout=600)
-
     channel_select = ui.Select(
         placeholder="🧹 Selecione um ou mais canais para limpar...",
         options=text_channel_options(),
-        min_values=1,
-        max_values=25,
+        min_values=1, max_values=25,
         custom_id="cleanup_multi_select",
     )
     channel_select.callback = _on_cleanup_select
@@ -761,16 +953,10 @@ def chat_cleanup_view():
     return layout
 
 async def _purge_channel(channel, guild, on_progress):
-    """
-    Limpa TODAS as mensagens de um canal.
-    on_progress(deleted_so_far, phase_str) é chamado periodicamente.
-    Retorna (total_deleted, erro).
-    """
     total = 0
     erro = None
     cutoff = discord.utils.utcnow() - datetime.timedelta(days=13)
 
-    # Fase 1: bulk delete < 14 dias
     try:
         while True:
             try:
@@ -786,7 +972,6 @@ async def _purge_channel(channel, guild, on_progress):
     except Exception as e:
         logger.error(f"Erro fase 1 {channel.name}: {e}")
 
-    # Fase 2: individual delete para antigas
     erros_consec = 0
     try:
         async for msg in channel.history(limit=None, before=cutoff, oldest_first=False):
@@ -820,7 +1005,6 @@ async def run_multi_cleanup(interaction: discord.Interaction):
         await interaction.response.send_message("❌ Nenhum canal selecionado. Use o menu antes.", ephemeral=True)
         return
 
-    # Valida canais
     channels = []
     for cid in ids:
         ch = interaction.guild.get_channel(cid)
@@ -843,18 +1027,14 @@ async def run_multi_cleanup(interaction: discord.Interaction):
     total_deleted = 0
     results = []
 
-    # Mensagem de progresso inicial
     init_view = _build_cleanup_progress_view(0, len(channels), None, 0, start_time)
     progress_msg = await interaction.edit_original_response(view=init_view)
 
     for idx, ch in enumerate(channels, start=1):
         last_update = {"t": datetime.datetime.now()}
-        ch_deleted_holder = {"n": 0}
 
         async def on_progress(deleted_so_far, phase):
-            ch_deleted_holder["n"] = deleted_so_far
             now = datetime.datetime.now()
-            # Atualiza no máximo a cada 1.8s para não floodar
             if (now - last_update["t"]).total_seconds() < 1.8:
                 return
             last_update["t"] = now
@@ -870,14 +1050,12 @@ async def run_multi_cleanup(interaction: discord.Interaction):
         total_deleted += ch_deleted
         results.append((ch, ch_deleted))
 
-        # Update final do canal
         view = _build_cleanup_progress_view(idx, len(channels), None, 0, start_time)
         try:
             await progress_msg.edit(view=view)
         except Exception:
             pass
 
-    # Resumo final
     elapsed = (datetime.datetime.now() - start_time).total_seconds()
     m, s = int(elapsed // 60), int(elapsed % 60)
 
@@ -893,13 +1071,11 @@ async def run_multi_cleanup(interaction: discord.Interaction):
         lines.append(f"• {ch.mention} — `{cnt}` mensagens")
 
     summary = "\n".join(lines)
-    final_view = _build_cleanup_final_view(summary)
     try:
-        await progress_msg.edit(view=final_view)
+        await progress_msg.edit(view=_build_cleanup_final_view(summary))
     except Exception:
         pass
 
-    # Log em moderation_logs
     log_id = config.get("moderation_logs_channel_id")
     if log_id:
         log_ch = interaction.guild.get_channel(log_id)
@@ -934,6 +1110,12 @@ def show_config_view():
         f"**Nome:** {bname()} {bemoji()}",
         f"**Guild ID:** `{config.get('guild_id')}`",
         f"**Admin Roles:** {role_list('admin_role_ids')}",
+        "",
+        f"### 🚫 Anti-Bot",
+        f"**Canal:** {ch('antibot_channel_id')}",
+        f"**Log:** {ch('antibot_log_channel_id')}",
+        f"**Banir:** `{config.get('antibot_punish_ban')}`  |  **Apagar msgs:** `{config.get('antibot_delete_messages')}`",
+        f"**Total punidos:** `{get_antibot_count()}`",
         "",
         f"### ✅ Captcha",
         f"**Método:** `{method_labels.get(config.get('verification_method','math'),'—')}`",
@@ -995,7 +1177,7 @@ def multi_role_view(key, title, current_ids):
             if r: selected.append(r)
         except Exception: pass
     role_select = ui.RoleSelect(
-        placeholder=f"Selecione cargos (múltiplos)",
+        placeholder="Selecione cargos (múltiplos)",
         min_values=0, max_values=25,
         default_values=selected if selected else None,
     )
@@ -1162,7 +1344,7 @@ def verification_diff_view():
     ])
     async def cb(interaction):
         config["verification_difficulty"] = int(sel.values[0]); save_config(config)
-        await interaction.response.send_message(f"✅ Dificuldade: **{sel.values[0]}**", ephemeral=True)
+        await interaction.response.send_message(f"✅ Dificuldade atualizada!", ephemeral=True)
     sel.callback = cb
     layout.add_item(ui.Container(
         ui.TextDisplay("# 🎚️ Dificuldade"),
@@ -1184,7 +1366,6 @@ async def on_interaction(interaction: discord.Interaction):
     cid = interaction.data.get("custom_id", "")
     if not cid:
         return
-    # esses têm callback próprio
     if cid in ("pxk_main_menu", "cleanup_multi_select", "cleanup_start"):
         return
 
@@ -1218,6 +1399,45 @@ async def on_interaction(interaction: discord.Interaction):
             await interaction.followup.send("✅ Avatar aplicado!" if ok else "❌ Falha ao aplicar avatar.", ephemeral=True)
         elif cid == "id_preview":
             await interaction.response.send_message(view=painel_layout(), ephemeral=True)
+
+        # ---------- ANTI-BOT ----------
+        elif cid == "ab_ch":
+            await interaction.response.send_message(view=single_channel_view("antibot_channel_id", "Canal Anti-Bot"), ephemeral=True)
+        elif cid == "ab_log":
+            await interaction.response.send_message(view=single_channel_view("antibot_log_channel_id", "Canal de Log AntiBot", admin_only=True), ephemeral=True)
+        elif cid == "ab_banner":
+            await interaction.response.send_modal(URLModal("antibot_banner_url", "URL do Banner AntiBot"))
+        elif cid == "ab_title":
+            await interaction.response.send_modal(AntibotTitleModal())
+        elif cid == "ab_desc":
+            await interaction.response.send_modal(AntibotDescModal())
+        elif cid == "ab_toggle_ban":
+            config["antibot_punish_ban"] = not config.get("antibot_punish_ban", True)
+            save_config(config)
+            await interaction.response.send_message(
+                f"✅ Banimento **{'ativado' if config['antibot_punish_ban'] else 'desativado'}**.",
+                ephemeral=True
+            )
+        elif cid == "ab_toggle_del":
+            config["antibot_delete_messages"] = not config.get("antibot_delete_messages", True)
+            save_config(config)
+            await interaction.response.send_message(
+                f"✅ Apagar mensagens **{'ativado' if config['antibot_delete_messages'] else 'desativado'}**.",
+                ephemeral=True
+            )
+        elif cid == "ab_post":
+            await post_antibot_panel(interaction)
+        elif cid == "ab_refresh":
+            await refresh_antibot_panel()
+            await interaction.response.send_message("✅ Contador atualizado.", ephemeral=True)
+        elif cid == "ab_reset":
+            await interaction.response.send_message(
+                "⚠️ **Zerar o contador?** Essa ação não pode ser desfeita.",
+                view=ConfirmResetAntibotView(),
+                ephemeral=True
+            )
+        elif cid == "ab_preview":
+            await interaction.response.send_message(view=antibot_panel_view(), ephemeral=True)
 
         # ---------- CAPTCHA ----------
         elif cid == "cap_roles":
@@ -1257,7 +1477,7 @@ async def on_interaction(interaction: discord.Interaction):
             await send_leave_message(interaction.user)
             await interaction.followup.send("✅ Teste de saída enviado!", ephemeral=True)
 
-        # ---------- LOGS DE VOZ (admin-only) ----------
+        # ---------- LOGS DE VOZ ----------
         elif cid == "vl_join_ch":
             await interaction.response.send_message(view=single_channel_view("voice_join_log_channel_id", "Canal de Log — Entrou", admin_only=True), ephemeral=True)
         elif cid == "vl_leave_ch":
@@ -1355,6 +1575,27 @@ async def on_interaction(interaction: discord.Interaction):
     except Exception as e:
         logger.error(f"Erro interaction {cid}: {e}", exc_info=True)
 
+# ===================== ANTI-BOT — POST PANEL =====================
+async def post_antibot_panel(interaction: discord.Interaction):
+    cid = config.get("antibot_channel_id")
+    if not cid:
+        await interaction.response.send_message("❌ Defina o **Canal Anti-Bot** primeiro.", ephemeral=True)
+        return
+    ch = interaction.guild.get_channel(cid)
+    if not ch:
+        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True)
+        return
+
+    try:
+        msg = await ch.send(view=antibot_panel_view())
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Erro: `{e}`", ephemeral=True)
+        return
+
+    config["antibot_panel_message_id"] = msg.id
+    save_config(config)
+    await interaction.response.send_message(f"✅ Painel AntiBot enviado em {ch.mention}!", ephemeral=True)
+
 # ===================== MODAIS =====================
 class BrandNameModal(ui.Modal, title="✏️ Nome da Marca"):
     v = ui.TextInput(label="Nome da marca", required=True, max_length=50)
@@ -1405,6 +1646,34 @@ class URLModal(ui.Modal):
             await interaction.response.send_message("❌ URL inválida.", ephemeral=True); return
         config[self.key] = val; save_config(config)
         await interaction.response.send_message("✅ URL salva!", ephemeral=True)
+
+class AntibotTitleModal(ui.Modal, title="✏️ Título do Painel AntiBot"):
+    v = ui.TextInput(
+        label="Título",
+        default="• Não envie mensagem nesse canal!",
+        required=True, max_length=200
+    )
+    async def on_submit(self, interaction):
+        config["antibot_title"] = self.v.value.strip()
+        save_config(config)
+        await refresh_antibot_panel()
+        await interaction.response.send_message("✅ Título atualizado!", ephemeral=True)
+
+class AntibotDescModal(ui.Modal, title="📝 Descrição do Painel AntiBot"):
+    v = ui.TextInput(
+        label="Descrição",
+        style=discord.TextStyle.paragraph,
+        default=(
+            "Sistema criado para prevenir bots de divulgação e outros SelfBots.\n"
+            "Quem enviar mensagem aqui será punido imediatamente."
+        ),
+        required=True, max_length=500
+    )
+    async def on_submit(self, interaction):
+        config["antibot_description"] = self.v.value
+        save_config(config)
+        await refresh_antibot_panel()
+        await interaction.response.send_message("✅ Descrição atualizada!", ephemeral=True)
 
 class WelcomeDefaultMessageModal(ui.Modal, title="Mensagem de Boas-vindas"):
     msg = ui.TextInput(label="Nova mensagem", style=discord.TextStyle.paragraph, required=True)
@@ -1505,6 +1774,21 @@ class ConfirmCloseView(ui.View):
             except Exception: pass
         await interaction.response.send_message("✅ Ticket fechado.", ephemeral=True)
 
+class ConfirmResetAntibotView(ui.View):
+    def __init__(self):
+        super().__init__(timeout=60)
+    @ui.button(label="✅ Sim, zerar", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction, button):
+        try:
+            conn = get_db()
+            c = conn.cursor()
+            c.execute("DELETE FROM antibot_punishments")
+            conn.commit(); conn.close()
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Erro: {e}", ephemeral=True); return
+        await refresh_antibot_panel()
+        await interaction.response.send_message("✅ Contador zerado!", ephemeral=True)
+
 class AddMemberView(ui.View):
     def __init__(self):
         super().__init__(timeout=60)
@@ -1586,13 +1870,14 @@ async def handle_ticket_open(interaction, tipo, nome):
 
     await interaction.response.send_message(f"✅ Ticket criado em {channel.mention}!", ephemeral=True)
 
-# ===================== CAPTCHA (MELHORADO) =====================
-_pending_kicks = {}  # (guild_id, user_id) -> asyncio.Task
+# ===================== CAPTCHA =====================
+_pending_kicks = {}
+_math_answers = {}
+_button_verification_target = {}
 
 def schedule_verification_kick(guild, member):
     minutes = config.get("verification_kick_minutes", 0)
-    if minutes <= 0:
-        return
+    if minutes <= 0: return
     key = (guild.id, member.id)
     if key in _pending_kicks:
         _pending_kicks[key].cancel()
@@ -1601,13 +1886,11 @@ def schedule_verification_kick(guild, member):
         try:
             await asyncio.sleep(minutes * 60)
             m = guild.get_member(member.id)
-            if not m:
-                return
+            if not m: return
             unver_ids = config.get("verification_unverified_role_ids", [])
             if any(r.id in unver_ids for r in m.roles):
                 try:
                     await guild.kick(m, reason="Não completou a verificação a tempo")
-                    logger.info(f"Kickado {m} por timeout de verificação")
                 except Exception as e:
                     logger.error(f"Falha ao kickar {m}: {e}")
         except asyncio.CancelledError:
@@ -1620,34 +1903,25 @@ def schedule_verification_kick(guild, member):
 def cancel_verification_kick(guild_id, user_id):
     key = (guild_id, user_id)
     task = _pending_kicks.pop(key, None)
-    if task:
-        task.cancel()
+    if task: task.cancel()
 
 def _generate_math_challenge():
     diff = config.get("verification_difficulty", 1)
     if diff == 1:
         a, b = random.randint(1, 10), random.randint(1, 10)
-        op = "+"
-        answer = a + b
+        return f"{a} + {b}", a + b
     elif diff == 2:
         if random.random() < 0.5:
             a, b = random.randint(10, 50), random.randint(10, 50)
-            op = "+"
-            answer = a + b
-        else:
-            a, b = random.randint(2, 12), random.randint(2, 12)
-            op = "×"
-            answer = a * b
+            return f"{a} + {b}", a + b
+        a, b = random.randint(2, 12), random.randint(2, 12)
+        return f"{a} × {b}", a * b
     else:
         if random.random() < 0.5:
             a, b = random.randint(100, 500), random.randint(100, 500)
-            op = "+"
-            answer = a + b
-        else:
-            a, b = random.randint(2, 15), random.randint(2, 15)
-            op = "×"
-            answer = a * b
-    return f"{a} {op} {b}", answer
+            return f"{a} + {b}", a + b
+        a, b = random.randint(2, 15), random.randint(2, 15)
+        return f"{a} × {b}", a * b
 
 async def _log_verification(guild, member, success, extra=""):
     cid = config.get("verification_log_channel_id")
@@ -1660,7 +1934,6 @@ async def _log_verification(guild, member, success, extra=""):
     except Exception: pass
 
 async def send_captcha_challenge(member, channel):
-    """Envia o desafio no canal escolhido."""
     method = config.get("verification_method", "math")
 
     if method == "button":
@@ -1670,16 +1943,12 @@ async def send_captcha_challenge(member, channel):
             color=color_secondary()
         )
         view = ui.View(timeout=3600)
-        btn = ui.Button(label="✅ Verificar Agora", style=SU, custom_id="captcha_button_verify")
-        # Nota: custom_id distinto por usuário não é permitido, então usamos o botão genérico
-        view.add_item(btn)
-        # Armazenamos o alvo esperado
+        view.add_item(ui.Button(label="✅ Verificar Agora", style=SU, custom_id="captcha_button_verify"))
         _button_verification_target[member.id] = True
         try: await channel.send(content=member.mention, embed=e, view=view)
         except Exception as e: logger.error(f"Erro enviando verif botão: {e}")
         return
 
-    # método math (padrão)
     question, answer = _generate_math_challenge()
     _math_answers[member.id] = answer
 
@@ -1693,23 +1962,16 @@ async def send_captcha_challenge(member, channel):
         color=color_secondary()
     )
     view = ui.View(timeout=3600)
-    btn = ui.Button(label="🔐 Resolver", style=SU, custom_id="captcha_solve")
-    view.add_item(btn)
+    view.add_item(ui.Button(label="🔐 Resolver", style=SU, custom_id="captcha_solve"))
     try: await channel.send(content=member.mention, embed=e, view=view)
     except Exception as e: logger.error(f"Erro enviando verif math: {e}")
 
-_math_answers = {}            # user_id -> resposta correta
-_button_verification_target = {}  # user_id -> True (aguardando clique)
-
 async def _grant_verification(guild, member):
-    """Aplica cargos de verificado, remove não-verificado, cancela kick, loga."""
-    # Adiciona cargos verificados
     for rid in config.get("verified_role_ids", []):
         r = guild.get_role(rid)
         if r and r not in member.roles:
             try: await member.add_roles(r)
             except Exception: pass
-    # Remove cargos não-verificado
     for rid in config.get("verification_unverified_role_ids", []):
         r = guild.get_role(rid)
         if r and r in member.roles:
@@ -1721,9 +1983,7 @@ async def _grant_verification(guild, member):
     await _log_verification(guild, member, True, "verificado")
 
 async def handle_captcha_start(interaction):
-    """Botão do painel de verificação."""
     member = interaction.user
-    # Envia o desafio no canal de verificação
     ch_id = config.get("verification_channel_id")
     ch = interaction.guild.get_channel(ch_id) if ch_id else interaction.channel
     if not ch:
@@ -1732,11 +1992,7 @@ async def handle_captcha_start(interaction):
     await interaction.response.send_message("✅ Desafio enviado! Verifique o canal.", ephemeral=True)
 
 async def handle_button_verify(interaction):
-    """Botão do tipo button (clique direto)."""
     member = interaction.user
-    if not _button_verification_target.get(member.id):
-        # Ainda assim, permite se os cargos estão configurados
-        pass
     await _grant_verification(interaction.guild, member)
     await interaction.response.send_message("✅ **Verificado!** Bem-vindo(a)! 🖤", ephemeral=True)
 
@@ -1760,7 +2016,6 @@ class CaptchaModal(ui.Modal, title="🧮 Verificação"):
 
         expected = _math_answers.get(self.user_id)
         if expected is None:
-            # Não há desafio pendente — permite passar (fallback)
             await _grant_verification(guild, member)
             await interaction.response.send_message("✅ Verificado!", ephemeral=True)
             return
@@ -1776,7 +2031,6 @@ class CaptchaModal(ui.Modal, title="🧮 Verificação"):
         else:
             await _log_verification(guild, member, False, "errou o desafio")
             await interaction.response.send_message("❌ Resposta incorreta. Tente novamente.", ephemeral=True)
-            # Reenvia novo desafio
             ch_id = config.get("verification_channel_id")
             ch = guild.get_channel(ch_id)
             if ch:
@@ -1786,10 +2040,8 @@ class VerificationPanelView(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
     @ui.button(label="🔐 Verificar Agora", style=discord.ButtonStyle.success, custom_id="verify_now")
-    async def verify(self, interaction, button):
-        pass
+    async def verify(self, interaction, button): pass
 
-# ===================== OUTRAS VIEWS DE PAINEL =====================
 class TicketPanelView(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -1824,6 +2076,27 @@ async def cmd_painel(interaction: discord.Interaction):
     config["painel_message_id"] = msg.id
     save_config(config)
     await interaction.response.send_message(f"✅ Painel do **{bname()}** enviado!", ephemeral=True)
+
+@bot.tree.command(name="painelantibot", description="🚫 Envia o painel Anti-Bot no canal configurado")
+@app_commands.default_permissions(administrator=True)
+async def cmd_antibot(interaction: discord.Interaction):
+    cid = config.get("antibot_channel_id")
+    if not cid:
+        await interaction.response.send_message(
+            "❌ Configure o **Canal Anti-Bot** no painel admin (`🚫 Anti-Bot > Definir Canal Anti-Bot`).",
+            ephemeral=True
+        )
+        return
+    ch = interaction.guild.get_channel(cid)
+    if not ch:
+        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
+    try:
+        msg = await ch.send(view=antibot_panel_view())
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Erro: `{e}`", ephemeral=True); return
+    config["antibot_panel_message_id"] = msg.id
+    save_config(config)
+    await interaction.response.send_message(f"✅ Painel AntiBot enviado em {ch.mention}!", ephemeral=True)
 
 @bot.tree.command(name="painelticket", description="🎫 Envia o painel de tickets")
 @app_commands.default_permissions(administrator=True)
@@ -1949,6 +2222,27 @@ async def task_voice(): await update_voice_name_impl()
 @tasks.loop(minutes=5)
 async def task_status(): await update_status()
 
+@tasks.loop(minutes=2)
+async def task_voice_watchdog():
+    """Tenta reconectar o canal 24h caso caia (DNS etc)."""
+    guild = get_guild()
+    if not guild: return
+    cid = config.get("voice_channel_id")
+    if not cid: return
+    ch = guild.get_channel(cid)
+    if not ch or not isinstance(ch, discord.VoiceChannel): return
+    vc = guild.voice_client
+    if vc and vc.is_connected():
+        return
+    try:
+        if not vc:
+            await ch.connect(timeout=15.0, reconnect=True)
+        else:
+            await vc.move_to(ch)
+        await update_voice_mute()
+    except Exception as e:
+        logger.debug(f"Voice watchdog: {e}")
+
 # ===================== AUX =====================
 async def bot_join_voice():
     guild = get_guild()
@@ -1958,11 +2252,14 @@ async def bot_join_voice():
     ch = guild.get_channel(cid)
     if not ch or not isinstance(ch, discord.VoiceChannel): return
     try:
-        if not guild.voice_client: await ch.connect()
-        else: await guild.voice_client.move_to(ch)
+        if not guild.voice_client:
+            await ch.connect(timeout=15.0, reconnect=True)
+        else:
+            await guild.voice_client.move_to(ch)
         await update_voice_name_impl()
         await update_voice_mute()
-    except Exception as e: logger.error(f"Voz: {e}")
+    except Exception as e:
+        logger.warning(f"Voz: {e}")
 
 async def apply_avatar_if_needed(force=False):
     url = avatar_url()
@@ -1994,28 +2291,39 @@ async def on_ready():
     await apply_avatar_if_needed()
     await bot_join_voice()
     await update_status()
-    for t in (task_voice, task_status):
+    for t in (task_voice, task_status, task_voice_watchdog):
         if not t.is_running(): t.start()
+
+@bot.event
+async def on_message(message: discord.Message):
+    # Ignora DMs e bots
+    if message.author.bot: return
+    if not message.guild: return
+
+    # ----- AntiBot -----
+    ab_cid = config.get("antibot_channel_id")
+    if ab_cid and message.channel.id == ab_cid:
+        await handle_antibot_punish(message)
+        return
+
+    await bot.process_commands(message)
 
 @bot.event
 async def on_member_join(member):
     if member.bot: return
     guild = member.guild
 
-    # Card de boas-vindas
     try:
         await send_welcome_message(member)
     except Exception as e:
         logger.error(f"Erro send_welcome: {e}")
 
-    # Cargo de não-verificado
     for rid in config.get("verification_unverified_role_ids", []):
         r = guild.get_role(rid)
         if r:
             try: await member.add_roles(r)
             except Exception: pass
 
-    # Envia desafio no canal de verificação
     ch_id = config.get("verification_channel_id")
     if ch_id:
         ch = guild.get_channel(ch_id)
@@ -2025,9 +2333,7 @@ async def on_member_join(member):
             except Exception as e:
                 logger.error(f"Erro enviando desafio: {e}")
 
-    # Agenda kick se configurado
     schedule_verification_kick(guild, member)
-
     await update_voice_name_impl()
     await update_status()
 
@@ -2045,7 +2351,6 @@ async def on_member_remove(member):
 @bot.event
 async def on_voice_state_update(member, before, after):
     if member.bot: return
-
     if before.channel is None and after.channel is not None:
         try:
             await send_voice_log(member, after.channel, "join")
