@@ -125,6 +125,26 @@ def save_config(data):
 
 config = load_config()
 
+# ===================== HOT-RELOAD (painel web) =====================
+_cfg_mtime = os.path.getmtime(CONFIG_FILE) if os.path.exists(CONFIG_FILE) else 0
+
+@tasks.loop(seconds=5)
+async def task_reload_config():
+    """Recarrega config.json quando o painel web altera o arquivo."""
+    global _cfg_mtime
+    try: m = os.path.getmtime(CONFIG_FILE)
+    except OSError: return
+    if m == _cfg_mtime: return
+    _cfg_mtime = m
+    try:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f: data = json.load(f)
+    except Exception: return
+    for k, v in DEFAULT_CONFIG.items(): data.setdefault(k, v)
+    config.clear(); config.update(data)
+    try:
+        await update_status(); await update_voice_name_impl()
+    except Exception: pass
+
 # ===================== HELPERS DE IDENTIDADE =====================
 def bname():  return config.get("brand_name") or "Bot"
 def bemoji(): return config.get("brand_emoji") or "🖤"
@@ -2680,7 +2700,7 @@ async def on_ready():
     await apply_avatar_if_needed()
     await bot_join_voice()
     await update_status()
-    for t in (task_voice, task_status, task_voice_watchdog, task_antibot_refresh):
+    for t in (task_voice, task_status, task_voice_watchdog, task_antibot_refresh, task_reload_config):
         if not t.is_running(): t.start()
     try:
         await refresh_antibot_panel()

@@ -8,3 +8,17 @@ services:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
     volumes:
       - ./data:/app/data
+
+  painel:
+    build: .
+    container_name: pxk-painel
+    restart: unless-stopped
+    command: ["python", "-u", "panel.py"]
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - PANEL_PASSWORD=${PANEL_PASSWORD}
+      - PANEL_SECRET=${PANEL_SECRET:-}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data

@@ -15,7 +15,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-COPY bot.py database.py ./
+COPY bot.py database.py panel.py ./
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
