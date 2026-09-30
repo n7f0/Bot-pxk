@@ -1,27 +1,23 @@
 FROM python:3.11-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
-
+# Instala ffmpeg (necessário para o keepalive de voz) e gosu (para o entrypoint)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential libffi-dev libnacl-dev libsodium-dev \
-        ffmpeg ca-certificates gosu \
+        ffmpeg \
+        gosu \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-COPY bot.py database.py panel.py ./
+COPY . .
+
+RUN useradd -m -u 1000 botuser
+RUN chown -R botuser:botuser /app
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-
-RUN mkdir -p /app/data
-RUN useradd -m -u 1000 botuser
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["python", "-u", "bot.py"]
