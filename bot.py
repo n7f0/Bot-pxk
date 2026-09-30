@@ -1,7 +1,7 @@
 import discord
 from discord import app_commands, ui
 from discord.ext import commands, tasks
-import json, os, datetime, random, logging, aiohttp, asyncio, re
+import json, os, datetime, random, logging, aiohttp, asyncio, re, shutil
 from database import *
 
 # ===================== TOKEN =====================
@@ -12,7 +12,17 @@ if not TOKEN:
 CONFIG_FILE = "/app/data/config.json"
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-logging.getLogger("discord.voice_state").setLevel(logging.WARNING)
+
+# ✅ SILENCIA O RUÍDO DE VOZ (as reconexões são normais e tratadas)
+logging.getLogger("discord.voice_state").setLevel(logging.CRITICAL)
+logging.getLogger("discord.voice_client").setLevel(logging.CRITICAL)
+logging.getLogger("discord.player").setLevel(logging.WARNING)
+logging.getLogger("discord.gateway").setLevel(logging.WARNING)
+
+# ✅ Detecta se o ffmpeg está disponível (usado pelo keepalive)
+FFMPEG_AVAILABLE = shutil.which("ffmpeg") is not None
+if not FFMPEG_AVAILABLE:
+    logger.warning("⚠️ ffmpeg não encontrado. O keepalive de voz ficará desativado.")
 
 # ===================== CONFIG PADRÃO =====================
 DEFAULT_CONFIG = {
@@ -58,7 +68,6 @@ DEFAULT_CONFIG = {
     "painel_channel_id": None,
     "painel_message_id": None,
 
-    # ---- TICKETS ----
     "ticket_category_doubt_id": None,
     "ticket_category_purchase_id": None,
     "ticket_logs_channel_id": None,
@@ -66,7 +75,6 @@ DEFAULT_CONFIG = {
     "ticket_panel_message_id": None,
     "ticket_support_role_ids": [],
 
-    # ✅ NOVOS CAMPOS EDITÁVEIS DO PAINEL DE TICKETS
     "ticket_panel_title": "🎫 Central de Tickets — {brand}",
     "ticket_panel_description": (
         "### 💬 Precisa de ajuda ou quer comprar algo?\n"
@@ -159,7 +167,6 @@ def banner_ticket():   return config.get("banner_ticket_url") or None
 def banner_welcome():  return config.get("welcome_image_url") or config.get("banner_welcome_url") or None
 
 def _fmt_text(t: str) -> str:
-    """Substitui placeholders dinâmicos no texto."""
     if not t: return ""
     guild = get_guild()
     members = guild.member_count if guild else 0
@@ -611,7 +618,6 @@ async def handle_antibot_punish(message: discord.Message):
 
 # ===================== TICKET PANEL — REFRESH =====================
 async def refresh_ticket_panel():
-    """Reenvia/edita o painel de tickets com as configs atuais."""
     cid = config.get("ticket_panel_channel_id")
     if not cid: return False
     guild = get_guild()
@@ -628,7 +634,6 @@ async def refresh_ticket_panel():
         except Exception as e:
             logger.debug(f"Não consegui editar painel existente: {e}")
 
-    # Se não existir, manda um novo
     try:
         msg = await ch.send(view=ticket_panel_layout())
         config["ticket_panel_message_id"] = msg.id
@@ -918,7 +923,6 @@ def painel_fixo_view():
         accent=color_primary(),
     )
 
-# ---------- 🎫 TICKETS ----------
 def tickets_view():
     ch_ok = "✅" if config.get("ticket_panel_channel_id") else "❌"
     return premium_submenu(
@@ -945,7 +949,6 @@ def tickets_view():
         accent=color_primary(),
     )
 
-# ✅ SUBMENU: PERSONALIZAR PAINEL DE TICKETS
 def ticket_panel_custom_view():
     t_title = config.get("ticket_panel_title") or ""
     t_ph    = config.get("ticket_panel_select_placeholder") or ""
@@ -1357,6 +1360,10 @@ def single_voice_view(key, title):
                 else: await guild.voice_client.move_to(channel)
                 await update_voice_name_impl()
                 await update_voice_mute()
+                # ✅ Reinicia o keepalive ao mudar de canal
+                if FFMPEG_AVAILABLE:
+                    try: await _play_silence(guild.voice_client)
+                    except Exception: pass
             except Exception: pass
         await interaction.response.send_message(f"✅ **{title}:** {channel.name if channel else val}", ephemeral=True)
     sel.callback = cb
@@ -1511,8 +1518,6 @@ def verification_panel_layout():
 
 
 def ticket_panel_layout():
-    """Painel público de tickets — TOTALMENTE editável pelo admin."""
-    # Pega textos configurados
     raw_title = config.get("ticket_panel_title") or "🎫 Central de Tickets — {brand}"
     raw_desc  = config.get("ticket_panel_description") or ""
     raw_ph    = config.get("ticket_panel_select_placeholder") or "🎫 Selecione o tipo de ticket..."
@@ -1525,7 +1530,6 @@ def ticket_panel_layout():
     p_desc  = config.get("ticket_purchase_desc") or ""
     p_emoji = config.get("ticket_purchase_emoji") or "🛒"
 
-    # Substitui placeholders
     title = _fmt_text(raw_title)
     desc  = _fmt_text(raw_desc)
     ph    = _fmt_text(raw_ph)
@@ -1548,7 +1552,6 @@ def ticket_panel_layout():
         if mg is not None:
             comps.append(mg)
 
-    # Select com labels/descrições/emojis configuráveis
     ticket_sel = _safe_select(
         placeholder=ph,
         options=[
@@ -1629,7 +1632,6 @@ async def on_interaction(interaction: discord.Interaction):
         return
 
     try:
-        # ---------- IDENTIDADE ----------
         if cid == "id_name":
             await interaction.response.send_modal(BrandNameModal())
         elif cid == "id_emoji":
@@ -1659,7 +1661,6 @@ async def on_interaction(interaction: discord.Interaction):
         elif cid == "id_preview":
             await interaction.response.send_message(view=painel_layout(), ephemeral=True)
 
-        # ---------- ANTI-BOT ----------
         elif cid == "ab_ch":
             await interaction.response.send_message(view=single_channel_view("antibot_channel_id", "Canal Anti-Bot"), ephemeral=True)
         elif cid == "ab_log":
@@ -1689,7 +1690,6 @@ async def on_interaction(interaction: discord.Interaction):
         elif cid == "ab_preview":
             await interaction.response.send_message(view=antibot_panel_view(), ephemeral=True)
 
-        # ---------- CAPTCHA ----------
         elif cid == "cap_roles":
             await interaction.response.send_message(view=multi_role_view("verified_role_ids", "Cargos Entregues (verificados)", config.get("verified_role_ids", [])), ephemeral=True)
         elif cid == "cap_unver":
@@ -1707,7 +1707,6 @@ async def on_interaction(interaction: discord.Interaction):
         elif cid == "cap_log":
             await interaction.response.send_message(view=single_channel_view("verification_log_channel_id", "Canal de Log", admin_only=True), ephemeral=True)
 
-        # ---------- BOAS-VINDAS & SAÍDA ----------
         elif cid == "wel_ch":
             await interaction.response.send_message(view=single_channel_view("welcome_channel_id", "Canal de Boas-vindas"), ephemeral=True)
         elif cid == "wel_msg":
@@ -1727,7 +1726,6 @@ async def on_interaction(interaction: discord.Interaction):
             await send_leave_message(interaction.user)
             await interaction.followup.send("✅ Teste de saída enviado!", ephemeral=True)
 
-        # ---------- LOGS DE VOZ ----------
         elif cid == "vl_join_ch":
             await interaction.response.send_message(view=single_channel_view("voice_join_log_channel_id", "Canal de Log — Entrou", admin_only=True), ephemeral=True)
         elif cid == "vl_leave_ch":
@@ -1751,7 +1749,6 @@ async def on_interaction(interaction: discord.Interaction):
             else:
                 await interaction.followup.send("❌ Nenhum canal de voz disponível.", ephemeral=True)
 
-        # ---------- VOZ ----------
         elif cid == "v_mute":
             config["voice_mute"] = not config.get("voice_mute", True)
             save_config(config)
@@ -1762,15 +1759,12 @@ async def on_interaction(interaction: discord.Interaction):
         elif cid == "v_ch":
             await interaction.response.send_message(view=single_voice_view("voice_channel_id", "Canal de Voz 24h"), ephemeral=True)
 
-        # ---------- ADMIN ----------
         elif cid == "adm_roles":
             await interaction.response.send_message(view=multi_role_view("admin_role_ids", "Cargos de Admin", config.get("admin_role_ids", [])), ephemeral=True)
 
-        # ---------- PAINEL FIXO ----------
         elif cid == "pf_ch":
             await interaction.response.send_message(view=single_channel_view("painel_channel_id", "Canal do Painel Principal"), ephemeral=True)
 
-        # ---------- TICKETS ----------
         elif cid == "tk_cat_d":
             await interaction.response.send_message(view=single_category_view("ticket_category_doubt_id", "Categoria Dúvidas"), ephemeral=True)
         elif cid == "tk_cat_p":
@@ -1784,7 +1778,6 @@ async def on_interaction(interaction: discord.Interaction):
         elif cid == "tk_mod":
             await interaction.response.send_message(view=single_channel_view("moderation_logs_channel_id", "Logs de Moderação"), ephemeral=True)
 
-        # ---------- TICKET PANEL CUSTOM ----------
         elif cid == "tk_customize":
             await interaction.response.send_message(view=ticket_panel_custom_view(), ephemeral=True)
         elif cid == "tpc_title":
@@ -1868,21 +1861,17 @@ async def on_interaction(interaction: discord.Interaction):
                 ephemeral=True
             )
 
-        # ---------- FEEDBACK ----------
         elif cid == "fb_ch":
             await interaction.response.send_message(view=single_channel_view("feedback_channel_id", "Canal de Feedback"), ephemeral=True)
 
-        # ---------- SUGESTÕES ----------
         elif cid == "sg_pch":
             await interaction.response.send_message(view=single_channel_view("suggestions_panel_channel_id", "Canal do Painel de Sugestões"), ephemeral=True)
         elif cid == "sg_ch":
             await interaction.response.send_message(view=single_channel_view("suggestions_channel_id", "Canal de Sugestões"), ephemeral=True)
 
-        # ---------- VOLTAR ----------
         elif cid == "back_main":
             await interaction.response.edit_message(view=painel_layout())
 
-        # ---------- BOTÕES DE AÇÃO ----------
         elif cid == "suggest_btn":
             await interaction.response.send_modal(SuggestionModal())
         elif cid == "verify_now":
@@ -1965,7 +1954,7 @@ class URLModal(ui.Modal):
     def __init__(self, key, label, refresh=None):
         super().__init__(title=f"🖼️ {label}")
         self.key = key
-        self.refresh = refresh  # "antibot", "ticket" ou None
+        self.refresh = refresh
         self.v = ui.TextInput(label="URL (ou 'limpar')", required=True)
         self.add_item(self.v)
     async def on_submit(self, interaction):
@@ -1989,7 +1978,6 @@ class URLModal(ui.Modal):
             except Exception: pass
 
 class GenericTextModal(ui.Modal):
-    """Modal genérico para editar qualquer campo de texto do config."""
     def __init__(self, key, title, label, default="", style=discord.TextStyle.short,
                  max_length=200, refresh=None):
         super().__init__(title=title[:45])
@@ -2009,7 +1997,6 @@ class GenericTextModal(ui.Modal):
         config[self.key] = val
         save_config(config)
 
-        # Refresh do painel afetado
         if self.refresh == "antibot":
             try: await refresh_antibot_panel()
             except Exception: pass
@@ -2618,6 +2605,37 @@ async def cmd_status(interaction, modo: str):
     await update_status()
     await interaction.response.send_message(f"✅ Status: **{modo}**", ephemeral=True)
 
+# ===================== KEEPALIVE DE VOZ =====================
+async def _play_silence(vc: discord.VoiceClient):
+    """Toca silêncio contínuo para manter a conexão de voz ativa."""
+    if not FFMPEG_AVAILABLE or not vc or not vc.is_connected():
+        return
+    if vc.is_playing() or vc.is_paused():
+        return
+    try:
+        source = discord.FFmpegPCMAudio(
+            "anullsrc=channel_layout=stereo:sample_rate=48000",
+            before_options="-f lavfi",
+            options="-t 300",  # 5 minutos de silêncio
+        )
+        vc.play(source)
+        logger.debug("🔇 Keepalive: reproduzindo silêncio (5 min).")
+    except Exception as e:
+        logger.debug(f"Keepalive play: {e}")
+
+@tasks.loop(seconds=60)
+async def task_voice_keepalive():
+    """Garante que o bot nunca fique com a voz ociosa (evita quedas 1006)."""
+    if not FFMPEG_AVAILABLE:
+        return
+    guild = get_guild()
+    if not guild: return
+    vc = guild.voice_client
+    if not vc or not vc.is_connected(): return
+    # Se não estiver tocando nada, reinicia o silêncio
+    if not vc.is_playing() and not vc.is_paused():
+        await _play_silence(vc)
+
 # ===================== TASKS =====================
 @tasks.loop(minutes=1)
 async def task_voice(): await update_voice_name_impl()
@@ -2627,6 +2645,7 @@ async def task_status(): await update_status()
 
 @tasks.loop(minutes=2)
 async def task_voice_watchdog():
+    """Watchdog: se o bot caiu da call, reconecta e reinicia o keepalive."""
     guild = get_guild()
     if not guild: return
     cid = config.get("voice_channel_id")
@@ -2642,6 +2661,8 @@ async def task_voice_watchdog():
         else:
             await vc.move_to(ch)
         await update_voice_mute()
+        # ✅ Reinicia o keepalive após reconectar
+        await _play_silence(guild.voice_client)
     except Exception as e:
         logger.debug(f"Voice watchdog: {e}")
 
@@ -2667,6 +2688,8 @@ async def bot_join_voice():
             await guild.voice_client.move_to(ch)
         await update_voice_name_impl()
         await update_voice_mute()
+        # ✅ Inicia o keepalive ao entrar
+        await _play_silence(guild.voice_client)
     except Exception as e:
         logger.warning(f"Voz: {e}")
 
@@ -2700,8 +2723,12 @@ async def on_ready():
     await apply_avatar_if_needed()
     await bot_join_voice()
     await update_status()
-    for t in (task_voice, task_status, task_voice_watchdog, task_antibot_refresh, task_reload_config):
+
+    # ✅ Registra TODAS as tasks (incluindo a nova de keepalive)
+    for t in (task_voice, task_status, task_voice_watchdog,
+              task_antibot_refresh, task_reload_config, task_voice_keepalive):
         if not t.is_running(): t.start()
+
     try:
         await refresh_antibot_panel()
     except Exception:
