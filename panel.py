@@ -25,6 +25,7 @@ SECTIONS = [
         ("avatar_url", "URL do avatar do bot", "text"),
         ("banner_painel_url", "Banner do painel (URL)", "text"),
         ("banner_ticket_url", "Banner dos tickets (URL)", "text"),
+        ("banner_welcome_url", "Banner de boas-vindas (URL)", "text"),
     ]),
     ("👋 Boas-vindas e saída", [
         ("welcome_channel_id", "Canal de boas-vindas", "ch"),
@@ -82,6 +83,10 @@ SECTIONS = [
         ("moderation_logs_channel_id", "Log de moderação", "ch"),
         ("painel_channel_id", "Canal do painel admin fixo", "ch"),
         ("admin_role_ids", "Cargos administradores do bot", "role"),
+    ]),
+    ("➕ /addcargo", [
+        ("addcargo_allowed_role_ids", "Cargos que podem usar /addcargo", "role"),
+        ("addcargo_panel_channel_id", "Canal do painel público do /addcargo", "ch"),
     ]),
     ("🎞️ Atividade do Bot", [
         ("activity_rotate_enabled", "Ativar rotação de atividade", "bool"),
