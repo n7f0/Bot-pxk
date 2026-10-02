@@ -27,7 +27,6 @@ DEFAULT_CONFIG = {
     "brand_name": "𝚙𝚡𝚔",
     "brand_emoji": "🖤",
     "brand_footer": "🖤 𝚙𝚡𝚔 • Sistema Oficial",
-    # 🎨 Roxo escuro
     "brand_color_primary": 0x3D1A5C,
     "brand_color_secondary": 0x5B2A8E,
     "brand_color_success": 0x00FF88,
@@ -65,10 +64,15 @@ DEFAULT_CONFIG = {
     # 🎞️ Rotação de Atividade
     "activity_rotate_enabled": False,
     "activity_rotate_seconds": 30,
-    "activity_type": "watching",     # watching | playing | listening | competing
+    "activity_type": "watching",
     "activity_messages": [],
 
     "admin_role_ids": [],
+
+    # ➕ /addcargo
+    "addcargo_allowed_role_ids": [],
+    "addcargo_panel_channel_id": None,
+    "addcargo_panel_message_id": None,
 
     "painel_channel_id": None,
     "painel_message_id": None,
@@ -251,7 +255,6 @@ def _current_activity_text():
             if _activity_index >= len(msgs):
                 _activity_index = 0
             return _fmt_text(msgs[_activity_index])
-    # fallback padrão
     if guild:
         return f"{bemoji()} {guild.member_count} membros em {bname()}"
     return f"{bemoji()} {bname()}"
@@ -293,7 +296,7 @@ def text_channel_options(max_items=25):
     return opts[:max_items] or [discord.SelectOption(label="Nenhum canal disponível", value="none")]
 
 def cleanup_channel_options(max_items=25):
-    """Inclui canais de texto E canais de voz (para limpar o chat interno da call)."""
+    """Canais de TEXTO + VOZ cujo chat interno pode ser limpo."""
     guild = get_guild()
     opts = []
     if guild:
@@ -303,8 +306,7 @@ def cleanup_channel_options(max_items=25):
                 if perms.manage_messages and perms.read_message_history:
                     opts.append(discord.SelectOption(
                         label=f"💬 #{c.name}"[:100], value=str(c.id),
-                        description="Canal de texto"
-                    ))
+                        description="Canal de texto"))
             except Exception: continue
         for c in guild.voice_channels:
             try:
@@ -312,10 +314,24 @@ def cleanup_channel_options(max_items=25):
                 if perms.manage_messages and perms.read_message_history:
                     opts.append(discord.SelectOption(
                         label=f"🔊 {c.name}"[:100], value=str(c.id),
-                        description="Chat da call de voz"
-                    ))
+                        description="Chat da call de voz"))
             except Exception: continue
     return opts[:25] or [discord.SelectOption(label="Nenhum canal disponível", value="none")]
+
+def cleanup_voice_only_options(max_items=25):
+    """Somente canais de voz cujo chat interno pode ser limpo."""
+    guild = get_guild()
+    opts = []
+    if guild:
+        for c in guild.voice_channels:
+            try:
+                perms = c.permissions_for(guild.me)
+                if perms.manage_messages and perms.read_message_history:
+                    opts.append(discord.SelectOption(
+                        label=f"🔊 {c.name}"[:100], value=str(c.id),
+                        description="Chat interno da call"))
+            except Exception: continue
+    return opts[:max_items] or [discord.SelectOption(label="Nenhum canal de voz disponível", value="none")]
 
 def voice_channel_options():
     guild = get_guild()
@@ -550,6 +566,161 @@ async def make_channel_admin_only(channel):
     except Exception as e:
         logger.warning(f"Não foi possível restringir {channel.name}: {e}")
 
+# ===================== /addcargo — PERMISSÃO =====================
+def user_can_use_addcargo(member) -> bool:
+    if not isinstance(member, discord.Member):
+        return False
+    if member.guild_permissions.administrator:
+        return True
+    allowed = config.get("addcargo_allowed_role_ids", []) or []
+    if not allowed:
+        return False
+    member_role_ids = {r.id for r in member.roles}
+    return any(rid in member_role_ids for rid in allowed)
+
+# ===================== /addcargo — MINI PAINEL =====================
+def build_addcargo_panel():
+    """Mini painel: RoleSelect (multi) + UserSelect + botão Aplicar."""
+    state = {"roles": [], "user": None}
+
+    layout = ui.LayoutView(timeout=600)
+
+    role_select = ui.RoleSelect(
+        placeholder="👑 Selecione um ou mais cargos para adicionar...",
+        min_values=1, max_values=10,
+    )
+    user_select = ui.UserSelect(
+        placeholder="👤 Selecione o usuário que vai receber os cargos...",
+        min_values=1, max_values=1,
+    )
+    confirm_btn = ui.Button(label="Aplicar Cargos", style=SU, emoji="✅")
+    cancel_btn = ui.Button(label="Cancelar", style=D, emoji="✖️")
+
+    async def on_roles(interaction: discord.Interaction):
+        state["roles"] = list(role_select.values)
+        try:
+            await interaction.response.defer()
+        except Exception:
+            pass
+
+    async def on_user(interaction: discord.Interaction):
+        vals = user_select.values
+        state["user"] = vals[0] if vals else None
+        try:
+            await interaction.response.defer()
+        except Exception:
+            pass
+
+    async def on_confirm(interaction: discord.Interaction):
+        roles = state["roles"]
+        user = state["user"]
+        if not roles or not user:
+            await interaction.response.send_message(
+                "❌ Selecione pelo menos **um cargo** e **um usuário**.", ephemeral=True)
+            return
+
+        me = interaction.guild.me
+        if not me.guild_permissions.manage_roles:
+            await interaction.response.send_message(
+                "❌ Não tenho permissão `Gerenciar Cargos`.", ephemeral=True)
+            return
+
+        applied, failed = [], []
+        target = user if isinstance(user, discord.Member) else interaction.guild.get_member(user.id)
+        if not target:
+            await interaction.response.send_message("❌ Usuário não está no servidor.", ephemeral=True)
+            return
+
+        for role in roles:
+            if role.is_default():
+                failed.append(f"{role.mention} (@everyone)")
+                continue
+            if role >= me.top_role:
+                failed.append(f"{role.mention} (cargo alto demais)")
+                continue
+            if role in target.roles:
+                failed.append(f"{role.mention} (já possui)")
+                continue
+            try:
+                await target.add_roles(role, reason=f"{interaction.user} via painel /addcargo")
+                applied.append(role.mention)
+            except discord.Forbidden:
+                failed.append(f"{role.mention} (sem permissão)")
+            except Exception as e:
+                failed.append(f"{role.mention} ({e})")
+
+        try:
+            log_moderation("add_role_panel", interaction.user.id, target.id,
+                           ", ".join(r.name for r in roles))
+        except Exception:
+            pass
+
+        parts = []
+        if applied:
+            parts.append(f"✅ **Adicionados a {target.mention}:**\n" + "\n".join(f"• {r}" for r in applied))
+        if failed:
+            parts.append(f"❌ **Falhas:**\n" + "\n".join(f"• {r}" for r in failed))
+        await interaction.response.send_message(
+            "\n\n".join(parts) or "✅ Concluído.", ephemeral=True)
+
+    async def on_cancel(interaction: discord.Interaction):
+        try:
+            await interaction.response.edit_message(view=None)
+        except Exception:
+            try: await interaction.response.defer()
+            except Exception: pass
+
+    role_select.callback = on_roles
+    user_select.callback = on_user
+    confirm_btn.callback = on_confirm
+    cancel_btn.callback = on_cancel
+
+    layout.add_item(ui.Container(
+        ui.TextDisplay("# ➕ Adicionar Cargos a Usuário"),
+        ui.Section(
+            ui.TextDisplay(
+                "**Como usar:**\n"
+                "> 1️⃣ Selecione o(s) **cargo(s)**\n"
+                "> 2️⃣ Selecione o **usuário**\n"
+                "> 3️⃣ Clique em **✅ Aplicar Cargos**"
+            ),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.TextDisplay("### 👑 Cargos"),
+        ui.ActionRow(role_select),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.TextDisplay("### 👤 Usuário"),
+        ui.ActionRow(user_select),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(confirm_btn, cancel_btn),
+        accent_color=color_primary(),
+    ))
+    return layout
+
+def addcargo_public_panel():
+    """Painel público com um botão que abre o mini painel /addcargo."""
+    layout = ui.LayoutView(timeout=None)
+    comps = [
+        ui.TextDisplay("# ➕ Adicionar Cargos"),
+        ui.Section(
+            ui.TextDisplay(
+                "### 🎁 Sistema de Cargos\n"
+                "Use este painel para **adicionar cargos a um usuário**.\n\n"
+                "**Como funciona:**\n"
+                "> • Clique em **➕ Abrir Painel**\n"
+                "> • Escolha os cargos e o usuário\n"
+                "> • Confirme e os cargos serão aplicados"
+            ),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(_btn("Abrir Painel", "addcargo_open", P, "➕")),
+        ui.TextDisplay(f"-# {bfooter()}"),
+    ]
+    layout.add_item(ui.Container(*comps, accent_color=color_primary()))
+    return layout
+
 # ===================== ANTI-BOT =====================
 def antibot_panel_view():
     count = get_antibot_count()
@@ -683,21 +854,18 @@ async def _refresh_simple_panel(channel_key, msg_key, builder):
         logger.debug(f"refresh {channel_key}: {e}")
 
 async def refresh_all_panels():
-    """Re-registra TODOS os painéis salvos. Chamado no boot e após mudanças."""
-    # Painel admin principal
     await _refresh_simple_panel("painel_channel_id", "painel_message_id", painel_layout)
-    # Anti-bot
     await refresh_antibot_panel()
-    # Tickets
     await refresh_ticket_panel()
-    # Sugestões
     await _refresh_simple_panel("suggestions_panel_channel_id",
                                 "suggestions_panel_message_id",
                                 suggestion_panel_layout)
-    # Verificação
     await _refresh_simple_panel("verification_panel_channel_id",
                                 "verification_panel_message_id",
                                 verification_panel_layout)
+    await _refresh_simple_panel("addcargo_panel_channel_id",
+                                "addcargo_panel_message_id",
+                                addcargo_public_panel)
 
 # ===================== PAINEL PRINCIPAL =====================
 def painel_layout():
@@ -732,6 +900,8 @@ def painel_layout():
                                  description="Canal 24h, mute e presença"),
             discord.SelectOption(label="Cargos de Admin", value="admin", emoji="👑",
                                  description="Quem pode usar este painel"),
+            discord.SelectOption(label="Cargos Autorizados (/addcargo)", value="addcargo_cfg", emoji="➕",
+                                 description="Quem pode dar cargos"),
             discord.SelectOption(label="Painel Fixo", value="painel_fixo", emoji="📌",
                                  description="Canal onde o painel fica fixado"),
             discord.SelectOption(label="Tickets", value="tickets", emoji="🎫",
@@ -741,7 +911,7 @@ def painel_layout():
             discord.SelectOption(label="Sugestões", value="suggestions", emoji="💡",
                                  description="Painel e canal de sugestões"),
             discord.SelectOption(label="Limpeza de Chat", value="chat_cleanup", emoji="🧹",
-                                 description="Apagar mensagens de canais de texto E voz"),
+                                 description="Apagar mensagens (texto e voz)"),
             discord.SelectOption(label="Ver Configuração Atual", value="show_config", emoji="📋",
                                  description="Visualizar tudo que está configurado"),
         ],
@@ -768,6 +938,7 @@ async def main_menu_callback(interaction: discord.Interaction):
         "voicelogs":    lambda: interaction.response.send_message(view=voicelogs_view(), ephemeral=True),
         "voice":        lambda: interaction.response.send_message(view=voice_view(), ephemeral=True),
         "admin":        lambda: interaction.response.send_message(view=admin_view(), ephemeral=True),
+        "addcargo_cfg": lambda: interaction.response.send_message(view=addcargo_cfg_view(), ephemeral=True),
         "painel_fixo":  lambda: interaction.response.send_message(view=painel_fixo_view(), ephemeral=True),
         "tickets":      lambda: interaction.response.send_message(view=tickets_view(), ephemeral=True),
         "feedback":     lambda: interaction.response.send_message(view=feedback_view(), ephemeral=True),
@@ -961,6 +1132,28 @@ def admin_view():
         accent=color_primary(),
     )
 
+def addcargo_cfg_view():
+    allowed = config.get("addcargo_allowed_role_ids", []) or []
+    ch_ok = "✅" if config.get("addcargo_panel_channel_id") else "❌"
+    return premium_submenu(
+        "➕ Configurar /addcargo",
+        "Defina **quais cargos** podem usar o comando `/addcargo` para dar cargos a outros membros.\n\n"
+        f"**Cargos autorizados:** `{len(allowed)}`\n"
+        f"**Painel público:** {ch_ok}\n"
+        "-# Administradores do servidor sempre podem usar.",
+        [
+            {"title": "👑 Cargos Autorizados", "rows": [
+                [_btn("Selecionar Cargos (múltiplos)", "acfg_roles", P, "👥")],
+            ]},
+            {"title": "📢 Painel Público", "rows": [
+                [_btn("Definir Canal", "acfg_ch",   P,  "📌"),
+                 _btn("Postar Painel", "acfg_post", SU, "📤")],
+                [_btn("Preview do Painel", "acfg_preview", S, "👁️")],
+            ]},
+        ],
+        accent=color_primary(),
+    )
+
 def painel_fixo_view():
     return premium_submenu(
         "📌 Painel Fixo",
@@ -1090,34 +1283,104 @@ def chat_cleanup_view():
     async def on_start(interaction): await run_multi_cleanup(interaction)
     start_btn.callback = on_start
     back_btn = _btn("Voltar ao Menu", "back_main", S, "↩️")
+    voice_btn = _btn("Limpar Chat de Voz", "cleanup_voice_open", P, "🔊")
 
     layout.add_item(ui.Container(
         ui.TextDisplay("# 🧹 Limpeza de Chat"),
         ui.Section(
             ui.TextDisplay(
-                "**Selecione vários canais** (de **texto** OU de **voz** — o chat interno da call também é limpo).\n"
+                "Escolha entre **canais de texto** e **canais de voz** (o **chat interno da call** também é limpo).\n"
                 "Uma **barra de progresso detalhada** mostrará o andamento em tempo real.\n"
                 "-# ⚠️ Ação irreversível. O bot precisa de `Gerenciar Mensagens` em cada canal."
             ),
             accessory=ui.Thumbnail(media=_thumb()),
         ),
         ui.Separator(spacing=discord.SeparatorSpacing.small),
-        ui.TextDisplay("### 📂 Canais (selecione um ou mais)"),
+        ui.TextDisplay("### 📂 Selecionar múltiplos canais"),
         ui.ActionRow(channel_select),
         ui.Separator(spacing=discord.SeparatorSpacing.small),
         ui.ActionRow(start_btn, back_btn),
+        ui.Separator(spacing=discord.SeparatorSpacing.large),
+        ui.TextDisplay("### 🔊 Limpar apenas o Chat de uma Call"),
+        ui.TextDisplay("-# Abre um painel com menu SELECT só de canais de voz."),
+        ui.ActionRow(voice_btn),
+        accent_color=color_danger(),
+    ))
+    return layout
+
+def voice_cleanup_view():
+    """Painel dedicado para limpar o chat interno de uma call."""
+    layout = ui.LayoutView(timeout=300)
+    opts = cleanup_voice_only_options()
+
+    sel = _safe_select(
+        placeholder="🔊 Escolha o canal de voz para limpar o chat interno...",
+        options=opts, min_values=1, max_values=1,
+    )
+
+    async def cb(interaction: discord.Interaction):
+        val = sel.values[0]
+        if val == "none":
+            await interaction.response.send_message("❌ Nenhum canal de voz disponível.", ephemeral=True); return
+        ch = interaction.guild.get_channel(int(val))
+        if not ch or not isinstance(ch, discord.VoiceChannel):
+            await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
+        perms = ch.permissions_for(interaction.guild.me)
+        if not (perms.manage_messages and perms.read_message_history):
+            await interaction.response.send_message("❌ Sem permissão nesse canal.", ephemeral=True); return
+
+        await interaction.response.defer(ephemeral=True)
+        start_time = datetime.datetime.now()
+        init_view = _build_cleanup_progress_view(0, 1, None, 0, start_time)
+        progress_msg = await interaction.edit_original_response(view=init_view)
+
+        last_update = {"t": datetime.datetime.now()}
+        async def on_progress(d, phase):
+            now = datetime.datetime.now()
+            if (now - last_update["t"]).total_seconds() < 1.8: return
+            last_update["t"] = now
+            v = _build_cleanup_progress_view(0, 1, ch, d, start_time, phase)
+            try: await progress_msg.edit(view=v)
+            except Exception: pass
+
+        total, erro = await _purge_channel(ch, interaction.guild, on_progress)
+        elapsed = (datetime.datetime.now() - start_time).total_seconds()
+        m, s = int(elapsed // 60), int(elapsed % 60)
+        summary = (
+            f"### ✅ Resumo\n**Tempo:** `{m:02d}m {s:02d}s`\n"
+            f"**Apagadas:** `{total}`\n**Canal de Voz:** {ch.mention}"
+            + (f"\n**Erro:** `{erro}`" if erro else "")
+        )
+        try: await progress_msg.edit(view=_build_cleanup_final_view(summary))
+        except Exception: pass
+
+    sel.callback = cb
+    back_btn = _btn("Voltar ao Menu", "back_main", S, "↩️")
+
+    layout.add_item(ui.Container(
+        ui.TextDisplay("# 🔊 Limpar Chat de Voz"),
+        ui.Section(
+            ui.TextDisplay(
+                "Escolha um **canal de voz** abaixo. O **chat interno** dessa call será totalmente limpo.\n"
+                "-# ⚠️ Ação irreversível. O bot precisa de `Gerenciar Mensagens` no canal."
+            ),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(sel),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(back_btn),
         accent_color=color_danger(),
     ))
     return layout
 
 async def _purge_channel(channel, guild, on_progress):
-    """Limpa canal de texto OU canal de voz (chat interno da call)."""
+    """Limpa canal de TEXTO ou VOZ (chat interno da call)."""
     total = 0
     erro = None
     cutoff = discord.utils.utcnow() - datetime.timedelta(days=13)
     is_text = isinstance(channel, discord.TextChannel)
 
-    # Fase 1: bulk delete (só em canais de texto)
     if is_text:
         try:
             while True:
@@ -1133,10 +1396,8 @@ async def _purge_channel(channel, guild, on_progress):
         except Exception as e:
             logger.error(f"Erro fase 1 {channel.name}: {e}")
 
-    # Fase 2: individual (canais de texto antigos + canais de voz)
     erros_consec = 0
     try:
-        # para texto: só as antigas; para voz: todas
         history_kwargs = dict(limit=None, oldest_first=False)
         if is_text:
             history_kwargs["before"] = cutoff
@@ -1173,7 +1434,6 @@ async def run_multi_cleanup(interaction: discord.Interaction):
     channels = []
     for cid in ids:
         ch = interaction.guild.get_channel(cid)
-        # aceitar texto E voz
         if not ch or not isinstance(ch, (discord.TextChannel, discord.VoiceChannel)):
             continue
         perms = ch.permissions_for(interaction.guild.me)
@@ -1184,8 +1444,7 @@ async def run_multi_cleanup(interaction: discord.Interaction):
         await interaction.response.send_message(
             "❌ Nenhum canal válido para limpar "
             "(verifique permissões `Gerenciar Mensagens` + `Ler Histórico`).",
-            ephemeral=True
-        )
+            ephemeral=True)
         return
 
     await interaction.response.defer(ephemeral=True)
@@ -1203,8 +1462,7 @@ async def run_multi_cleanup(interaction: discord.Interaction):
             if (now - last_update["t"]).total_seconds() < 1.8: return
             last_update["t"] = now
             view = _build_cleanup_progress_view(
-                idx - 1, len(channels), ch, deleted_so_far, start_time, phase
-            )
+                idx - 1, len(channels), ch, deleted_so_far, start_time, phase)
             try: await progress_msg.edit(view=view)
             except Exception: pass
 
@@ -1241,8 +1499,7 @@ async def run_multi_cleanup(interaction: discord.Interaction):
                 await log_ch.send(
                     f"🧹 **Limpeza Múltipla** por {interaction.user.mention}\n"
                     f"**Canais:** {len(results)} | **Total:** `{total_deleted}`\n" +
-                    "\n".join(f"• {ch.mention} — `{cnt}`" for ch, cnt in results)
-                )
+                    "\n".join(f"• {ch.mention} — `{cnt}`" for ch, cnt in results))
             except Exception: pass
 
     _cleanup_selection.pop(user_id, None)
@@ -1272,6 +1529,9 @@ def show_config_view():
         f"**Nome:** {bname()} {bemoji()}",
         f"**Guild ID:** `{config.get('guild_id')}`",
         f"**Admin Roles:** {role_list('admin_role_ids')}",
+        "", "### ➕ /addcargo",
+        f"**Cargos autorizados:** {role_list('addcargo_allowed_role_ids')}",
+        f"**Painel público:** {ch('addcargo_panel_channel_id')}",
         "", "### 🚫 Anti-Bot",
         f"**Canal:** {ch('antibot_channel_id')}",
         f"**Log:** {ch('antibot_log_channel_id')}",
@@ -1319,6 +1579,8 @@ def multi_role_view(key, title, current_ids):
     async def on_role_select(interaction: discord.Interaction):
         ids = [int(r.id) for r in role_select.values]
         config[key] = ids; save_config(config)
+        try: await refresh_all_panels()
+        except Exception: pass
         if ids:
             await interaction.response.send_message(
                 f"✅ **{title}:** {len(ids)} cargo(s).\n" + "\n".join(f"• <@&{i}>" for i in ids),
@@ -1444,7 +1706,6 @@ def status_view():
 
 def activity_type_view():
     layout = ui.LayoutView(timeout=180)
-    cur = config.get("activity_type", "watching")
     sel = _safe_select(
         placeholder="Escolha o tipo da atividade rotativa",
         options=[
@@ -1797,6 +2058,25 @@ async def on_interaction(interaction: discord.Interaction):
         elif cid == "adm_roles":
             await interaction.response.send_message(view=multi_role_view("admin_role_ids", "Cargos de Admin", config.get("admin_role_ids", [])), ephemeral=True)
 
+        # ➕ /addcargo config + painel
+        elif cid == "acfg_roles":
+            await interaction.response.send_message(view=multi_role_view(
+                "addcargo_allowed_role_ids", "Cargos Autorizados a usar /addcargo",
+                config.get("addcargo_allowed_role_ids", [])), ephemeral=True)
+        elif cid == "acfg_ch":
+            await interaction.response.send_message(view=single_channel_view(
+                "addcargo_panel_channel_id", "Canal do Painel /addcargo"), ephemeral=True)
+        elif cid == "acfg_post":
+            await post_addcargo_panel(interaction)
+        elif cid == "acfg_preview":
+            await interaction.response.send_message(view=addcargo_public_panel(), ephemeral=True)
+        elif cid == "addcargo_open":
+            if not user_can_use_addcargo(interaction.user):
+                await interaction.response.send_message(
+                    "❌ Você não tem permissão para usar este painel.", ephemeral=True)
+                return
+            await interaction.response.send_message(view=build_addcargo_panel(), ephemeral=True)
+
         elif cid == "pf_ch":
             await interaction.response.send_message(view=single_channel_view("painel_channel_id", "Canal do Painel Principal"), ephemeral=True)
 
@@ -1882,6 +2162,10 @@ async def on_interaction(interaction: discord.Interaction):
         elif cid == "back_main":
             await interaction.response.edit_message(view=painel_layout())
 
+        # 🔧 Limpeza dedicada de voz
+        elif cid == "cleanup_voice_open":
+            await interaction.response.send_message(view=voice_cleanup_view(), ephemeral=True)
+
         elif cid == "suggest_btn":
             await interaction.response.send_modal(SuggestionModal())
         elif cid == "verify_now":
@@ -1920,6 +2204,20 @@ async def post_antibot_panel(interaction: discord.Interaction):
         await interaction.response.send_message(f"❌ Erro: `{e}`", ephemeral=True); return
     config["antibot_panel_message_id"] = msg.id; save_config(config)
     await interaction.response.send_message(f"✅ Painel AntiBot enviado em {ch.mention}!", ephemeral=True)
+
+async def post_addcargo_panel(interaction: discord.Interaction):
+    cid = config.get("addcargo_panel_channel_id")
+    if not cid:
+        await interaction.response.send_message("❌ Defina o **Canal do Painel /addcargo** primeiro.", ephemeral=True); return
+    ch = interaction.guild.get_channel(cid)
+    if not ch:
+        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
+    try:
+        msg = await ch.send(view=addcargo_public_panel())
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Erro: `{e}`", ephemeral=True); return
+    config["addcargo_panel_message_id"] = msg.id; save_config(config)
+    await interaction.response.send_message(f"✅ Painel /addcargo enviado em {ch.mention}!", ephemeral=True)
 
 # ===================== MODAIS =====================
 class BrandNameModal(ui.Modal, title="✏️ Nome da Marca"):
@@ -2291,10 +2589,8 @@ async def handle_ticket_open(interaction, tipo, nome):
     await channel.send(view=welcome_layout)
 
     if mentions:
-        # menção em TextDisplay (sem `content` pois MessageFlags V2 proíbe)
         await channel.send(view=ui.LayoutView(
-            ui.Container(ui.TextDisplay(f"📢 {', '.join(mentions)} — novo ticket de {interaction.user.mention}."))
-        ))
+            ui.Container(ui.TextDisplay(f"📢 {', '.join(mentions)} — novo ticket de {interaction.user.mention}."))))
 
     await channel.send(view=ticket_actions_layout())
     await interaction.response.send_message(f"✅ Ticket criado em {channel.mention}!", ephemeral=True)
@@ -2376,11 +2672,8 @@ async def send_captcha_challenge(member, channel):
         layout = ui.LayoutView(timeout=None)
         layout.add_item(ui.Container(*comps, accent_color=color_secondary()))
         _button_verification_target[member.id] = True
-        try:
-            # ⚠️ Sem `content=` — MessageFlags V2 proíbe conteúdo separado
-            await channel.send(view=layout)
-        except Exception as e:
-            logger.error(f"Erro enviando verif botão: {e}")
+        try: await channel.send(view=layout)
+        except Exception as e: logger.error(f"Erro enviando verif botão: {e}")
         return
 
     question, answer = _generate_math_challenge()
@@ -2400,11 +2693,8 @@ async def send_captcha_challenge(member, channel):
     ]
     layout = ui.LayoutView(timeout=None)
     layout.add_item(ui.Container(*comps, accent_color=color_secondary()))
-    try:
-        # ⚠️ Removido `content=member.mention` — isso causava o erro 50035 (V2 proíbe)
-        await channel.send(view=layout)
-    except Exception as e:
-        logger.error(f"Erro enviando verif math: {e}")
+    try: await channel.send(view=layout)
+    except Exception as e: logger.error(f"Erro enviando verif math: {e}")
 
 async def _grant_verification(guild, member):
     for rid in config.get("verified_role_ids", []):
@@ -2547,16 +2837,51 @@ async def cmd_pv(interaction):
     config["verification_panel_message_id"] = msg.id; save_config(config)
     await interaction.response.send_message(f"✅ Painel de verificação enviado em {ch.mention}!", ephemeral=True)
 
-# ✅ NOVO: /addcargo
-@bot.tree.command(name="addcargo", description="➕ Adiciona um cargo a um usuário")
-@app_commands.default_permissions(manage_roles=True)
-@app_commands.describe(cargo="Cargo que será adicionado", usuario="Usuário que receberá o cargo")
-async def cmd_addcargo(interaction: discord.Interaction, cargo: discord.Role, usuario: discord.Member):
-    if not interaction.guild.me.guild_permissions.manage_roles:
+@bot.tree.command(name="paineladdcargo", description="➕ Envia o painel público do /addcargo no canal configurado")
+@app_commands.default_permissions(administrator=True)
+async def cmd_painel_addcargo(interaction: discord.Interaction):
+    cid = config.get("addcargo_panel_channel_id")
+    if not cid:
+        await interaction.response.send_message(
+            "❌ Configure em **➕ Cargos Autorizados (/addcargo) > Canal**.",
+            ephemeral=True); return
+    ch = interaction.guild.get_channel(cid)
+    if not ch:
+        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
+    try:
+        msg = await ch.send(view=addcargo_public_panel())
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Erro: `{e}`", ephemeral=True); return
+    config["addcargo_panel_message_id"] = msg.id; save_config(config)
+    await interaction.response.send_message(f"✅ Painel enviado em {ch.mention}!", ephemeral=True)
+
+# ➕ /addcargo — modo direto OU abre mini painel
+@bot.tree.command(name="addcargo", description="➕ Adiciona cargo(s) a um usuário (sem args abre o painel)")
+@app_commands.describe(cargo="Cargo a adicionar (opcional)", usuario="Usuário que vai receber (opcional)")
+async def cmd_addcargo(interaction: discord.Interaction,
+                       cargo: discord.Role = None,
+                       usuario: discord.Member = None):
+    if not user_can_use_addcargo(interaction.user):
+        await interaction.response.send_message(
+            "❌ Você não tem permissão para usar este comando.", ephemeral=True)
+        return
+
+    if cargo is None and usuario is None:
+        await interaction.response.send_message(view=build_addcargo_panel(), ephemeral=True)
+        return
+
+    if cargo is None or usuario is None:
+        await interaction.response.send_message(
+            "❌ Informe **cargo e usuário** juntos, ou use `/addcargo` sem argumentos para abrir o painel.",
+            ephemeral=True)
+        return
+
+    me = interaction.guild.me
+    if not me.guild_permissions.manage_roles:
         await interaction.response.send_message("❌ Não tenho permissão `Gerenciar Cargos`.", ephemeral=True); return
     if cargo.is_default():
         await interaction.response.send_message("❌ Não posso adicionar o cargo @everyone.", ephemeral=True); return
-    if cargo >= interaction.guild.me.top_role:
+    if cargo >= me.top_role:
         await interaction.response.send_message(
             "❌ Esse cargo é **igual ou superior** ao meu cargo mais alto.", ephemeral=True); return
     if cargo in usuario.roles:
@@ -2572,7 +2897,7 @@ async def cmd_addcargo(interaction: discord.Interaction, cargo: discord.Role, us
     await interaction.response.send_message(
         f"✅ Cargo {cargo.mention} adicionado a {usuario.mention}.", ephemeral=True)
 
-@bot.tree.command(name="limparchat", description="🧹 Apaga TODAS as mensagens de um canal (texto ou voz)")
+@bot.tree.command(name="limparchat", description="🧹 Apaga TODAS as mensagens de um canal de texto")
 @app_commands.default_permissions(administrator=True)
 @app_commands.describe(canal="Canal que será totalmente limpo")
 async def cmd_limpar(interaction: discord.Interaction, canal: discord.TextChannel):
@@ -2695,17 +3020,13 @@ async def task_voice():
 
 @tasks.loop(seconds=5)
 async def task_activity_rotate():
-    """Roda a cada 5s mas só muda a presença quando passou o intervalo configurado."""
     if not config.get("activity_rotate_enabled"): return
     await update_status()
 
 @tasks.loop(minutes=3)
 async def task_refresh_panels():
-    """Mantém todos os painéis vivos/re-renderizados (sobrevive reinícios)."""
-    try:
-        await refresh_all_panels()
-    except Exception as e:
-        logger.debug(f"refresh panels: {e}")
+    try: await refresh_all_panels()
+    except Exception as e: logger.debug(f"refresh panels: {e}")
 
 @tasks.loop(minutes=2)
 async def task_voice_watchdog():
@@ -2783,13 +3104,11 @@ async def on_ready():
     await bot_join_voice()
     await update_status(force=True)
 
-    # Registra todas as tasks
     for t in (task_voice, task_activity_rotate, task_refresh_panels,
               task_voice_watchdog, task_antibot_refresh, task_reload_config,
               task_voice_keepalive):
         if not t.is_running(): t.start()
 
-    # Restaura todos os painéis salvos
     try:
         await refresh_all_panels()
         logger.info("✅ Painéis re-registrados")
