@@ -12,7 +12,7 @@ app.secret_key = os.getenv("PANEL_SECRET") or hashlib.sha256(("pxk" + PASSWORD).
 app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax")
 
 # ---------- Esquema dos campos ----------
-# tipos: text, area, color, bool, num, choice, ch (canal texto), vc (voz), cat (categoria), role (multi cargos)
+# tipos: text, area, color, bool, num, choice, ch, vc, cat, role, list
 SECTIONS = [
     ("🎨 Identidade", [
         ("brand_name", "Nome da marca", "text"),
@@ -83,6 +83,13 @@ SECTIONS = [
         ("painel_channel_id", "Canal do painel admin fixo", "ch"),
         ("admin_role_ids", "Cargos administradores do bot", "role"),
     ]),
+    ("🎞️ Atividade do Bot", [
+        ("activity_rotate_enabled", "Ativar rotação de atividade", "bool"),
+        ("activity_type", "Tipo da atividade",
+         "choice:watching=Assistindo,playing=Jogando,listening=Ouvindo,competing=Competindo"),
+        ("activity_rotate_seconds", "Trocar a cada X segundos (mín 10)", "num"),
+        ("activity_messages", "Mensagens (uma por linha — use {brand}, {emoji}, {members})", "list"),
+    ]),
 ]
 
 # ---------- Config ----------
@@ -120,7 +127,8 @@ def discord_data(gid):
             if c["type"] in (0, 5): out["ch"].append((c["id"], "#" + label))
             elif c["type"] == 2: out["vc"].append((c["id"], "🔊 " + label))
             elif c["type"] == 4: out["cat"].append((c["id"], c["name"]))
-        out["role"] = [(r["id"], "@" + r["name"]) for r in sorted(roles, key=lambda r: -r["position"]) if r["name"] != "@everyone"]
+        out["role"] = [(r["id"], "@" + r["name"]) for r in sorted(roles, key=lambda r: -r["position"])
+                       if r["name"] != "@everyone"]
         _cache.update(t=time.time(), gid=gid, data=out)
     except Exception:
         pass
@@ -178,8 +186,15 @@ def index():
     if request.method == "POST":
         for _, fields in SECTIONS:
             for key, _label, typ in fields:
-                if typ in ("text", "area", "choice") or typ.startswith("choice"):
-                    cfg[key] = request.form.get(key, "").strip() if typ != "area" else request.form.get(key, "").replace("\r\n", "\n")
+                if typ == "list":
+                    raw = request.form.get(key, "").replace("\r\n", "\n")
+                    cfg[key] = [ln.strip() for ln in raw.split("\n") if ln.strip()]
+                elif typ == "area":
+                    cfg[key] = request.form.get(key, "").replace("\r\n", "\n")
+                elif typ.startswith("choice"):
+                    cfg[key] = request.form.get(key, "").strip()
+                elif typ == "text":
+                    cfg[key] = request.form.get(key, "").strip()
                 elif typ == "color":
                     try: cfg[key] = int(request.form.get(key, "#000000").lstrip("#"), 16)
                     except ValueError: pass
@@ -206,7 +221,7 @@ def healthz():
 # ---------- Templates ----------
 STYLE = """
 <style>
-:root{--bg:#0d0b14;--card:#171225;--line:#2b2340;--tx:#ece7f7;--mut:#9d93b8;--pri:#8a2be2;--pri2:#b026ff}
+:root{--bg:#0a0611;--card:#160a24;--line:#2c1740;--tx:#ece7f7;--mut:#9d93b8;--pri:#3d1a5c;--pri2:#5b2a8e}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,sans-serif}
 a{color:var(--pri2)}
 </style>"""
@@ -222,7 +237,7 @@ button{width:100%;padding:11px;border:0;border-radius:8px;background:linear-grad
 PAGE = """<!doctype html><html lang="pt-br"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Painel do Bot</title>""" + STYLE + """
 <style>
-header{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;padding:12px 20px;background:#0d0b14ee;backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+header{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;padding:12px 20px;background:#0a0611ee;backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
 header b{font-size:17px}main{max-width:900px;margin:0 auto;padding:20px 16px 120px}
 nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
 nav button{background:var(--card);color:var(--mut);border:1px solid var(--line);padding:8px 14px;border-radius:999px;cursor:pointer;font-size:14px}
@@ -233,9 +248,9 @@ input[type=text],input[type=number],textarea,select{width:100%;padding:10px;bord
 textarea{min-height:110px;resize:vertical}select[multiple]{min-height:130px}
 input[type=color]{width:60px;height:38px;border:1px solid var(--line);border-radius:8px;background:none;padding:2px}
 .sw{display:flex;align-items:center;gap:10px}.sw input{width:20px;height:20px;accent-color:var(--pri2)}.sw label{margin:0;color:var(--tx);font-size:15px}
-.bar{position:fixed;bottom:0;left:0;right:0;padding:14px;background:#0d0b14f2;border-top:1px solid var(--line);text-align:center}
+.bar{position:fixed;bottom:0;left:0;right:0;padding:14px;background:#0a0611f2;border-top:1px solid var(--line);text-align:center}
 .bar button{padding:12px 34px;border:0;border-radius:10px;background:linear-gradient(90deg,var(--pri),var(--pri2));color:#fff;font-weight:600;font-size:15px;cursor:pointer}
-.ok{background:#12301f;border:1px solid #1f6b3f;color:#8ff0b5;padding:10px 14px;border-radius:10px;margin-bottom:16px}
+.ok{background:#1a1030;border:1px solid #3d1a5c;color:#d6c4ff;padding:10px 14px;border-radius:10px;margin-bottom:16px}
 .hint{font-size:12px;color:var(--mut);margin-top:4px}.warn{background:#2c2312;border:1px solid #6b5a1f;color:#f0d98f;padding:10px 14px;border-radius:10px;margin-bottom:16px;font-size:13px}
 </style>
 <header><b>🖤 Painel do Bot</b><a href="/logout">Sair</a></header>
@@ -250,6 +265,7 @@ input[type=color]{width:60px;height:38px;border:1px solid var(--line);border-rad
 {% else %}<label for="{{key}}">{{label}}</label>
 {% if typ=='text' %}<input type="text" id="{{key}}" name="{{key}}" value="{{v or ''}}">
 {% elif typ=='area' %}<textarea id="{{key}}" name="{{key}}">{{v or ''}}</textarea>
+{% elif typ=='list' %}<textarea id="{{key}}" name="{{key}}">{{ (v or [])|join('\n') }}</textarea><div class="hint">Uma mensagem por linha. Use {brand}, {emoji}, {members}.</div>
 {% elif typ=='num' %}<input type="number" id="{{key}}" name="{{key}}" value="{{v or 0}}" min="0">
 {% elif typ=='color' %}<input type="color" id="{{key}}" name="{{key}}" value="{{hexcolor(v)}}">
 {% elif typ.startswith('choice') %}<select id="{{key}}" name="{{key}}">{% for o in typ[7:].split(',') %}{% set kv=o.split('=') %}<option value="{{kv[0]}}" {{'selected' if v==kv[0]}}>{{kv[1]}}</option>{% endfor %}</select>
