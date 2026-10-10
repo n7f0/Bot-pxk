@@ -2593,4 +2593,719 @@ class AddMemberView(ui.View):
                 await log_admin_action(interaction, "ticket_add_member", f"membro={member.id}")
                 await interaction.response.send_message(f"✅ {member.mention} adicionado.", ephemeral=True)
             except Exception as e:
-                await interaction.response.send_message(f"
+                await interaction.response.send_message(f"❌ Erro: {e}", ephemeral=True)
+
+# ===================== TICKETS =====================
+async def handle_ticket_open(interaction, tipo, nome):
+    try:
+        count = count_user_tickets_last_hours(interaction.user.id, 8)
+    except Exception:
+        count = 0
+    if count >= 3:
+        await interaction.response.send_message("❌ Limite de 3 tickets em 8h.", ephemeral=True); return
+    guild = interaction.guild
+    cid = config.get(f"ticket_category_{tipo}_id")
+    if not cid:
+        await interaction.response.send_message("❌ Categoria não configurada.", ephemeral=True); return
+    category = guild.get_channel(cid)
+    if not category or not isinstance(category, discord.CategoryChannel):
+        await interaction.response.send_message("❌ Categoria inválida.", ephemeral=True); return
+
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True,
+                                                       read_message_history=True, attach_files=True),
+    }
+    mentions = []
+    for rid in config.get("ticket_support_role_ids", []):
+        role = guild.get_role(rid)
+        if role:
+            overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True,
+                                                           read_message_history=True)
+            mentions.append(role.mention)
+
+    nome_canal = f"ticket-{tipo}-{interaction.user.name[:20]}".lower().replace(" ", "-")
+    try:
+        channel = await guild.create_text_channel(name=nome_canal, category=category,
+                                                   overwrites=overwrites,
+                                                   reason=f"Ticket {nome} por {interaction.user}")
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Erro: {e}", ephemeral=True); return
+
+    try: add_open_ticket(interaction.user.id, channel.id)
+    except Exception: pass
+
+    welcome_comps = [
+        ui.TextDisplay(f"# {bemoji()} Ticket de {nome} — {bname()}"),
+        ui.Section(
+            ui.TextDisplay(
+                f"**Olá {interaction.user.mention}!** Bem-vindo(a) ao atendimento. 💜\n\n"
+                "Descreva seu pedido abaixo e nossa equipe responderá em breve.\n"
+                "-# Ações disponíveis no painel fixado abaixo."
+            ),
+            accessory=ui.Thumbnail(media=interaction.user.display_avatar.url),
+        ),
+    ]
+    banner = banner_ticket()
+    if banner:
+        mg = _safe_media_gallery(banner)
+        if mg is not None: welcome_comps.append(mg)
+    welcome_layout = ui.LayoutView(timeout=None)
+    welcome_layout.add_item(ui.Container(*welcome_comps, accent_color=color_primary()))
+    await channel.send(view=welcome_layout)
+
+    if mentions:
+        await channel.send(view=ui.LayoutView(
+            ui.Container(ui.TextDisplay(f"📢 {', '.join(mentions)} — novo ticket de {interaction.user.mention}."))))
+
+    await channel.send(view=ticket_actions_layout())
+    await interaction.response.send_message(f"✅ Ticket criado em {channel.mention}!", ephemeral=True)
+
+# ===================== CAPTCHA / VERIFICAÇÃO COM CANAL TEMPORÁRIO =====================
+_pending_kicks = {}
+_math_answers = {}
+_button_verification_target = {}
+_temp_verification_channels = {}  # user_id -> channel_id
+
+def schedule_verification_kick(guild, member):
+    minutes = config.get("verification_kick_minutes", 0)
+    if minutes <= 0: return
+    key = (guild.id, member.id)
+    if key in _pending_kicks:
+        _pending_kicks[key].cancel()
+
+    async def _kick_later():
+        try:
+            await asyncio.sleep(minutes * 60)
+            m = guild.get_member(member.id)
+            if not m: return
+            unver_ids = config.get("verification_unverified_role_ids", [])
+            if any(r.id in unver_ids for r in m.roles):
+                try:
+                    await guild.kick(m, reason="Não completou a verificação a tempo")
+                    await _delete_temp_channel(guild, member.id)
+                except Exception as e: logger.error(f"Falha ao kickar {m}: {e}")
+        except asyncio.CancelledError:
+            pass
+        finally:
+            _pending_kicks.pop(key, None)
+
+    _pending_kicks[key] = asyncio.create_task(_kick_later())
+
+def cancel_verification_kick(guild_id, user_id):
+    key = (guild_id, user_id)
+    task = _pending_kicks.pop(key, None)
+    if task: task.cancel()
+
+def _generate_math_challenge():
+    diff = config.get("verification_difficulty", 1)
+    if diff == 1:
+        a, b = random.randint(1, 10), random.randint(1, 10)
+        return f"{a} + {b}", a + b
+    elif diff == 2:
+        if random.random() < 0.5:
+            a, b = random.randint(10, 50), random.randint(10, 50)
+            return f"{a} + {b}", a + b
+        a, b = random.randint(2, 12), random.randint(2, 12)
+        return f"{a} × {b}", a * b
+    else:
+        if random.random() < 0.5:
+            a, b = random.randint(100, 500), random.randint(100, 500)
+            return f"{a} + {b}", a + b
+        a, b = random.randint(2, 15), random.randint(2, 15)
+        return f"{a} × {b}", a * b
+
+async def _create_temp_verification_channel(guild, member):
+    """Cria canal privado temporário para a verificação."""
+    cat_id = config.get("verification_temp_category_id")
+    category = guild.get_channel(cat_id) if cat_id else None
+    if category and not isinstance(category, discord.CategoryChannel):
+        category = None
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        member: discord.PermissionOverwrite(view_channel=True, send_messages=True,
+                                             read_message_history=True),
+        guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True,
+                                               manage_channels=True, manage_messages=True),
+    }
+    try:
+        ch = await guild.create_text_channel(
+            name=f"verificar-{member.name}"[:100],
+            category=category,
+            overwrites=overwrites,
+            reason=f"Canal temporário de verificação para {member}",
+        )
+        _temp_verification_channels[member.id] = ch.id
+        return ch
+    except Exception as e:
+        logger.error(f"Erro criando canal temporário: {e}")
+        return None
+
+async def _delete_temp_channel(guild, user_id, delay=None):
+    """Apaga o canal temporário após a verificação."""
+    cid = _temp_verification_channels.pop(user_id, None)
+    if not cid: return
+    if delay:
+        await asyncio.sleep(delay)
+    ch = guild.get_channel(cid)
+    if ch:
+        try: await ch.delete(reason="Verificação concluída — canal temporário")
+        except Exception as e: logger.debug(f"Erro apagando temp: {e}")
+
+async def _log_verification(guild, member, success, extra=""):
+    cid = config.get("verification_log_channel_id")
+    if not cid: return
+    ch = guild.get_channel(cid)
+    if not ch: return
+    icon = "✅" if success else "❌"
+    try:
+        await ch.send(f"{icon} **{member}** (`{member.id}`) — {extra or ('verificado' if success else 'falhou')}")
+    except Exception: pass
+
+async def send_captcha_challenge(member, channel):
+    """Envia desafio no canal temporário."""
+    method = config.get("verification_method", "math")
+
+    if method == "button":
+        comps = [
+            ui.TextDisplay(f"# ✅ Verificação — {bname()}"),
+            ui.Section(
+                ui.TextDisplay(f"Olá {member.mention}! Clique no botão abaixo para se verificar."),
+                accessory=ui.Thumbnail(media=member.display_avatar.url),
+            ),
+            ui.Separator(spacing=discord.SeparatorSpacing.small),
+            ui.ActionRow(_btn("Verificar Agora", "captcha_button_verify", SU, E("verificado"))),
+        ]
+        layout = ui.LayoutView(timeout=None)
+        layout.add_item(ui.Container(*comps, accent_color=color_primary()))
+        _button_verification_target[member.id] = True
+        try: await channel.send(view=layout)
+        except Exception as e: logger.error(f"Erro enviando verif botão: {e}")
+        return
+
+    question, answer = _generate_math_challenge()
+    _math_answers[member.id] = answer
+    comps = [
+        ui.TextDisplay(f"# 🧮 Verificação — {bname()}"),
+        ui.Section(
+            ui.TextDisplay(
+                f"Olá {member.mention}!\n\n"
+                f"Resolva o desafio abaixo clicando em **🔐 Resolver**:\n\n"
+                f"# `{question}`"
+            ),
+            accessory=ui.Thumbnail(media=member.display_avatar.url),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(_btn("Resolver", "captcha_solve", SU, E("tdj_1"))),
+    ]
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(*comps, accent_color=color_primary()))
+    try: await channel.send(view=layout)
+    except Exception as e: logger.error(f"Erro enviando verif math: {e}")
+
+async def _grant_verification(guild, member):
+    for rid in config.get("verified_role_ids", []):
+        r = guild.get_role(rid)
+        if r and r not in member.roles:
+            try: await member.add_roles(r)
+            except Exception: pass
+    for rid in config.get("verification_unverified_role_ids", []):
+        r = guild.get_role(rid)
+        if r and r in member.roles:
+            try: await member.remove_roles(r)
+            except Exception: pass
+    cancel_verification_kick(guild.id, member.id)
+    _math_answers.pop(member.id, None)
+    _button_verification_target.pop(member.id, None)
+    await _log_verification(guild, member, True, "verificado")
+    # 🔥 apaga canal temporário após delay configurável
+    delay = max(1, int(config.get("verification_temp_delete_seconds", 5)))
+    asyncio.create_task(_delete_temp_channel(guild, member.id, delay=delay))
+
+async def handle_captcha_start(interaction):
+    """Botão do painel de verificação — cria canal temporário."""
+    member = interaction.user
+    guild = interaction.guild
+
+    # Se já tem canal temporário, reusa
+    existing_cid = _temp_verification_channels.get(member.id)
+    existing = guild.get_channel(existing_cid) if existing_cid else None
+
+    if not existing:
+        existing = await _create_temp_verification_channel(guild, member)
+
+    if not existing:
+        await interaction.response.send_message(
+            "❌ Não consegui criar o canal temporário. Contate a administração.",
+            ephemeral=True)
+        return
+
+    # se o canal já tem desafio, não reenvia
+    await send_captcha_challenge(member, existing)
+    await interaction.response.send_message(
+        f"✅ Canal temporário criado: {existing.mention}\n"
+        f"-# Ele será apagado automaticamente após a verificação.",
+        ephemeral=True)
+
+async def handle_button_verify(interaction):
+    member = interaction.user
+    await _grant_verification(interaction.guild, member)
+    await interaction.response.send_message("✅ **Verificado!** Bem-vindo(a)! 🖤", ephemeral=True)
+    # Se a mensagem estiver em canal temporário, apaga em 3s
+    delay = max(1, int(config.get("verification_temp_delete_seconds", 5)))
+    asyncio.create_task(_delete_temp_channel(interaction.guild, member.id, delay=delay))
+
+class CaptchaModal(ui.Modal, title="🧮 Verificação"):
+    def __init__(self, guild_id, user_id):
+        super().__init__()
+        self.guild_id = guild_id
+        self.user_id = user_id
+        self.resposta = ui.TextInput(label="Resposta", required=True, max_length=10)
+        self.add_item(self.resposta)
+    @classmethod
+    def from_button(cls, interaction):
+        return cls(guild_id=interaction.guild.id, user_id=interaction.user.id)
+    async def on_submit(self, interaction):
+        guild = bot.get_guild(self.guild_id)
+        if not guild:
+            await interaction.response.send_message("❌ Servidor não encontrado.", ephemeral=True); return
+        member = guild.get_member(self.user_id) or interaction.user
+        expected = _math_answers.get(self.user_id)
+        if expected is None:
+            await _grant_verification(guild, member)
+            await interaction.response.send_message("✅ Verificado!", ephemeral=True); return
+        try:
+            val = int(self.resposta.value.strip())
+        except ValueError:
+            await interaction.response.send_message("❌ Digite apenas números.", ephemeral=True); return
+        if val == expected:
+            await _grant_verification(guild, member)
+            await interaction.response.send_message("✅ **Verificado com sucesso!** 🖤", ephemeral=True)
+        else:
+            await _log_verification(guild, member, False, "errou o desafio")
+            await interaction.response.send_message("❌ Resposta incorreta. Tente novamente.", ephemeral=True)
+            # reenvia desafio no mesmo canal temporário
+            cid = _temp_verification_channels.get(member.id)
+            ch = guild.get_channel(cid) if cid else None
+            if ch: await send_captcha_challenge(member, ch)
+
+# ===================== COMANDOS =====================
+@bot.tree.command(name="painelpxkadmin", description="🖤 Painel administrativo do servidor")
+@app_commands.default_permissions(administrator=True)
+async def cmd_painel(interaction: discord.Interaction):
+    cid = config.get("painel_channel_id")
+    if cid:
+        channel = interaction.guild.get_channel(cid)
+        if channel and config.get("painel_message_id"):
+            try:
+                msg = await channel.fetch_message(config["painel_message_id"])
+                await msg.edit(view=painel_layout())
+                await interaction.response.send_message(f"✅ Painel atualizado em {channel.mention}", ephemeral=True)
+                return
+            except Exception: pass
+    layout = painel_layout()
+    msg = await interaction.channel.send(view=layout)
+    config["painel_channel_id"] = interaction.channel.id
+    config["painel_message_id"] = msg.id
+    save_config(config)
+    await interaction.response.send_message(f"✅ Painel do **{bname()}** enviado!", ephemeral=True)
+
+@bot.tree.command(name="painelantibot", description="🚫 Envia o painel Anti-Bot no canal configurado")
+@app_commands.default_permissions(administrator=True)
+async def cmd_antibot(interaction: discord.Interaction):
+    cid = config.get("antibot_channel_id")
+    if not cid:
+        await interaction.response.send_message(
+            "❌ Configure o **Canal Anti-Bot** no painel admin (`🚫 Anti-Bot > Definir Canal Anti-Bot`).",
+            ephemeral=True); return
+    ch = interaction.guild.get_channel(cid)
+    if not ch:
+        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
+    try:
+        msg = await ch.send(view=antibot_panel_view())
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Erro: `{e}`", ephemeral=True); return
+    config["antibot_panel_message_id"] = msg.id; save_config(config)
+    await interaction.response.send_message(f"✅ Painel AntiBot enviado em {ch.mention}!", ephemeral=True)
+
+@bot.tree.command(name="painelticket", description="🎫 Envia o painel de tickets (V2 com select)")
+@app_commands.default_permissions(administrator=True)
+async def cmd_pt(interaction):
+    cid = config.get("ticket_panel_channel_id")
+    if not cid:
+        await interaction.response.send_message("❌ Configure em Tickets > Canal do Painel.", ephemeral=True); return
+    ch = interaction.guild.get_channel(cid)
+    if not ch:
+        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
+    msg = await ch.send(view=ticket_panel_layout())
+    config["ticket_panel_message_id"] = msg.id; save_config(config)
+    await interaction.response.send_message(f"✅ Painel de tickets enviado em {ch.mention}!", ephemeral=True)
+
+@bot.tree.command(name="painelsugestoes", description="💡 Envia o painel de sugestões (V2)")
+@app_commands.default_permissions(administrator=True)
+async def cmd_ps(interaction):
+    cid = config.get("suggestions_panel_channel_id")
+    if not cid:
+        await interaction.response.send_message("❌ Configure em Sugestões > Canal do Painel.", ephemeral=True); return
+    ch = interaction.guild.get_channel(cid)
+    if not ch:
+        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
+    msg = await ch.send(view=suggestion_panel_layout())
+    config["suggestions_panel_message_id"] = msg.id; save_config(config)
+    await interaction.response.send_message(f"✅ Painel de sugestões enviado em {ch.mention}!", ephemeral=True)
+
+@bot.tree.command(name="painelverificacao", description="✅ Envia o painel de verificação (V2)")
+@app_commands.default_permissions(administrator=True)
+async def cmd_pv(interaction):
+    cid = config.get("verification_panel_channel_id")
+    if not cid:
+        await interaction.response.send_message("❌ Configure em Verificação > Canal do Painel.", ephemeral=True); return
+    ch = interaction.guild.get_channel(cid)
+    if not ch:
+        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
+    msg = await ch.send(view=verification_panel_layout())
+    config["verification_panel_message_id"] = msg.id; save_config(config)
+    await interaction.response.send_message(f"✅ Painel de verificação enviado em {ch.mention}!", ephemeral=True)
+
+@bot.tree.command(name="paineladdcargo", description="➕ Envia o painel público do /addcargo no canal configurado")
+@app_commands.default_permissions(administrator=True)
+async def cmd_painel_addcargo(interaction: discord.Interaction):
+    cid = config.get("addcargo_panel_channel_id")
+    if not cid:
+        await interaction.response.send_message(
+            "❌ Configure em **➕ Cargos Autorizados (/addcargo) > Canal**.",
+            ephemeral=True); return
+    ch = interaction.guild.get_channel(cid)
+    if not ch:
+        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
+    try:
+        msg = await ch.send(view=addcargo_public_panel())
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Erro: `{e}`", ephemeral=True); return
+    config["addcargo_panel_message_id"] = msg.id; save_config(config)
+    await interaction.response.send_message(f"✅ Painel enviado em {ch.mention}!", ephemeral=True)
+
+@bot.tree.command(name="addcargo", description="➕ Adiciona cargo(s) a um usuário (sem args abre o painel)")
+@app_commands.describe(cargo="Cargo a adicionar (opcional)", usuario="Usuário que vai receber (opcional)")
+async def cmd_addcargo(interaction: discord.Interaction,
+                       cargo: discord.Role = None,
+                       usuario: discord.Member = None):
+    if not user_can_use_addcargo(interaction.user):
+        await interaction.response.send_message(
+            "❌ Você não tem permissão para usar este comando.", ephemeral=True)
+        return
+
+    if cargo is None and usuario is None:
+        await interaction.response.send_message(view=build_addcargo_panel(), ephemeral=True)
+        return
+
+    if cargo is None or usuario is None:
+        await interaction.response.send_message(
+            "❌ Informe **cargo e usuário** juntos, ou use `/addcargo` sem argumentos para abrir o painel.",
+            ephemeral=True)
+        return
+
+    me = interaction.guild.me
+    if not me.guild_permissions.manage_roles:
+        await interaction.response.send_message("❌ Não tenho permissão `Gerenciar Cargos`.", ephemeral=True); return
+    if cargo.is_default():
+        await interaction.response.send_message("❌ Não posso adicionar o cargo @everyone.", ephemeral=True); return
+    if cargo >= me.top_role:
+        await interaction.response.send_message(
+            "❌ Esse cargo é **igual ou superior** ao meu cargo mais alto.", ephemeral=True); return
+    if cargo in usuario.roles:
+        await interaction.response.send_message(f"ℹ️ {usuario.mention} já possui {cargo.mention}.", ephemeral=True); return
+    try:
+        await usuario.add_roles(cargo, reason=f"Adicionado por {interaction.user} ({interaction.user.id})")
+    except discord.Forbidden:
+        await interaction.response.send_message("❌ Sem permissão para adicionar esse cargo.", ephemeral=True); return
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Erro: `{e}`", ephemeral=True); return
+    try: log_moderation("add_role", interaction.user.id, usuario.id, f"{cargo.name} ({cargo.id})")
+    except Exception: pass
+    await log_admin_action(interaction, "addcargo_direct",
+                           f"target={usuario.id} cargo={cargo.name}")
+    await interaction.response.send_message(
+        f"✅ Cargo {cargo.mention} adicionado a {usuario.mention}.", ephemeral=True)
+
+@bot.tree.command(name="limparchat", description="🧹 Apaga TODAS as mensagens de um canal de texto")
+@app_commands.default_permissions(administrator=True)
+@app_commands.describe(canal="Canal que será totalmente limpo")
+async def cmd_limpar(interaction: discord.Interaction, canal: discord.TextChannel):
+    perms = canal.permissions_for(interaction.guild.me)
+    if not perms.manage_messages or not perms.read_message_history:
+        await interaction.response.send_message(f"❌ Sem permissão em {canal.mention}.", ephemeral=True); return
+    await interaction.response.defer(ephemeral=True)
+    start_time = datetime.datetime.now()
+    init_view = _build_cleanup_progress_view(0, 1, None, 0, start_time)
+    progress_msg = await interaction.edit_original_response(view=init_view)
+    last_update = {"t": datetime.datetime.now()}
+    async def on_progress(d, phase):
+        now = datetime.datetime.now()
+        if (now - last_update["t"]).total_seconds() < 1.8: return
+        last_update["t"] = now
+        v = _build_cleanup_progress_view(0, 1, canal, d, start_time, phase)
+        try: await progress_msg.edit(view=v)
+        except Exception: pass
+    total, erro = await _purge_channel(canal, interaction.guild, on_progress)
+    elapsed = (datetime.datetime.now() - start_time).total_seconds()
+    m, s = int(elapsed // 60), int(elapsed % 60)
+    summary = (
+        f"### ✅ Resumo\n**Tempo:** `{m:02d}m {s:02d}s`\n"
+        f"**Apagadas:** `{total}`\n**Canal:** {canal.mention}"
+        + (f"\n**Erro:** `{erro}`" if erro else "")
+    )
+    await progress_msg.edit(view=_build_cleanup_final_view(summary))
+    await log_admin_action(interaction, "limparchat", f"canal={canal.id} apagadas={total}")
+
+@bot.tree.command(name="limparchatvoz", description="🔊 Limpa o chat interno de um canal de voz")
+@app_commands.default_permissions(administrator=True)
+@app_commands.describe(canal="Canal de voz cujo chat será limpo")
+async def cmd_limparvoz(interaction: discord.Interaction, canal: discord.VoiceChannel):
+    perms = canal.permissions_for(interaction.guild.me)
+    if not perms.manage_messages or not perms.read_message_history:
+        await interaction.response.send_message(f"❌ Sem permissão em {canal.mention}.", ephemeral=True); return
+    await interaction.response.defer(ephemeral=True)
+    start_time = datetime.datetime.now()
+    init_view = _build_cleanup_progress_view(0, 1, None, 0, start_time)
+    progress_msg = await interaction.edit_original_response(view=init_view)
+    last_update = {"t": datetime.datetime.now()}
+    async def on_progress(d, phase):
+        now = datetime.datetime.now()
+        if (now - last_update["t"]).total_seconds() < 1.8: return
+        last_update["t"] = now
+        v = _build_cleanup_progress_view(0, 1, canal, d, start_time, phase)
+        try: await progress_msg.edit(view=v)
+        except Exception: pass
+    total, erro = await _purge_channel(canal, interaction.guild, on_progress)
+    elapsed = (datetime.datetime.now() - start_time).total_seconds()
+    m, s = int(elapsed // 60), int(elapsed % 60)
+    summary = (
+        f"### ✅ Resumo\n**Tempo:** `{m:02d}m {s:02d}s`\n"
+        f"**Apagadas:** `{total}`\n**Canal:** {canal.mention}"
+        + (f"\n**Erro:** `{erro}`" if erro else "")
+    )
+    await progress_msg.edit(view=_build_cleanup_final_view(summary))
+    await log_admin_action(interaction, "limparchatvoz", f"canal={canal.id} apagadas={total}")
+
+@bot.tree.command(name="mutar", description="🔇 Muta o bot na call")
+async def cmd_mutar(interaction):
+    guild = interaction.guild
+    vc = guild.voice_client if guild else None
+    if not vc or not vc.is_connected():
+        await interaction.response.send_message("❌ Bot não está em call.", ephemeral=True); return
+    try:
+        await guild.me.edit(mute=True)
+        config["voice_mute"] = True; save_config(config)
+        await interaction.response.send_message("🔇 Mutado.", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ {e}", ephemeral=True)
+
+@bot.tree.command(name="desmutar", description="🔊 Desmuta o bot na call")
+async def cmd_desmutar(interaction):
+    guild = interaction.guild
+    vc = guild.voice_client if guild else None
+    if not vc or not vc.is_connected():
+        await interaction.response.send_message("❌ Bot não está em call.", ephemeral=True); return
+    try:
+        await guild.me.edit(mute=False)
+        config["voice_mute"] = False; save_config(config)
+        await interaction.response.send_message("🔊 Desmutado.", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ {e}", ephemeral=True)
+
+@bot.tree.command(name="status", description="🎭 Altera o status do bot")
+async def cmd_status(interaction, modo: str):
+    if modo.lower() not in ["online", "idle", "dnd", "invisible"]:
+        await interaction.response.send_message("❌ Use: online, idle, dnd, invisible", ephemeral=True); return
+    config["bot_status"] = modo.lower(); save_config(config)
+    await update_status(force=True)
+    await interaction.response.send_message(f"✅ Status: **{modo}**", ephemeral=True)
+
+# ===================== KEEPALIVE DE VOZ =====================
+async def _play_silence(vc: discord.VoiceClient):
+    if not FFMPEG_AVAILABLE or not vc or not vc.is_connected(): return
+    if vc.is_playing() or vc.is_paused(): return
+    try:
+        source = discord.FFmpegPCMAudio(
+            "anullsrc=channel_layout=stereo:sample_rate=48000",
+            before_options="-f lavfi", options="-t 300",
+        )
+        vc.play(source)
+        logger.debug("🔇 Keepalive: reproduzindo silêncio (5 min).")
+    except Exception as e:
+        logger.debug(f"Keepalive play: {e}")
+
+@tasks.loop(seconds=60)
+async def task_voice_keepalive():
+    if not FFMPEG_AVAILABLE: return
+    guild = get_guild()
+    if not guild: return
+    vc = guild.voice_client
+    if not vc or not vc.is_connected(): return
+    if not vc.is_playing() and not vc.is_paused():
+        await _play_silence(vc)
+
+# ===================== TASKS =====================
+@tasks.loop(minutes=1)
+async def task_voice():
+    await update_voice_name_impl()
+
+@tasks.loop(seconds=5)
+async def task_activity_rotate():
+    if not config.get("activity_rotate_enabled"): return
+    await update_status()
+
+@tasks.loop(minutes=3)
+async def task_refresh_panels():
+    try: await refresh_all_panels()
+    except Exception as e: logger.debug(f"refresh panels: {e}")
+
+@tasks.loop(minutes=2)
+async def task_voice_watchdog():
+    guild = get_guild()
+    if not guild: return
+    cid = config.get("voice_channel_id")
+    if not cid: return
+    ch = guild.get_channel(cid)
+    if not ch or not isinstance(ch, discord.VoiceChannel): return
+    vc = guild.voice_client
+    if vc and vc.is_connected(): return
+    try:
+        if not vc:
+            await ch.connect(timeout=15.0, reconnect=True)
+        else:
+            await vc.move_to(ch)
+        await update_voice_mute()
+        await _play_silence(guild.voice_client)
+    except Exception as e:
+        logger.debug(f"Voice watchdog: {e}")
+
+@tasks.loop(minutes=2)
+async def task_antibot_refresh():
+    try: await refresh_antibot_panel()
+    except Exception as e: logger.debug(f"Antibot refresh: {e}")
+
+# ===================== AUX =====================
+async def bot_join_voice():
+    guild = get_guild()
+    if not guild: return
+    cid = config.get("voice_channel_id")
+    if not cid: return
+    ch = guild.get_channel(cid)
+    if not ch or not isinstance(ch, discord.VoiceChannel): return
+    try:
+        if not guild.voice_client:
+            await ch.connect(timeout=15.0, reconnect=True)
+        else:
+            await guild.voice_client.move_to(ch)
+        await update_voice_name_impl()
+        await update_voice_mute()
+        await _play_silence(guild.voice_client)
+    except Exception as e:
+        logger.warning(f"Voz: {e}")
+
+async def apply_avatar_if_needed(force=False):
+    url = avatar_url()
+    if not url: return False
+    if not force and config.get("_last_avatar_url") == url: return True
+    try:
+        async with aiohttp.ClientSession() as s:
+            async with s.get(url) as r:
+                if r.status != 200: return False
+                data = await r.read()
+        await bot.user.edit(avatar=data)
+        config["_last_avatar_url"] = url; save_config(config)
+        return True
+    except Exception as e:
+        logger.warning(f"Avatar: {e}"); return False
+
+# ===================== EVENTOS =====================
+@bot.event
+async def on_ready():
+    logger.info(f"{bemoji()} {bname()} conectado como {bot.user}")
+    try: init_db()
+    except Exception as e: logger.error(f"DB: {e}")
+    if not config.get("guild_id") and bot.guilds:
+        config["guild_id"] = bot.guilds[0].id; save_config(config)
+    try:
+        await bot.tree.sync()
+        logger.info("✅ Comandos sincronizados")
+    except Exception as e:
+        logger.error(f"Sync: {e}")
+    await apply_avatar_if_needed()
+    await bot_join_voice()
+    await update_status(force=True)
+
+    for t in (task_voice, task_activity_rotate, task_refresh_panels,
+              task_voice_watchdog, task_antibot_refresh, task_reload_config,
+              task_voice_keepalive):
+        if not t.is_running(): t.start()
+
+    try:
+        await refresh_all_panels()
+        logger.info("✅ Painéis re-registrados")
+    except Exception as e:
+        logger.error(f"refresh_all_panels: {e}")
+
+@bot.event
+async def on_message(message: discord.Message):
+    if message.author.bot: return
+    if not message.guild: return
+    ab_cid = config.get("antibot_channel_id")
+    if ab_cid and message.channel.id == ab_cid:
+        await handle_antibot_punish(message)
+        return
+    await bot.process_commands(message)
+
+@bot.event
+async def on_member_join(member):
+    if member.bot: return
+    guild = member.guild
+    try: await send_welcome_message(member)
+    except Exception as e: logger.error(f"Erro send_welcome: {e}")
+    for rid in config.get("verification_unverified_role_ids", []):
+        r = guild.get_role(rid)
+        if r:
+            try: await member.add_roles(r)
+            except Exception: pass
+    # 🔥 cria canal temporário e envia desafio
+    ch_id = config.get("verification_channel_id")
+    if ch_id:
+        try:
+            temp_ch = await _create_temp_verification_channel(guild, member)
+            if temp_ch:
+                await send_captcha_challenge(member, temp_ch)
+        except Exception as e:
+            logger.error(f"Erro criando temp verification: {e}")
+    schedule_verification_kick(guild, member)
+    await update_voice_name_impl()
+    await update_status(force=True)
+
+@bot.event
+async def on_member_remove(member):
+    if member.bot: return
+    try: await send_leave_message(member)
+    except Exception as e: logger.error(f"Erro send_leave: {e}")
+    cancel_verification_kick(member.guild.id, member.id)
+    _temp_verification_channels.pop(member.id, None)
+    await update_voice_name_impl()
+    await update_status(force=True)
+
+@bot.event
+async def on_voice_state_update(member, before, after):
+    if member.bot: return
+    if before.channel is None and after.channel is not None:
+        try: await send_voice_log(member, after.channel, "join")
+        except Exception as e: logger.error(f"Erro voice join: {e}")
+    elif before.channel is not None and after.channel is None:
+        try: await send_voice_log(member, before.channel, "leave")
+        except Exception as e: logger.error(f"Erro voice leave: {e}")
+
+@bot.event
+async def on_guild_join(guild):
+    config["guild_id"] = guild.id; save_config(config)
+
+# ===================== EXECUÇÃO =====================
+if __name__ == "__main__":
+    bot.run(TOKEN)
