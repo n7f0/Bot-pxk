@@ -27,6 +27,9 @@ SECTIONS = [
         ("banner_ticket_url", "Banner dos tickets (URL)", "text"),
         ("banner_welcome_url", "Banner de boas-vindas (URL)", "text"),
     ]),
+    ("✨ Auto-Emoji", [
+        ("auto_emoji_channels", "Adicionar emoji automático nos canais", "bool"),
+    ]),
     ("👋 Boas-vindas e saída", [
         ("welcome_channel_id", "Canal de boas-vindas", "ch"),
         ("welcome_message", "Mensagem de boas-vindas", "area"),
@@ -61,10 +64,13 @@ SECTIONS = [
         ("ticket_purchase_label", "Compras — nome", "text"),
         ("ticket_purchase_desc", "Compras — descrição", "text"),
         ("ticket_purchase_emoji", "Compras — emoji", "text"),
-        ("feedback_channel_id", "Canal de avaliações", "ch"),
     ]),
-    ("💡 Sugestões", [
-        ("suggestions_channel_id", "Canal onde sugestões chegam", "ch"),
+    ("⭐ Feedback & Sugestões", [
+        ("feedback_channel_id", "Canal onde chegam as avaliações (logs)", "ch"),
+        ("feedback_panel_channel_id", "Canal do painel público de avaliações", "ch"),
+        ("feedback_panel_title", "Título do painel de avaliações", "text"),
+        ("feedback_panel_description", "Descrição do painel de avaliações", "area"),
+        ("suggestions_channel_id", "Canal onde as sugestões chegam", "ch"),
         ("suggestions_panel_channel_id", "Canal do painel de sugestões", "ch"),
     ]),
     ("🚫 AntiBot", [
