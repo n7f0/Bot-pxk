@@ -43,6 +43,8 @@ SECTIONS = [
         ("verification_channel_id", "Canal de verificação", "ch"),
         ("verification_panel_channel_id", "Canal do painel de verificação", "ch"),
         ("verification_log_channel_id", "Canal de logs de verificação", "ch"),
+        ("verification_temp_category_id", "Categoria do canal temporário", "cat"),
+        ("verification_temp_delete_seconds", "Apagar canal temp após X segundos", "num"),
     ]),
     ("🎫 Tickets", [
         ("ticket_panel_channel_id", "Canal do painel de tickets", "ch"),
