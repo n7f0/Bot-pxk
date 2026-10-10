@@ -28,6 +28,25 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS antibot_punishments (
         id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, guild_id INTEGER,
         reason TEXT, banned INTEGER, deleted_count INTEGER, created_at TEXT)''')
+    # NOVAS: sugestões + votos + feedback geral
+    c.execute('''CREATE TABLE IF NOT EXISTS suggestions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message_id INTEGER UNIQUE,
+        channel_id INTEGER,
+        user_id INTEGER,
+        content TEXT,
+        upvotes INTEGER DEFAULT 0,
+        downvotes INTEGER DEFAULT 0,
+        status TEXT DEFAULT 'open',
+        created_at TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS suggestion_votes (
+        suggestion_id INTEGER,
+        user_id INTEGER,
+        vote_type TEXT,
+        PRIMARY KEY (suggestion_id, user_id))''')
+    c.execute('''CREATE TABLE IF NOT EXISTS general_feedback (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, rating INTEGER,
+        comment TEXT, created_at TEXT)''')
     conn.commit(); conn.close()
 
 def get_welcome_message(user_id):
@@ -105,5 +124,87 @@ def get_antibot_count(guild_id=None):
         c.execute("SELECT COUNT(*) FROM antibot_punishments WHERE guild_id = ?", (guild_id,))
     else:
         c.execute("SELECT COUNT(*) FROM antibot_punishments")
+    n = c.fetchone()[0]; conn.close()
+    return n
+
+# ===================== SUGESTÕES =====================
+def add_suggestion(message_id, channel_id, user_id, content):
+    conn = get_db(); c = conn.cursor()
+    c.execute("INSERT INTO suggestions (message_id, channel_id, user_id, content, created_at) VALUES (?, ?, ?, ?, ?)",
+              (message_id, channel_id, user_id, content, datetime.datetime.now().isoformat()))
+    sid = c.lastrowid
+    conn.commit(); conn.close()
+    return sid
+
+def get_suggestion(sid):
+    conn = get_db(); c = conn.cursor()
+    c.execute("SELECT * FROM suggestions WHERE id = ?", (sid,))
+    row = c.fetchone(); conn.close()
+    return row
+
+def get_suggestion_by_message(message_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute("SELECT * FROM suggestions WHERE message_id = ?", (message_id,))
+    row = c.fetchone(); conn.close()
+    return row
+
+def vote_suggestion(suggestion_id, user_id, vote_type):
+    """Retorna (up, down, acao) onde acao ∈ {'added','changed','removed'}."""
+    conn = get_db(); c = conn.cursor()
+    c.execute("SELECT vote_type FROM suggestion_votes WHERE suggestion_id = ? AND user_id = ?",
+              (suggestion_id, user_id))
+    row = c.fetchone()
+    prev = row["vote_type"] if row else None
+
+    if prev == vote_type:
+        c.execute("DELETE FROM suggestion_votes WHERE suggestion_id = ? AND user_id = ?",
+                  (suggestion_id, user_id))
+        if vote_type == "up":
+            c.execute("UPDATE suggestions SET upvotes = MAX(0, upvotes - 1) WHERE id = ?", (suggestion_id,))
+        else:
+            c.execute("UPDATE suggestions SET downvotes = MAX(0, downvotes - 1) WHERE id = ?", (suggestion_id,))
+        acao = "removed"
+    elif prev:
+        c.execute("UPDATE suggestion_votes SET vote_type = ? WHERE suggestion_id = ? AND user_id = ?",
+                  (vote_type, suggestion_id, user_id))
+        if vote_type == "up":
+            c.execute("UPDATE suggestions SET upvotes = upvotes + 1, downvotes = MAX(0, downvotes - 1) WHERE id = ?",
+                      (suggestion_id,))
+        else:
+            c.execute("UPDATE suggestions SET downvotes = downvotes + 1, upvotes = MAX(0, upvotes - 1) WHERE id = ?",
+                      (suggestion_id,))
+        acao = "changed"
+    else:
+        c.execute("INSERT INTO suggestion_votes (suggestion_id, user_id, vote_type) VALUES (?, ?, ?)",
+                  (suggestion_id, user_id, vote_type))
+        if vote_type == "up":
+            c.execute("UPDATE suggestions SET upvotes = upvotes + 1 WHERE id = ?", (suggestion_id,))
+        else:
+            c.execute("UPDATE suggestions SET downvotes = downvotes + 1 WHERE id = ?", (suggestion_id,))
+        acao = "added"
+
+    c.execute("SELECT upvotes, downvotes FROM suggestions WHERE id = ?", (suggestion_id,))
+    r = c.fetchone()
+    up = r["upvotes"] if r else 0
+    down = r["downvotes"] if r else 0
+    conn.commit(); conn.close()
+    return up, down, acao
+
+def get_user_vote(suggestion_id, user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute("SELECT vote_type FROM suggestion_votes WHERE suggestion_id = ? AND user_id = ?",
+              (suggestion_id, user_id))
+    row = c.fetchone(); conn.close()
+    return row["vote_type"] if row else None
+
+def add_general_feedback(user_id, rating, comment):
+    conn = get_db(); c = conn.cursor()
+    c.execute("INSERT INTO general_feedback (user_id, rating, comment, created_at) VALUES (?, ?, ?, ?)",
+              (user_id, rating, comment, datetime.datetime.now().isoformat()))
+    conn.commit(); conn.close()
+
+def count_general_feedback():
+    conn = get_db(); c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM general_feedback")
     n = c.fetchone()[0]; conn.close()
     return n
