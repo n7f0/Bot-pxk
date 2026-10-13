@@ -499,4 +499,3366 @@ def cleanup_channel_options(max_items=25):
                 if perms.manage_messages and perms.read_message_history:
                     opts.append(discord.SelectOption(
                         label=f"💬 #{c.name}"[:100], value=str(c.id),
-   
+                        description="Canal de texto"))
+            except Exception: continue
+        for c in guild.voice_channels:
+            try:
+                perms = c.permissions_for(guild.me)
+                if perms.manage_messages and perms.read_message_history:
+                    opts.append(discord.SelectOption(
+                        label=f"🔊 {c.name}"[:100], value=str(c.id),
+                        description="Chat da call de voz"))
+            except Exception: continue
+    return opts[:25] or [discord.SelectOption(label="Nenhum canal disponível", value="none")]
+
+def cleanup_voice_only_options(max_items=25):
+    guild = get_guild()
+    opts = []
+    if guild:
+        for c in guild.voice_channels:
+            try:
+                perms = c.permissions_for(guild.me)
+                if perms.manage_messages and perms.read_message_history:
+                    opts.append(discord.SelectOption(
+                        label=f"🔊 {c.name}"[:100], value=str(c.id),
+                        description="Chat interno da call"))
+            except Exception: continue
+    return opts[:max_items] or [discord.SelectOption(label="Nenhum canal de voz disponível", value="none")]
+
+def voice_channel_options():
+    guild = get_guild()
+    opts = []
+    if guild:
+        for c in guild.voice_channels:
+            opts.append(discord.SelectOption(label=c.name[:100], value=str(c.id)))
+    return opts[:25] or [discord.SelectOption(label="Nenhum canal de voz", value="none")]
+
+def category_options():
+    guild = get_guild()
+    opts = []
+    if guild:
+        for c in guild.categories:
+            opts.append(discord.SelectOption(label=c.name[:100], value=str(c.id)))
+    return opts[:25] or [discord.SelectOption(label="Nenhuma categoria", value="none")]
+
+# ===================== COMPONENTS V2 HELPERS =====================
+P  = discord.ButtonStyle.primary
+S  = discord.ButtonStyle.secondary
+SU = discord.ButtonStyle.success
+D  = discord.ButtonStyle.danger
+
+def _btn(label, cid, style=P, emoji=None):
+    if isinstance(emoji, str) and emoji.startswith("<"):
+        emoji = _parse_emoji(emoji)
+    return ui.Button(label=label, style=style, custom_id=cid, emoji=emoji)
+
+def _thumb():
+    return avatar_url() or "https://cdn.discordapp.com/embed/avatars/0.png"
+
+def _safe_media_gallery(media_url):
+    if not media_url: return None
+    MG  = getattr(ui, "MediaGallery", None) or getattr(discord, "MediaGallery", None)
+    MGI = getattr(ui, "MediaGalleryItem", None) or getattr(discord, "MediaGalleryItem", None)
+    if not MG or not MGI: return None
+    try: return MG(MGI(media=media_url))
+    except Exception: return None
+
+def _safe_select(placeholder, options, custom_id=None, min_values=1, max_values=1):
+    if not options:
+        options = [discord.SelectOption(label="Nenhuma opção", value="none")]
+    options = options[:25]
+    n = len(options)
+    safe_max = max(1, min(max_values, n))
+    safe_min = max(0, min(min_values, safe_max))
+    kwargs = dict(placeholder=placeholder, options=options,
+                  min_values=safe_min, max_values=safe_max)
+    if custom_id: kwargs["custom_id"] = custom_id
+    return ui.Select(**kwargs)
+
+def premium_submenu(title, description, sections, accent=None):
+    layout = ui.LayoutView(timeout=300)
+    comps = [
+        ui.TextDisplay(f"# {title}"),
+        ui.Section(ui.TextDisplay(description), accessory=ui.Thumbnail(media=_thumb())),
+    ]
+    for sec in sections:
+        comps.append(ui.Separator(spacing=discord.SeparatorSpacing.small))
+        comps.append(ui.TextDisplay(f"### {sec['title']}"))
+        for row in sec["rows"]:
+            comps.append(ui.ActionRow(*row))
+    comps.append(ui.Separator(spacing=discord.SeparatorSpacing.large))
+    comps.append(ui.ActionRow(_btn("Voltar ao Menu", "back_main", D, E("seta"))))
+    layout.add_item(ui.Container(*comps, accent_color=accent or color_primary()))
+    return layout
+
+# ===================== BARRA DE PROGRESSO =====================
+def _progress_bar(current, total, length=22):
+    if total <= 0:
+        return f"`[{'█' * length}]` **100%**"
+    current = max(0, min(current, total))
+    pct = int(current / total * 100)
+    filled = int(length * current / total)
+    empty = length - filled
+    return f"`[{'█' * filled}{'░' * empty}]` **{pct}%**"
+
+def _fmt_elapsed(start_time):
+    elapsed = (datetime.datetime.now() - start_time).total_seconds()
+    m = int(elapsed // 60); s = int(elapsed % 60)
+    return f"{m:02d}:{s:02d}"
+
+def _build_cleanup_progress_view(channels_done, total_channels, current_channel,
+                                  current_deleted, start_time, phase=""):
+    overall_bar = _progress_bar(channels_done, total_channels)
+    status = "✅ Concluído" if channels_done >= total_channels else "🔄 Em andamento..."
+    lines = [
+        "### 📊 Progresso Geral",
+        f"{overall_bar}",
+        f"**Canais concluídos:** `{channels_done}/{total_channels}`",
+        f"**Status:** {status}",
+        f"**Tempo decorrido:** `{_fmt_elapsed(start_time)}`",
+    ]
+    if current_channel is not None:
+        lines.append("")
+        lines.append(f"### 📂 Canal Atual ({channels_done + 1}/{total_channels})")
+        lines.append(f"**{current_channel.mention}**")
+        lines.append(f"**Mensagens apagadas:** `{current_deleted}`")
+        if phase: lines.append(f"**Fase:** {phase}")
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(
+        ui.TextDisplay("# 🧹 Limpeza de Chat"),
+        ui.TextDisplay("\n".join(lines)),
+        accent_color=color_primary(),
+    ))
+    return layout
+
+def _build_cleanup_final_view(summary):
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(
+        ui.TextDisplay("# ✅ Limpeza Concluída"),
+        ui.TextDisplay(summary),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(_btn("Voltar ao Menu", "back_main", D, E("seta"))),
+        accent_color=color_primary(),
+    ))
+    return layout
+
+# ===================== CARD DE MEMBRO (CLEAN) =====================
+async def _fetch_banner_url(user_id: int):
+    try:
+        user = await bot.fetch_user(user_id)
+        if user and user.banner:
+            return user.banner.url
+    except Exception:
+        pass
+    return None
+
+def _build_welcome_card(member, action="join"):
+    now_ts = int(datetime.datetime.now().timestamp())
+    avatar = member.display_avatar.with_size(256).url
+
+    if action == "join":
+        header = "✨ Novo Membro"
+        lead = "acabou de entrar no servidor"
+        msg = config.get("welcome_message") or "Seja bem-vindo(a)!"
+        info = [
+            f"👤 {member.mention}",
+            f"👥 Você é o membro **nº {member.guild.member_count}**",
+            f"📅 Conta criada <t:{int(member.created_at.timestamp())}:R>",
+        ]
+    else:
+        header = "🔒 Até Logo"
+        lead = "acabou de sair do servidor"
+        msg = config.get("leave_message") or "Sentiremos sua falta."
+        info = [f"👤 {member.mention}"]
+        if member.joined_at:
+            delta = datetime.datetime.now(datetime.timezone.utc) - member.joined_at
+            info.append(f"📥 Entrou <t:{int(member.joined_at.timestamp())}:R>")
+            info.append(f"⏳ Ficou **{delta.days}** dia(s) conosco")
+        info.append(f"👥 Restam **{member.guild.member_count}** membros")
+
+    comps = [
+        ui.TextDisplay(f"## {header}"),
+        ui.Section(
+            ui.TextDisplay(f"### {member.display_name}\n-# {lead}"),
+            accessory=ui.Thumbnail(media=avatar),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.TextDisplay(f"> {msg}"),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.TextDisplay("\n".join(info)),
+        ui.TextDisplay(f"-# {bfooter()} • <t:{now_ts}:f>"),
+    ]
+
+    if action == "join":
+        banner = banner_welcome()
+        if banner:
+            mg = _safe_media_gallery(banner)
+            if mg is not None:
+                comps.insert(2, mg)
+
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(*comps, accent_color=color_primary()))
+    return layout
+
+async def send_welcome_message(member):
+    cid = config.get("welcome_channel_id")
+    if not cid: return
+    ch = member.guild.get_channel(cid)
+    if not ch: return
+    card = _build_welcome_card(member, "join")
+    try: await ch.send(view=card)
+    except Exception as e: logger.error(f"Erro welcome: {e}")
+
+async def send_leave_message(member):
+    cid = config.get("leave_channel_id")
+    if not cid: return
+    ch = member.guild.get_channel(cid)
+    if not ch: return
+    card = _build_welcome_card(member, "leave")
+    try: await ch.send(view=card)
+    except Exception as e: logger.error(f"Erro leave: {e}")
+
+async def send_voice_log(member, channel, action):
+    if action == "join":
+        cid = config.get("voice_join_log_channel_id")
+        title = f"🔊 {member.display_name} entrou na call"
+        subtitle = f"> Entrou em **{channel.name}**"
+        accent = color_primary()
+    else:
+        cid = config.get("voice_leave_log_channel_id")
+        title = f"🔇 {member.display_name} saiu da call"
+        subtitle = f"> Saiu de **{channel.name}**"
+        accent = color_primary()
+    if not cid: return
+    log_ch = member.guild.get_channel(cid)
+    if not log_ch: return
+
+    now_ts = int(datetime.datetime.now().timestamp())
+    avatar = member.display_avatar.with_size(256).url
+    info = [f"👤 {member.mention}"]
+    if action == "join":
+        info.append(f"🔊 Canal: {channel.mention}")
+        info.append(f"👥 No canal: **{len(channel.members)}**")
+    else:
+        info.append(f"🔊 Canal: {channel.mention}")
+        info.append(f"📤 Saiu <t:{now_ts}:T>")
+
+    comps = [
+        ui.TextDisplay(f"## {title}"),
+        ui.Section(
+            ui.TextDisplay(f"### {member.display_name}"),
+            accessory=ui.Thumbnail(media=avatar),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.TextDisplay(subtitle),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.TextDisplay("\n".join(info)),
+        ui.TextDisplay(f"-# {bfooter()}"),
+    ]
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(*comps, accent_color=accent))
+    try: await log_ch.send(view=layout)
+    except Exception as e: logger.error(f"Erro voice log: {e}")
+
+async def make_channel_admin_only(channel):
+    guild = channel.guild
+    try:
+        await channel.set_permissions(guild.default_role, view_channel=False, reason="Logs admin-only")
+        for rid in config.get("admin_role_ids", []):
+            role = guild.get_role(rid)
+            if role:
+                try:
+                    await channel.set_permissions(role, view_channel=True, read_message_history=True,
+                                                  reason="Logs admin-only")
+                except Exception: pass
+    except Exception as e:
+        logger.warning(f"Não foi possível restringir {channel.name}: {e}")
+
+# ===================== /addcargo =====================
+def user_can_use_addcargo(member) -> bool:
+    if not isinstance(member, discord.Member): return False
+    if member.guild_permissions.administrator: return True
+    allowed = config.get("addcargo_allowed_role_ids", []) or []
+    if not allowed: return False
+    member_role_ids = {r.id for r in member.roles}
+    return any(rid in member_role_ids for rid in allowed)
+
+def build_addcargo_panel():
+    state = {"roles": [], "user": None}
+    layout = ui.LayoutView(timeout=600)
+    role_select = ui.RoleSelect(
+        placeholder="👑 Selecione um ou mais cargos para adicionar...",
+        min_values=1, max_values=10,
+    )
+    user_select = ui.UserSelect(
+        placeholder="👤 Selecione o usuário que vai receber os cargos...",
+        min_values=1, max_values=1,
+    )
+    confirm_btn = ui.Button(label="Aplicar Cargos", style=SU, emoji=E("verificado"))
+    cancel_btn = ui.Button(label="Cancelar", style=D, emoji=E("seta"))
+
+    async def on_roles(interaction):
+        state["roles"] = list(role_select.values)
+        try: await interaction.response.defer()
+        except Exception: pass
+
+    async def on_user(interaction):
+        vals = user_select.values
+        state["user"] = vals[0] if vals else None
+        try: await interaction.response.defer()
+        except Exception: pass
+
+    async def on_confirm(interaction):
+        roles = state["roles"]; user = state["user"]
+        if not roles or not user:
+            await interaction.response.send_message(
+                "❌ Selecione pelo menos **um cargo** e **um usuário**.", ephemeral=True); return
+        me = interaction.guild.me
+        if not me.guild_permissions.manage_roles:
+            await interaction.response.send_message("❌ Não tenho permissão `Gerenciar Cargos`.", ephemeral=True); return
+        applied, failed = [], []
+        target = user if isinstance(user, discord.Member) else interaction.guild.get_member(user.id)
+        if not target:
+            await interaction.response.send_message("❌ Usuário não está no servidor.", ephemeral=True); return
+        for role in roles:
+            if role.is_default():
+                failed.append(f"{role.mention} (@everyone)"); continue
+            if role >= me.top_role:
+                failed.append(f"{role.mention} (cargo alto demais)"); continue
+            if role in target.roles:
+                failed.append(f"{role.mention} (já possui)"); continue
+            try:
+                await target.add_roles(role, reason=f"{interaction.user} via painel /addcargo")
+                applied.append(role.mention)
+            except discord.Forbidden:
+                failed.append(f"{role.mention} (sem permissão)")
+            except Exception as e:
+                failed.append(f"{role.mention} ({e})")
+        try:
+            log_moderation("add_role_panel", interaction.user.id, target.id,
+                           ", ".join(r.name for r in roles))
+        except Exception: pass
+        await log_admin_action(interaction, "addcargo_panel",
+                               f"target={target.id} roles={[r.name for r in roles]}")
+        parts = []
+        if applied:
+            parts.append(f"{E('verificado')} **Adicionados a {target.mention}:**\n" + "\n".join(f"• {r}" for r in applied))
+        if failed:
+            parts.append(f"❌ **Falhas:**\n" + "\n".join(f"• {r}" for r in failed))
+        await interaction.response.send_message("\n\n".join(parts) or "✅ Concluído.", ephemeral=True)
+
+    async def on_cancel(interaction):
+        try: await interaction.response.edit_message(view=None)
+        except Exception:
+            try: await interaction.response.defer()
+            except Exception: pass
+
+    role_select.callback = on_roles
+    user_select.callback = on_user
+    confirm_btn.callback = on_confirm
+    cancel_btn.callback = on_cancel
+
+    layout.add_item(ui.Container(
+        ui.TextDisplay("# ➕ Adicionar Cargos a Usuário"),
+        ui.Section(
+            ui.TextDisplay(
+                "**Como usar:**\n"
+                "> 1️⃣ Selecione o(s) **cargo(s)**\n"
+                "> 2️⃣ Selecione o **usuário**\n"
+                "> 3️⃣ Clique em **✅ Aplicar Cargos**"
+            ),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.TextDisplay("### 👑 Cargos"),
+        ui.ActionRow(role_select),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.TextDisplay("### 👤 Usuário"),
+        ui.ActionRow(user_select),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(confirm_btn, cancel_btn),
+        accent_color=color_primary(),
+    ))
+    return layout
+
+def addcargo_public_panel():
+    layout = ui.LayoutView(timeout=None)
+    comps = [
+        ui.TextDisplay("# ➕ Adicionar Cargos"),
+        ui.Section(
+            ui.TextDisplay(
+                "### 🎁 Sistema de Cargos\n"
+                "Use este painel para **adicionar cargos a um usuário**.\n\n"
+                "**Como funciona:**\n"
+                "> • Clique em **➕ Abrir Painel**\n"
+                "> • Escolha os cargos e o usuário\n"
+                "> • Confirme e os cargos serão aplicados"
+            ),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(_btn("Abrir Painel", "addcargo_open", P, E("nitroboo"))),
+        ui.TextDisplay(f"-# {bfooter()}"),
+    ]
+    layout.add_item(ui.Container(*comps, accent_color=color_primary()))
+    return layout
+
+# ===================== ANTI-BOT =====================
+def antibot_panel_view():
+    count = get_antibot_count()
+    comps = []
+    banner = config.get("antibot_banner_url")
+    if banner:
+        mg = _safe_media_gallery(banner)
+        if mg is not None: comps.append(mg)
+        else: comps.append(ui.Section(ui.TextDisplay(""), accessory=ui.Thumbnail(media=banner)))
+    title_txt = config.get("antibot_title") or "• Não envie mensagem nesse canal!"
+    desc_txt  = config.get("antibot_description") or (
+        "Sistema criado para prevenir bots de divulgação e outros SelfBots.\n"
+        "Quem enviar mensagem aqui será punido imediatamente."
+    )
+    comps.append(ui.TextDisplay(f"# {title_txt}"))
+    comps.append(ui.TextDisplay(f"> {desc_txt.replace(chr(10), chr(10) + '> ')}"))
+    comps.append(ui.Separator(spacing=discord.SeparatorSpacing.small))
+    counter_btn = ui.Button(label=f"Punidos: {count}", style=S, disabled=True,
+                            custom_id="antibot_counter_display")
+    comps.append(ui.ActionRow(counter_btn))
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(*comps, accent_color=color_primary()))
+    return layout
+
+async def refresh_antibot_panel():
+    cid = config.get("antibot_channel_id")
+    mid = config.get("antibot_panel_message_id")
+    if not cid or not mid: return
+    guild = get_guild()
+    if not guild: return
+    ch = guild.get_channel(cid)
+    if not ch: return
+    try:
+        msg = await ch.fetch_message(mid)
+        await msg.edit(view=antibot_panel_view())
+    except Exception as e:
+        logger.debug(f"Refresh antibot panel: {e}")
+
+async def _delete_all_user_messages(guild, user_id, limit_per_channel=300):
+    deleted = 0
+    for channel in guild.text_channels:
+        try:
+            perms = channel.permissions_for(guild.me)
+            if not perms.manage_messages or not perms.read_message_history: continue
+            async for msg in channel.history(limit=limit_per_channel):
+                if msg.author.id == user_id:
+                    try:
+                        await msg.delete(); deleted += 1; await asyncio.sleep(0.35)
+                    except discord.NotFound: continue
+                    except discord.HTTPException: await asyncio.sleep(1.5)
+        except Exception: continue
+    return deleted
+
+async def handle_antibot_punish(message):
+    guild = message.guild; member = message.author
+    logger.info(f"🚫 AntiBot: {member} ({member.id}) em #{message.channel.name}")
+    try: await message.delete()
+    except Exception: pass
+    deleted_count = 0
+    if config.get("antibot_delete_messages", True):
+        try: deleted_count = await _delete_all_user_messages(guild, member.id)
+        except Exception as e: logger.error(f"Erro apagando mensagens: {e}")
+    banned = False
+    if config.get("antibot_punish_ban", True):
+        try:
+            await guild.ban(member, reason="AntiBot: mensagem em canal protegido",
+                            delete_message_seconds=0)
+            banned = True
+        except discord.Forbidden:
+            logger.warning(f"Sem permissão para banir {member}")
+        except Exception as e: logger.error(f"Erro ban: {e}")
+    try:
+        add_antibot_punishment(member.id, guild.id, "Mensagem em canal protegido",
+                                banned=banned, deleted_count=deleted_count)
+    except Exception as e: logger.error(f"Erro registrando punição: {e}")
+    await refresh_antibot_panel()
+    log_id = config.get("antibot_log_channel_id")
+    if log_id:
+        log_ch = guild.get_channel(log_id)
+        if log_ch:
+            try:
+                await log_ch.send(
+                    f"🚫 **AntiBot** — punição aplicada\n"
+                    f"**Usuário:** {member} (`{member.id}`)\n"
+                    f"**Canal:** {message.channel.mention}\n"
+                    f"**Mensagens apagadas:** `{deleted_count}`\n"
+                    f"**Banido:** `{'Sim' if banned else 'Não'}`"
+                )
+            except Exception: pass
+
+# ===================== TICKET / REFRESH =====================
+async def refresh_ticket_panel():
+    cid = config.get("ticket_panel_channel_id")
+    if not cid: return False
+    guild = get_guild()
+    if not guild: return False
+    ch = guild.get_channel(cid)
+    if not ch: return False
+    mid = config.get("ticket_panel_message_id")
+    if mid:
+        try:
+            msg = await ch.fetch_message(mid)
+            await msg.edit(view=ticket_panel_layout())
+            return True
+        except Exception as e:
+            logger.debug(f"Não consegui editar painel existente: {e}")
+    try:
+        msg = await ch.send(view=ticket_panel_layout())
+        config["ticket_panel_message_id"] = msg.id
+        save_config(config)
+        return True
+    except Exception as e:
+        logger.error(f"Erro enviando painel de tickets: {e}")
+        return False
+
+async def refresh_feedback_panel():
+    cid = config.get("feedback_panel_channel_id")
+    mid = config.get("feedback_panel_message_id")
+    if not cid or not mid: return False
+    guild = get_guild()
+    if not guild: return False
+    ch = guild.get_channel(cid)
+    if not ch: return False
+    try:
+        msg = await ch.fetch_message(mid)
+        await msg.edit(view=feedback_panel_layout())
+        return True
+    except Exception as e:
+        logger.debug(f"refresh_feedback_panel: {e}")
+        return False
+
+async def _refresh_simple_panel(channel_key, msg_key, builder):
+    cid = config.get(channel_key); mid = config.get(msg_key)
+    if not cid or not mid: return
+    guild = get_guild()
+    if not guild: return
+    ch = guild.get_channel(cid)
+    if not ch: return
+    try:
+        msg = await ch.fetch_message(mid)
+        await msg.edit(view=builder())
+    except Exception as e:
+        logger.debug(f"refresh {channel_key}: {e}")
+
+async def refresh_all_panels():
+    await _refresh_simple_panel("painel_channel_id", "painel_message_id", painel_layout)
+    await refresh_antibot_panel()
+    await refresh_ticket_panel()
+    await _refresh_simple_panel("suggestions_panel_channel_id",
+                                "suggestions_panel_message_id",
+                                suggestion_panel_layout)
+    await _refresh_simple_panel("feedback_panel_channel_id",
+                                "feedback_panel_message_id",
+                                feedback_panel_layout)
+    await _refresh_simple_panel("verification_panel_channel_id",
+                                "verification_panel_message_id",
+                                verification_panel_layout)
+    await _refresh_simple_panel("addcargo_panel_channel_id",
+                                "addcargo_panel_message_id",
+                                addcargo_public_panel)
+
+# ===================== PAINEL PRINCIPAL =====================
+def painel_layout():
+    layout = ui.LayoutView(timeout=None)
+    header = [
+        ui.TextDisplay(f"# {E('nitroboo')} {bname()} — Central de Controle"),
+        ui.Section(
+            ui.TextDisplay(
+                f"### {E('tdj_1')} Painel Administrativo Premium\n"
+                "Gerencie **todo o seu servidor** em um só lugar.\n"
+                f"-# {E('seta')} Selecione uma categoria no menu abaixo para começar."
+            ),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+    ]
+    layout.add_item(ui.Container(*header, accent_color=color_primary()))
+
+    select = _safe_select(
+        placeholder="🖤 Escolha uma categoria para configurar...",
+        options=[
+            discord.SelectOption(label="Identidade Visual", value="identity", emoji=E("tdj_1"),
+                                 description="Nome, emoji, cores e banners"),
+            discord.SelectOption(label="Auto-Emoji nos Canais", value="autoemoji", emoji="✨",
+                                 description="Adiciona emojis automáticos nos canais"),
+            discord.SelectOption(label="Anti-Bot", value="antibot", emoji=E("tdj_2"),
+                                 description="Canal protegido e punições automáticas"),
+            discord.SelectOption(label="Verificação Captcha", value="captcha", emoji=E("verificado"),
+                                 description="Sistema de verificação avançado"),
+            discord.SelectOption(label="Boas-vindas & Saída", value="welcome", emoji=E("tdj_3"),
+                                 description="Mensagens de entrada e saída"),
+            discord.SelectOption(label="Logs de Voz", value="voicelogs", emoji=E("tdj_4"),
+                                 description="Canais de entrada/saída da call (admin-only)"),
+            discord.SelectOption(label="Voz & Status", value="voice", emoji=E("tdj_5"),
+                                 description="Canal 24h, mute e presença"),
+            discord.SelectOption(label="Cargos de Admin", value="admin", emoji=E("tdj_6"),
+                                 description="Quem pode usar este painel"),
+            discord.SelectOption(label="Cargos Autorizados (/addcargo)", value="addcargo_cfg", emoji=E("tdj_7"),
+                                 description="Quem pode dar cargos"),
+            discord.SelectOption(label="Painel Fixo", value="painel_fixo", emoji=E("tdj_8"),
+                                 description="Canal onde o painel fica fixado"),
+            discord.SelectOption(label="Tickets", value="tickets", emoji=E("tdj_9"),
+                                 description="Categorias, suporte e logs"),
+            discord.SelectOption(label="Painel de Avaliações", value="feedback_panel", emoji="⭐",
+                                 description="Painel público de feedback"),
+            discord.SelectOption(label="Sugestões", value="suggestions", emoji=E("minecraft"),
+                                 description="Painel e canal de sugestões"),
+            discord.SelectOption(label="Limpeza de Chat", value="chat_cleanup", emoji=E("hellokitty"),
+                                 description="Apagar mensagens (texto e voz)"),
+            discord.SelectOption(label="Ver Configuração Atual", value="show_config", emoji=E("nitro_boo"),
+                                 description="Visualizar tudo que está configurado"),
+        ],
+        custom_id="pxk_main_menu", min_values=1, max_values=1,
+    )
+    select.callback = main_menu_callback
+
+    layout.add_item(ui.Container(
+        ui.TextDisplay(f"## {E('seta')} Categorias Disponíveis"),
+        ui.TextDisplay("-# Cada categoria abre um submenu com botões organizados por função."),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(select),
+        accent_color=color_secondary(),
+    ))
+    return layout
+
+async def main_menu_callback(interaction: discord.Interaction):
+    v = interaction.data["values"][0]
+    await log_admin_action(interaction, "menu_open", f"categoria={v}")
+    routes = {
+        "identity":       lambda: interaction.response.send_message(view=identity_view(), ephemeral=True),
+        "autoemoji":      lambda: interaction.response.send_message(view=autoemoji_view(), ephemeral=True),
+        "antibot":        lambda: interaction.response.send_message(view=antibot_view(), ephemeral=True),
+        "captcha":        lambda: interaction.response.send_message(view=captcha_view(), ephemeral=True),
+        "welcome":        lambda: interaction.response.send_message(view=welcome_view(), ephemeral=True),
+        "voicelogs":      lambda: interaction.response.send_message(view=voicelogs_view(), ephemeral=True),
+        "voice":          lambda: interaction.response.send_message(view=voice_view(), ephemeral=True),
+        "admin":          lambda: interaction.response.send_message(view=admin_view(), ephemeral=True),
+        "addcargo_cfg":   lambda: interaction.response.send_message(view=addcargo_cfg_view(), ephemeral=True),
+        "painel_fixo":    lambda: interaction.response.send_message(view=painel_fixo_view(), ephemeral=True),
+        "tickets":        lambda: interaction.response.send_message(view=tickets_view(), ephemeral=True),
+        "feedback_panel": lambda: interaction.response.send_message(view=feedback_panel_view(), ephemeral=True),
+        "suggestions":    lambda: interaction.response.send_message(view=suggestions_view(), ephemeral=True),
+        "chat_cleanup":   lambda: interaction.response.send_message(view=chat_cleanup_view(), ephemeral=True),
+        "show_config":    lambda: interaction.response.send_message(view=show_config_view(), ephemeral=True),
+    }
+    fn = routes.get(v)
+    if fn: await fn()
+
+# ===================== SUBMENUS =====================
+def identity_view():
+    return premium_submenu(
+        "🎨 Identidade Visual",
+        "Personalize o nome, emoji, cores e imagens que aparecem em **todo o bot**.",
+        [
+            {"title": "🏷️ Marca", "rows": [[
+                _btn("Nome",   "id_name",   P, E("tdj_1")),
+                _btn("Emoji",  "id_emoji",  P, E("tdj_2")),
+                _btn("Rodapé", "id_footer", P, E("tdj_3")),
+            ]]},
+            {"title": "🎨 Paleta de Cores", "rows": [[
+                _btn("Primária",   "id_c1", P,  E("tdj_1")),
+                _btn("Secundária", "id_c2", P,  E("tdj_2")),
+                _btn("Sucesso",    "id_c3", SU, E("tdj_3")),
+                _btn("Perigo",     "id_c4", D,  E("tdj_4")),
+            ]]},
+            {"title": "🖼️ Imagens & Banners", "rows": [
+                [_btn("Avatar", "id_avatar", S, E("nitroboo")),
+                 _btn("Banner Painel", "id_bp", S, E("tdj_5"))],
+                [_btn("Banner Ticket", "id_bt", S, E("tdj_6")),
+                 _btn("Banner Boas-vindas", "id_bw", S, E("tdj_7"))],
+            ]},
+            {"title": "⚙️ Ações", "rows": [[
+                _btn("Aplicar Avatar", "id_apply",   SU, E("verificado")),
+                _btn("Pré-visualizar", "id_preview", S,  E("seta")),
+            ]]},
+        ],
+        accent=color_primary(),
+    )
+
+def autoemoji_view():
+    on = config.get("auto_emoji_channels", True)
+    return premium_submenu(
+        "✨ Auto-Emoji nos Canais",
+        "O bot identifica o **nome de cada canal** e adiciona automaticamente um "
+        "**emoji que combina** com o propósito dele.\n\n"
+        f"**Status:** `{'Ativado' if on else 'Desativado'}`\n"
+        f"**Separador:** `{EMOJI_SEPARATOR}`\n"
+        f"**Regras cadastradas:** `{len(CHANNEL_EMOJI_RULES)}`\n\n"
+        "**Exemplos:**\n"
+        "> `✨・bem-vindo`  `🔒・saiu`  `📜・regras`\n"
+        "> `💬・chat-geral`  `🎫・tickets`  `💡・sugestoes`",
+        [
+            {"title": "⚙️ Controle", "rows": [[
+                _btn(f"Auto-Emoji: {'ON' if on else 'OFF'}", "ae_toggle", SU if on else D, "✨"),
+                _btn("Sincronizar Agora", "ae_sync", P, E("verificado")),
+            ]]},
+            {"title": "🧪 Preview", "rows": [[
+                _btn("Ver Regras", "ae_rules", S, E("tdj_1")),
+            ]]},
+        ],
+        accent=color_primary(),
+    )
+
+def antibot_view():
+    ban_on = config.get("antibot_punish_ban", True)
+    del_on = config.get("antibot_delete_messages", True)
+    ch_set = "✅" if config.get("antibot_channel_id") else "❌"
+    log_set = "✅" if config.get("antibot_log_channel_id") else "❌"
+    total = get_antibot_count()
+    return premium_submenu(
+        "🚫 Anti-Bot",
+        "Configure o canal protegido onde **qualquer mensagem** resulta em banimento e deleção total.\n\n"
+        f"**Canal protegido:** {ch_set}\n**Canal de log:** {log_set}\n"
+        f"**Banir:** `{'Ativo' if ban_on else 'Desativado'}`  |  "
+        f"**Apagar msgs:** `{'Ativo' if del_on else 'Desativado'}`\n"
+        f"**Total punidos:** `{total}`",
+        [
+            {"title": "📢 Canal Protegido", "rows": [
+                [_btn("Definir Canal Anti-Bot", "ab_ch", P, E("tdj_1"))],
+                [_btn("Canal de Log", "ab_log", P, E("tdj_2"))],
+            ]},
+            {"title": "🖼️ Aparência do Painel", "rows": [
+                [_btn("Banner do Painel", "ab_banner", P, E("tdj_3")),
+                 _btn("Título", "ab_title",  P, E("tdj_4"))],
+                [_btn("Descrição", "ab_desc", P, E("tdj_5"))],
+            ]},
+            {"title": "⚙️ Ações de Punição", "rows": [
+                [_btn(f"Banir: {'ON' if ban_on else 'OFF'}", "ab_toggle_ban", SU if ban_on else D, E("tdj_6")),
+                 _btn(f"Apagar Msgs: {'ON' if del_on else 'OFF'}", "ab_toggle_del", SU if del_on else D, E("tdj_7"))],
+            ]},
+            {"title": "🎛️ Painel", "rows": [
+                [_btn("Postar Painel Aqui", "ab_post", SU, E("verificado"))],
+                [_btn("Preview do Painel",  "ab_preview", S, E("seta"))],
+            ]},
+        ],
+        accent=color_primary(),
+    )
+
+def captcha_view():
+    method = config.get("verification_method", "math")
+    diff   = config.get("verification_difficulty", 1)
+    kick   = config.get("verification_kick_minutes", 0)
+    method_label = "🧮 Matemática" if method == "math" else "🔘 Botão"
+    diff_labels = {1: "Fácil", 2: "Médio", 3: "Difícil"}
+    kick_label = "Desativado" if not kick else f"{kick} min"
+    return premium_submenu(
+        "✅ Verificação Captcha",
+        f"Sistema avançado com método, dificuldade e expulsão automática.\n"
+        f"Cria um **canal temporário** para o membro se verificar.\n\n"
+        f"**Método atual:** `{method_label}`\n"
+        f"**Dificuldade:** `{diff_labels.get(diff, 'Fácil')}`\n"
+        f"**Kick automático:** `{kick_label}`",
+        [
+            {"title": "👑 Cargos", "rows": [
+                [_btn("Cargos Entregues (verificados)", "cap_roles", P, E("verificado"))],
+                [_btn("Cargos Não Verificado", "cap_unver", P, E("tdj_1"))],
+            ]},
+            {"title": "⚙️ Método & Dificuldade", "rows": [
+                [_btn("Mudar Método",      "cap_method", P, E("tdj_2")),
+                 _btn("Mudar Dificuldade", "cap_diff",   P, E("tdj_3"))],
+            ]},
+            {"title": "⏰ Expulsão Automática", "rows": [
+                [_btn("Configurar Tempo", "cap_kick", D, E("tdj_4"))],
+            ]},
+            {"title": "📢 Canais", "rows": [
+                [_btn("Canal de Verificação", "cap_ch",   P, E("tdj_5")),
+                 _btn("Canal do Painel",      "cap_pch",  P, E("tdj_6"))],
+                [_btn("Canal de Log", "cap_log", P, E("tdj_7"))],
+                [_btn("Categoria Temporária", "cap_tmpcat", P, E("tdj_8"))],
+            ]},
+        ],
+        accent=color_secondary(),
+    )
+
+def welcome_view():
+    return premium_submenu(
+        "💌 Boas-vindas & Saída",
+        "Configure as mensagens premium de **entrada** e **saída** do servidor.\n"
+        "-# Visual clean, moderno e em tom roxo.",
+        [
+            {"title": "🎉 Entrada no Servidor", "rows": [
+                [_btn("Canal de Boas-vindas", "wel_ch",  P, E("tdj_1")),
+                 _btn("Mensagem de Entrada",  "wel_msg", P, E("tdj_2"))],
+                [_btn("Banner de Entrada", "wel_img", S, E("tdj_3")),
+                 _btn("Testar Entrada",    "wel_test", SU, E("verificado"))],
+            ]},
+            {"title": "👋 Saída do Servidor", "rows": [
+                [_btn("Canal de Saída",    "lev_ch",  P, E("tdj_4")),
+                 _btn("Mensagem de Saída", "lev_msg", P, E("tdj_5"))],
+                [_btn("Testar Saída", "lev_test", SU, E("verificado"))],
+            ]},
+        ],
+        accent=color_primary(),
+    )
+
+def voicelogs_view():
+    return premium_submenu(
+        "🎙️ Logs de Voz",
+        "Escolha canais separados para registrar **quem entra** e **quem sai** das calls.\n"
+        "-# 🔒 Os canais serão automaticamente restritos a **admins**.",
+        [
+            {"title": "🔊 Entrada na Call", "rows": [[
+                _btn("Canal de Log — Entrou", "vl_join_ch",   P, E("tdj_1")),
+                _btn("Testar Entrada",        "vl_join_test", SU, E("verificado")),
+            ]]},
+            {"title": "🔇 Saída da Call", "rows": [[
+                _btn("Canal de Log — Saiu", "vl_leave_ch",   P, E("tdj_2")),
+                _btn("Testar Saída",        "vl_leave_test", SU, E("verificado")),
+            ]]},
+        ],
+        accent=color_secondary(),
+    )
+
+def voice_view():
+    rot = config.get("activity_rotate_enabled", False)
+    tipo = config.get("activity_type", "watching")
+    tipo_labels = {"watching": "👁️ Assistindo", "playing": "🎮 Jogando",
+                   "listening": "🎧 Ouvindo", "competing": "🏆 Competindo"}
+    msgs = config.get("activity_messages") or []
+    intervalo = config.get("activity_rotate_seconds", 30)
+    return premium_submenu(
+        "🔊 Voz & Status",
+        "Configure o canal de voz 24h, mute automático e a **atividade rotativa** do bot.\n\n"
+        f"**Rotação:** `{'Ativada' if rot else 'Desativada'}`\n"
+        f"**Tipo:** `{tipo_labels.get(tipo, '—')}`\n"
+        f"**Intervalo:** `{intervalo}s`\n"
+        f"**Mensagens:** `{len(msgs)}` cadastrada(s)",
+        [
+            {"title": "🎙️ Voz 24h", "rows": [[
+                _btn("Canal de Voz 24h", "v_ch", P, E("tdj_1")),
+            ]]},
+            {"title": "🎭 Presença", "rows": [[
+                _btn("Mute na Call",  "v_mute",   P, E("tdj_2")),
+                _btn("Status do Bot", "v_status", P, E("tdj_3")),
+            ]]},
+            {"title": "🎞️ Atividade Rotativa", "rows": [
+                [_btn(f"Rotação: {'ON' if rot else 'OFF'}", "act_toggle", SU if rot else D, E("tdj_4")),
+                 _btn("Mensagens", "act_msgs", P, E("tdj_5"))],
+                [_btn("Tipo",      "act_type",     P, E("tdj_6")),
+                 _btn("Intervalo", "act_interval", P, E("tdj_7"))],
+                [_btn("Ver Agora", "act_preview", S, E("seta"))],
+            ]},
+        ],
+        accent=color_primary(),
+    )
+
+def admin_view():
+    return premium_submenu(
+        "👑 Cargos de Admin",
+        "Defina **quais cargos** podem usar este painel.\n-# Administradores do servidor já têm acesso por padrão.",
+        [
+            {"title": "🔐 Permissões", "rows": [[
+                _btn("Selecionar Cargos (múltiplos)", "adm_roles", P, E("tdj_1")),
+            ]]},
+        ],
+        accent=color_primary(),
+    )
+
+def addcargo_cfg_view():
+    allowed = config.get("addcargo_allowed_role_ids", []) or []
+    ch_ok = "✅" if config.get("addcargo_panel_channel_id") else "❌"
+    return premium_submenu(
+        "➕ Configurar /addcargo",
+        "Defina **quais cargos** podem usar o comando `/addcargo` para dar cargos a outros membros.\n\n"
+        f"**Cargos autorizados:** `{len(allowed)}`\n"
+        f"**Painel público:** {ch_ok}\n"
+        "-# Administradores do servidor sempre podem usar.",
+        [
+            {"title": "👑 Cargos Autorizados", "rows": [
+                [_btn("Selecionar Cargos (múltiplos)", "acfg_roles", P, E("tdj_1"))],
+            ]},
+            {"title": "📢 Painel Público", "rows": [
+                [_btn("Definir Canal", "acfg_ch",   P,  E("tdj_2")),
+                 _btn("Postar Painel", "acfg_post", SU, E("verificado"))],
+                [_btn("Preview do Painel", "acfg_preview", S, E("seta"))],
+            ]},
+        ],
+        accent=color_primary(),
+    )
+
+def painel_fixo_view():
+    return premium_submenu(
+        "📌 Painel Fixo",
+        "Escolha o canal onde o **painel administrativo** ficará fixado.\n"
+        "-# O bot re-registra os painéis automaticamente sempre que reiniciar.",
+        [
+            {"title": "📢 Canal", "rows": [[
+                _btn("Definir Canal do Painel", "pf_ch", P, E("tdj_1")),
+            ]]},
+        ],
+        accent=color_primary(),
+    )
+
+def tickets_view():
+    ch_ok = "✅" if config.get("ticket_panel_channel_id") else "❌"
+    return premium_submenu(
+        "🎫 Sistema de Tickets",
+        "Configure categorias, cargos, canais **e personalize todo o painel público**.\n\n"
+        f"**Painel enviado em:** {ch_ok}",
+        [
+            {"title": "📂 Categorias", "rows": [[
+                _btn("Dúvidas", "tk_cat_d", P, E("tdj_1")),
+                _btn("Compras", "tk_cat_p", P, E("tdj_2")),
+            ]]},
+            {"title": "👥 Suporte & Logs", "rows": [[
+                _btn("Cargos de Suporte (múltiplos)", "tk_sup",  P, E("tdj_3")),
+                _btn("Logs de Tickets",               "tk_logs", P, E("tdj_4")),
+            ]]},
+            {"title": "📢 Canais", "rows": [[
+                _btn("Painel de Tickets", "tk_panel", P, E("tdj_5")),
+                _btn("Logs de Moderação", "tk_mod",   P, E("tdj_6")),
+            ]]},
+            {"title": "🎨 Personalizar Painel", "rows": [
+                [_btn("Abrir Customização", "tk_customize", SU, E("verificado"))],
+            ]},
+        ],
+        accent=color_primary(),
+    )
+
+def ticket_panel_custom_view():
+    d_label = config.get("ticket_doubt_label") or ""
+    d_emoji = config.get("ticket_doubt_emoji") or ""
+    p_label = config.get("ticket_purchase_label") or ""
+    p_emoji = config.get("ticket_purchase_emoji") or ""
+    return premium_submenu(
+        "🎨 Personalizar Painel de Tickets",
+        "Edite **qualquer informação** que aparece no painel público de tickets.\n"
+        "-# Placeholders disponíveis: `{brand}`, `{emoji}`, `{members}`",
+        [
+            {"title": "🏷️ Cabeçalho", "rows": [
+                [_btn("Título",   "tpc_title", P, E("tdj_1")),
+                 _btn("Descrição","tpc_desc",  P, E("tdj_2"))],
+                [_btn("Banner (URL)", "tpc_banner", P, E("tdj_3"))],
+            ]},
+            {"title": "🔤 Menu Select", "rows": [
+                [_btn("Placeholder", "tpc_ph", P, E("tdj_4"))],
+            ]},
+            {"title": f"❓ Opção Dúvidas (atual: {d_emoji} {d_label})", "rows": [
+                [_btn("Label",     "tpc_dlabel", P, E("tdj_5")),
+                 _btn("Descrição", "tpc_ddesc",  P, E("tdj_6")),
+                 _btn("Emoji",     "tpc_demoji", P, E("tdj_7"))],
+            ]},
+            {"title": f"🛒 Opção Compras (atual: {p_emoji} {p_label})", "rows": [
+                [_btn("Label",     "tpc_plabel", P, E("tdj_8")),
+                 _btn("Descrição", "tpc_pdesc",  P, E("tdj_9")),
+                 _btn("Emoji",     "tpc_pemoji", P, E("tdj_1"))],
+            ]},
+            {"title": "⚙️ Ações", "rows": [
+                [_btn("🔄 Atualizar Painel Agora", "tpc_refresh", SU, E("verificado")),
+                 _btn("👁️ Preview",                 "tpc_preview", S,  E("seta"))],
+                [_btn("↩️ Restaurar Padrões", "tpc_reset", D, E("seta"))],
+            ]},
+        ],
+        accent=color_primary(),
+    )
+
+def feedback_view():
+    """Submenu antigo (mantido por compatibilidade)."""
+    return feedback_panel_view()
+
+def feedback_panel_view():
+    ch_ok = "✅" if config.get("feedback_panel_channel_id") else "❌"
+    ch_log = "✅" if config.get("feedback_channel_id") else "❌"
+    return premium_submenu(
+        "⭐ Painel de Avaliações",
+        "Configure o **painel público** onde os membros enviam feedback.\n\n"
+        f"**Painel enviado:** {ch_ok}\n"
+        f"**Canal de logs:** {ch_log}",
+        [
+            {"title": "📢 Canais", "rows": [
+                [_btn("Canal do Painel",   "fbp_ch",   P, E("tdj_1")),
+                 _btn("Canal de Logs",     "fbp_log",  P, E("tdj_2"))],
+                [_btn("Postar Painel",     "fbp_post", SU, E("verificado")),
+                 _btn("Preview",           "fbp_prev", S,  E("seta"))],
+            ]},
+            {"title": "🎨 Personalizar", "rows": [
+                [_btn("Título",    "fbp_title", P, E("tdj_3")),
+                 _btn("Descrição", "fbp_desc",  P, E("tdj_4"))],
+            ]},
+            {"title": "🔄 Ações", "rows": [
+                [_btn("Atualizar Painel", "fbp_refresh", SU, E("verificado"))],
+            ]},
+        ],
+        accent=color_primary(),
+    )
+
+def suggestions_view():
+    ch_ok = "✅" if config.get("suggestions_panel_channel_id") else "❌"
+    ch_sug = "✅" if config.get("suggestions_channel_id") else "❌"
+    return premium_submenu(
+        "💡 Sugestões",
+        "Configure o painel e o canal onde as **sugestões dos membros** são enviadas.\n\n"
+        f"**Painel:** {ch_ok}  |  **Canal de sugestões:** {ch_sug}",
+        [
+            {"title": "📢 Canais", "rows": [[
+                _btn("Canal do Painel",    "sg_pch", P, E("tdj_1")),
+                _btn("Canal de Sugestões", "sg_ch",  P, E("tdj_2")),
+            ]]},
+            {"title": "⚙️ Ações", "rows": [[
+                _btn("Atualizar Painel", "sg_refresh", SU, E("verificado")),
+                _btn("Preview",          "sg_prev",    S,  E("seta")),
+            ]]},
+        ],
+        accent=color_primary(),
+    )
+
+# ===================== PAINEL DE SUGESTÕES V2 =====================
+def _suggestion_progress(up, down, length=14):
+    total = up + down
+    if total <= 0:
+        return f"`[{'░' * length}]` **0%**"
+    pct = int(up / total * 100)
+    filled = int(length * up / total)
+    empty = length - filled
+    return f"`[{'█' * filled}{'░' * empty}]` **{pct}%** de aprovação"
+
+def suggestion_panel_layout():
+    total = 0
+    try:
+        conn = get_db(); c = conn.cursor()
+        c.execute("SELECT COUNT(*) FROM suggestions")
+        total = c.fetchone()[0]; conn.close()
+    except Exception:
+        pass
+
+    comps = [
+        ui.TextDisplay(f"# 💡 Central de Sugestões — {bname()}"),
+        ui.Section(
+            ui.TextDisplay(
+                "### 🌟 Sua voz constrói o servidor!\n"
+                "Tem uma ideia, melhoria ou projeto? **Compartilhe com a gente!**\n\n"
+                "**Como funciona:**\n"
+                "> 📝 **Envie** sua sugestão pelo botão abaixo\n"
+                "> 👍 A comunidade **vota com botões** (sem reactions)\n"
+                "> 🏆 As mais votadas são analisadas pela equipe\n"
+                "> 🚀 Ideias aprovadas entram em produção"
+            ),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.large),
+        ui.TextDisplay(
+            f"### 📊 Estatísticas\n"
+            f"> **Sugestões enviadas:** `{total}`\n"
+            f"> **Votação:** por **botões** direto no card\n"
+            f"> **Sistema:** transparente e democrático"
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(
+            _btn("Enviar Sugestão", "suggest_btn", SU, "✨"),
+            _btn("Ver Regras", "sug_rules_btn", S, "📜"),
+        ),
+        ui.TextDisplay(f"-# {bfooter()}"),
+    ]
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(*comps, accent_color=color_primary()))
+    return layout
+
+def suggestion_card_layout(sid, author, content, up, down, status="open", voter_id=None):
+    total = up + down
+    avatar = author.display_avatar.with_size(256).url
+    bar = _suggestion_progress(up, down)
+    status_icon = {"open": "🟢 Aberta", "approved": "✅ Aprovada", "denied": "❌ Recusada"}.get(status, "🟢 Aberta")
+
+    comps = [
+        ui.TextDisplay(f"# 💡 Sugestão #{sid}"),
+        ui.Section(
+            ui.TextDisplay(f"### {author.display_name}\n-# Autor • {author.mention}"),
+            accessory=ui.Thumbnail(media=avatar),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.TextDisplay(f">>> {content}"),
+        ui.Separator(spacing=discord.SeparatorSpacing.large),
+        ui.TextDisplay(f"### 📊 Votação\n{bar}"),
+        ui.TextDisplay(
+            f"👍 **{up}** a favor  •  👎 **{down}** contra  •  📈 Total: **{total}**"
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+    ]
+
+    up_btn   = ui.Button(label=f"A Favor  •  {up}",   style=SU, custom_id=f"sug_up_{sid}",   emoji="👍")
+    down_btn = ui.Button(label=f"Contra  •  {down}",  style=D,  custom_id=f"sug_down_{sid}", emoji="👎")
+    comps.append(ui.ActionRow(up_btn, down_btn))
+    comps.append(ui.TextDisplay(f"-# Status: {status_icon}  •  {bfooter()}"))
+
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(*comps, accent_color=color_primary()))
+    return layout
+
+async def handle_suggestion_vote(interaction: discord.Interaction, custom_id: str):
+    parts = custom_id.split("_")
+    vote_type = parts[1]
+    try:
+        sid = int(parts[2])
+    except (IndexError, ValueError):
+        await interaction.response.send_message("❌ ID inválido.", ephemeral=True); return
+
+    up, down, acao = vote_suggestion(sid, interaction.user.id, vote_type)
+    s = get_suggestion(sid)
+    if not s:
+        await interaction.response.send_message("❌ Sugestão não encontrada.", ephemeral=True); return
+
+    author = interaction.guild.get_member(s["user_id"])
+    if not author:
+        try: author = await interaction.guild.fetch_member(s["user_id"])
+        except Exception: author = interaction.user
+
+    new_view = suggestion_card_layout(
+        sid=sid, author=author, content=s["content"],
+        up=up, down=down, status=(s["status"] or "open"),
+    )
+    await interaction.response.edit_message(view=new_view)
+
+    msg_map = {
+        "added": "✅ Voto registrado!",
+        "changed": "🔄 Voto alterado!",
+        "removed": "↩️ Voto removido!",
+    }
+    try:
+        await interaction.followup.send(msg_map.get(acao, "✅"), ephemeral=True)
+    except Exception:
+        pass
+
+# ===================== PAINEL DE FEEDBACK V2 =====================
+def feedback_panel_layout():
+    total = 0
+    try: total = count_general_feedback()
+    except Exception: pass
+
+    raw_title = config.get("feedback_panel_title") or "⭐ Avaliações & Feedback — {brand}"
+    raw_desc  = config.get("feedback_panel_description") or ""
+    title = _fmt_text(raw_title)
+    desc  = _fmt_text(raw_desc)
+    if not title.startswith("#"): title = f"# {title}"
+
+    comps = [
+        ui.TextDisplay(title),
+        ui.Section(
+            ui.TextDisplay(desc),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.large),
+        ui.TextDisplay(
+            f"### 📊 Estatísticas do Servidor\n"
+            f"> **Avaliações recebidas:** `{total}`\n"
+            f"> **Escala:** ⭐⭐⭐⭐⭐ (1 a 5 estrelas)\n"
+            f"> **Anonimato:** sua avaliação é privada para a equipe"
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(
+            _btn("Avaliar Agora", "fb_open_modal", SU, "⭐"),
+            _btn("Como Funciona", "fb_help_btn", S, "❓"),
+        ),
+        ui.TextDisplay(f"-# {bfooter()}"),
+    ]
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(*comps, accent_color=color_primary()))
+    return layout
+
+# ===================== LIMPEZA =====================
+_cleanup_selection = {}
+
+async def _on_cleanup_select(interaction: discord.Interaction):
+    sel = interaction.data.get("values", [])
+    _cleanup_selection[interaction.user.id] = [int(v) for v in sel if v != "none"]
+    ids = _cleanup_selection[interaction.user.id]
+    await log_admin_action(interaction, "cleanup_select", f"canais={ids}")
+    if not ids:
+        await interaction.response.send_message("❌ Nenhum canal selecionado.", ephemeral=True); return
+    mentions = "\n".join(f"• <#{c}>" for c in ids)
+    await interaction.response.send_message(
+        f"✅ **{len(ids)} canal(is)** selecionado(s):\n{mentions}\n\n"
+        f"-# Clique em **🧹 Iniciar Limpeza** para começar.", ephemeral=True
+    )
+
+def chat_cleanup_view():
+    layout = ui.LayoutView(timeout=600)
+    opts = cleanup_channel_options()
+    n = len([o for o in opts if o.value != "none"])
+    max_vals = max(1, min(25, n))
+    channel_select = _safe_select(
+        placeholder="🧹 Selecione canais (texto ou voz) para limpar...",
+        options=opts, custom_id="cleanup_multi_select",
+        min_values=1, max_values=max_vals,
+    )
+    channel_select.callback = _on_cleanup_select
+
+    start_btn = ui.Button(label="Iniciar Limpeza", style=D, emoji=E("hellokitty"), custom_id="cleanup_start")
+    async def on_start(interaction): await run_multi_cleanup(interaction)
+    start_btn.callback = on_start
+    back_btn = _btn("Voltar ao Menu", "back_main", S, E("seta"))
+    voice_btn = _btn("Limpar Chat de Voz", "cleanup_voice_open", P, E("tdj_4"))
+
+    layout.add_item(ui.Container(
+        ui.TextDisplay("# 🧹 Limpeza de Chat"),
+        ui.Section(
+            ui.TextDisplay(
+                "Escolha entre **canais de texto** e **canais de voz** (o **chat interno da call** também é limpo).\n"
+                "Uma **barra de progresso detalhada** mostrará o andamento em tempo real.\n"
+                "-# ⚠️ Ação irreversível. O bot precisa de `Gerenciar Mensagens` em cada canal."
+            ),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.TextDisplay("### 📂 Selecionar múltiplos canais"),
+        ui.ActionRow(channel_select),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(start_btn, back_btn),
+        ui.Separator(spacing=discord.SeparatorSpacing.large),
+        ui.TextDisplay("### 🔊 Limpar apenas o Chat de uma Call"),
+        ui.TextDisplay("-# Abre um painel com menu SELECT só de canais de voz."),
+        ui.ActionRow(voice_btn),
+        accent_color=color_primary(),
+    ))
+    return layout
+
+def voice_cleanup_view():
+    layout = ui.LayoutView(timeout=300)
+    opts = cleanup_voice_only_options()
+    sel = _safe_select(
+        placeholder="🔊 Escolha o canal de voz para limpar o chat interno...",
+        options=opts, min_values=1, max_values=1,
+    )
+    async def cb(interaction):
+        val = sel.values[0]
+        if val == "none":
+            await interaction.response.send_message("❌ Nenhum canal de voz disponível.", ephemeral=True); return
+        ch = interaction.guild.get_channel(int(val))
+        if not ch or not isinstance(ch, discord.VoiceChannel):
+            await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
+        perms = ch.permissions_for(interaction.guild.me)
+        if not (perms.manage_messages and perms.read_message_history):
+            await interaction.response.send_message("❌ Sem permissão nesse canal.", ephemeral=True); return
+        await log_admin_action(interaction, "cleanup_voice", f"canal={ch.id}")
+        await interaction.response.defer(ephemeral=True)
+        start_time = datetime.datetime.now()
+        init_view = _build_cleanup_progress_view(0, 1, None, 0, start_time)
+        progress_msg = await interaction.edit_original_response(view=init_view)
+        last_update = {"t": datetime.datetime.now()}
+        async def on_progress(d, phase):
+            now = datetime.datetime.now()
+            if (now - last_update["t"]).total_seconds() < 1.8: return
+            last_update["t"] = now
+            v = _build_cleanup_progress_view(0, 1, ch, d, start_time, phase)
+            try: await progress_msg.edit(view=v)
+            except Exception: pass
+        total, erro = await _purge_channel(ch, interaction.guild, on_progress)
+        elapsed = (datetime.datetime.now() - start_time).total_seconds()
+        m, s = int(elapsed // 60), int(elapsed % 60)
+        summary = (
+            f"### ✅ Resumo\n**Tempo:** `{m:02d}m {s:02d}s`\n"
+            f"**Apagadas:** `{total}`\n**Canal de Voz:** {ch.mention}"
+            + (f"\n**Erro:** `{erro}`" if erro else "")
+        )
+        try: await progress_msg.edit(view=_build_cleanup_final_view(summary))
+        except Exception: pass
+    sel.callback = cb
+    back_btn = _btn("Voltar ao Menu", "back_main", S, E("seta"))
+    layout.add_item(ui.Container(
+        ui.TextDisplay("# 🔊 Limpar Chat de Voz"),
+        ui.Section(
+            ui.TextDisplay(
+                "Escolha um **canal de voz** abaixo. O **chat interno** dessa call será totalmente limpo.\n"
+                "-# ⚠️ Ação irreversível. O bot precisa de `Gerenciar Mensagens` no canal."
+            ),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(sel),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(back_btn),
+        accent_color=color_primary(),
+    ))
+    return layout
+
+async def _purge_channel(channel, guild, on_progress):
+    total = 0
+    erro = None
+    cutoff = discord.utils.utcnow() - datetime.timedelta(days=13)
+    is_text = isinstance(channel, discord.TextChannel)
+    if is_text:
+        try:
+            while True:
+                try:
+                    deleted = await channel.purge(limit=100, after=cutoff, bulk=True)
+                except discord.HTTPException as e:
+                    logger.warning(f"Bulk falhou em {channel.name}: {e}"); break
+                if not deleted: break
+                total += len(deleted)
+                await on_progress(total, "🟢 Bulk delete")
+                await asyncio.sleep(0.9)
+        except Exception as e:
+            logger.error(f"Erro fase 1 {channel.name}: {e}")
+    erros_consec = 0
+    try:
+        history_kwargs = dict(limit=None, oldest_first=False)
+        if is_text: history_kwargs["before"] = cutoff
+        async for msg in channel.history(**history_kwargs):
+            try:
+                await msg.delete(); total += 1; erros_consec = 0
+                fase = "🟡 Delete individual (antigas)" if is_text else "🔊 Chat da call"
+                await on_progress(total, fase)
+                await asyncio.sleep(0.4 if is_text else 1.1)
+            except discord.NotFound: continue
+            except discord.Forbidden as e:
+                erro = f"Forbidden: {e}"; break
+            except discord.HTTPException as e:
+                erros_consec += 1
+                if erros_consec >= 5: erro = f"muitos erros: {e}"; break
+                await asyncio.sleep(2.0)
+    except Exception as e:
+        logger.error(f"Erro fase 2 {channel.name}: {e}"); erro = str(e)
+    return total, erro
+
+async def run_multi_cleanup(interaction: discord.Interaction):
+    user_id = interaction.user.id
+    ids = _cleanup_selection.get(user_id, [])
+    if not ids:
+        await interaction.response.send_message("❌ Nenhum canal selecionado. Use o menu antes.", ephemeral=True); return
+    channels = []
+    for cid in ids:
+        ch = interaction.guild.get_channel(cid)
+        if not ch or not isinstance(ch, (discord.TextChannel, discord.VoiceChannel)): continue
+        perms = ch.permissions_for(interaction.guild.me)
+        if perms.manage_messages and perms.read_message_history: channels.append(ch)
+    if not channels:
+        await interaction.response.send_message(
+            "❌ Nenhum canal válido para limpar (verifique permissões).", ephemeral=True); return
+    await log_admin_action(interaction, "cleanup_start", f"canais={[c.id for c in channels]}")
+    await interaction.response.defer(ephemeral=True)
+    start_time = datetime.datetime.now()
+    total_deleted = 0
+    results = []
+    init_view = _build_cleanup_progress_view(0, len(channels), None, 0, start_time)
+    progress_msg = await interaction.edit_original_response(view=init_view)
+    for idx, ch in enumerate(channels, start=1):
+        last_update = {"t": datetime.datetime.now()}
+        async def on_progress(deleted_so_far, phase):
+            now = datetime.datetime.now()
+            if (now - last_update["t"]).total_seconds() < 1.8: return
+            last_update["t"] = now
+            view = _build_cleanup_progress_view(idx - 1, len(channels), ch, deleted_so_far, start_time, phase)
+            try: await progress_msg.edit(view=view)
+            except Exception: pass
+        ch_deleted, _err = await _purge_channel(ch, interaction.guild, on_progress)
+        total_deleted += ch_deleted
+        results.append((ch, ch_deleted))
+        view = _build_cleanup_progress_view(idx, len(channels), None, 0, start_time)
+        try: await progress_msg.edit(view=view)
+        except Exception: pass
+    elapsed = (datetime.datetime.now() - start_time).total_seconds()
+    m, s = int(elapsed // 60), int(elapsed % 60)
+    lines = [
+        "### ✅ Resumo",
+        f"**Tempo total:** `{m:02d}m {s:02d}s`",
+        f"**Canais limpos:** `{len(results)}`",
+        f"**Total apagado:** `{total_deleted}` mensagens",
+        "", "### 📋 Por canal",
+    ]
+    for ch, cnt in results:
+        tipo = "🔊" if isinstance(ch, discord.VoiceChannel) else "💬"
+        lines.append(f"• {tipo} {ch.mention} — `{cnt}` mensagens")
+    try: await progress_msg.edit(view=_build_cleanup_final_view("\n".join(lines)))
+    except Exception: pass
+    log_id = config.get("moderation_logs_channel_id")
+    if log_id:
+        log_ch = interaction.guild.get_channel(log_id)
+        if log_ch:
+            try:
+                await log_ch.send(
+                    f"🧹 **Limpeza Múltipla** por {interaction.user.mention}\n"
+                    f"**Canais:** {len(results)} | **Total:** `{total_deleted}`\n" +
+                    "\n".join(f"• {ch.mention} — `{cnt}`" for ch, cnt in results))
+            except Exception: pass
+    _cleanup_selection.pop(user_id, None)
+
+def show_config_view():
+    layout = ui.LayoutView(timeout=300)
+    def role_list(key):
+        ids = config.get(key, [])
+        if not ids: return "—"
+        return ", ".join(f"<@&{r}>" for r in ids)
+    def ch(key):
+        cid = config.get(key)
+        return f"<#{cid}>" if cid else "—"
+    method_labels = {"math": "🧮 Matemática", "button": "🔘 Botão"}
+    diff_labels = {1: "Fácil", 2: "Médio", 3: "Difícil"}
+    kick = config.get("verification_kick_minutes", 0)
+    msgs = config.get("activity_messages") or []
+    act_info = (f"**Rotação:** `{'ON' if config.get('activity_rotate_enabled') else 'OFF'}` | "
+                f"**Tipo:** `{config.get('activity_type')}` | "
+                f"**Intervalo:** `{config.get('activity_rotate_seconds')}s` | "
+                f"**Msgs:** `{len(msgs)}`")
+    lines = [
+        "### 🏷️ Marca",
+        f"**Nome:** {bname()} {bemoji()}",
+        f"**Guild ID:** `{config.get('guild_id')}`",
+        f"**Admin Roles:** {role_list('admin_role_ids')}",
+        "", "### ✨ Auto-Emoji",
+        f"**Ativado:** `{'Sim' if config.get('auto_emoji_channels', True) else 'Não'}`",
+        "", "### ➕ /addcargo",
+        f"**Cargos autorizados:** {role_list('addcargo_allowed_role_ids')}",
+        f"**Painel público:** {ch('addcargo_panel_channel_id')}",
+        "", "### 🚫 Anti-Bot",
+        f"**Canal:** {ch('antibot_channel_id')}",
+        f"**Log:** {ch('antibot_log_channel_id')}",
+        f"**Total punidos:** `{get_antibot_count()}`",
+        "", "### ✅ Captcha",
+        f"**Método:** `{method_labels.get(config.get('verification_method','math'),'—')}`",
+        f"**Dificuldade:** `{diff_labels.get(config.get('verification_difficulty',1),'—')}`",
+        f"**Kick auto:** `{'Desativado' if not kick else f'{kick} min'}`",
+        f"**Cargos Verif:** {role_list('verified_role_ids')}",
+        f"**Cargos Não Verif:** {role_list('verification_unverified_role_ids')}",
+        "", "### 🎫 Tickets",
+        f"**Suporte:** {role_list('ticket_support_role_ids')}",
+        f"**Painel:** {ch('ticket_panel_channel_id')}",
+        f"**Logs:** {ch('ticket_logs_channel_id')}",
+        "", "### ⭐ Feedback",
+        f"**Painel:** {ch('feedback_panel_channel_id')}",
+        f"**Canal de logs:** {ch('feedback_channel_id')}",
+        "", "### 💡 Sugestões",
+        f"**Painel:** {ch('suggestions_panel_channel_id')}",
+        f"**Canal:** {ch('suggestions_channel_id')}",
+        "", "### 🎞️ Atividade",
+        act_info,
+    ]
+    layout.add_item(ui.Container(
+        ui.TextDisplay("# 📋 Configuração Atual"),
+        ui.Section(ui.TextDisplay("Tudo que está configurado no bot **agora mesmo**."),
+                   accessory=ui.Thumbnail(media=_thumb())),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.TextDisplay("\n".join(lines)),
+        ui.Separator(spacing=discord.SeparatorSpacing.large),
+        ui.ActionRow(_btn("Voltar ao Menu", "back_main", D, E("seta"))),
+        accent_color=color_primary(),
+    ))
+    return layout
+
+# ===================== VIEWS DE SELEÇÃO =====================
+def multi_role_view(key, title, current_ids):
+    layout = ui.LayoutView(timeout=180)
+    selected = []
+    for rid in current_ids[:25]:
+        try:
+            r = get_guild().get_role(rid)
+            if r: selected.append(r)
+        except Exception: pass
+    role_select = ui.RoleSelect(
+        placeholder="Selecione cargos (múltiplos)",
+        min_values=0, max_values=25,
+        default_values=selected if selected else None,
+    )
+    async def on_role_select(interaction: discord.Interaction):
+        ids = [int(r.id) for r in role_select.values]
+        config[key] = ids; save_config(config)
+        await log_admin_action(interaction, f"set_roles:{key}", f"roles={ids}")
+        try: await refresh_all_panels()
+        except Exception: pass
+        if ids:
+            await interaction.response.send_message(
+                f"✅ **{title}:** {len(ids)} cargo(s).\n" + "\n".join(f"• <@&{i}>" for i in ids),
+                ephemeral=True)
+        else:
+            await interaction.response.send_message(f"✅ **{title}:** nenhum cargo definido.", ephemeral=True)
+    role_select.callback = on_role_select
+    layout.add_item(ui.Container(
+        ui.TextDisplay(f"# 👑 {title}"),
+        ui.Section(ui.TextDisplay("Selecione **um ou mais cargos**. Depois de escolher, feche esta mensagem."),
+                   accessory=ui.Thumbnail(media=_thumb())),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(role_select),
+        accent_color=color_primary(),
+    ))
+    return layout
+
+def single_channel_view(key, title, admin_only=False):
+    layout = ui.LayoutView(timeout=180)
+    opts = text_channel_options()
+    sel = _safe_select(placeholder=title, options=opts, min_values=1, max_values=1)
+    async def cb(interaction):
+        val = sel.values[0]
+        if val == "none":
+            await interaction.response.send_message("❌ Nenhum canal.", ephemeral=True); return
+        config[key] = int(val); save_config(config)
+        ch = interaction.guild.get_channel(int(val))
+        await log_admin_action(interaction, f"set_channel:{key}", f"canal={val}")
+        msg = f"✅ **{title}:** <#{val}>"
+        if admin_only and ch:
+            await make_channel_admin_only(ch)
+            msg += "\n🔒 Canal restrito a **admins**."
+        await interaction.response.send_message(msg, ephemeral=True)
+    sel.callback = cb
+    layout.add_item(ui.Container(
+        ui.TextDisplay(f"# 📌 {title}"),
+        ui.Section(ui.TextDisplay("Escolha o canal desejado no menu abaixo."),
+                   accessory=ui.Thumbnail(media=_thumb())),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(sel),
+        accent_color=color_primary(),
+    ))
+    return layout
+
+def single_voice_view(key, title):
+    layout = ui.LayoutView(timeout=180)
+    opts = voice_channel_options()
+    sel = _safe_select(placeholder=title, options=opts, min_values=1, max_values=1)
+    async def cb(interaction):
+        val = sel.values[0]
+        if val == "none":
+            await interaction.response.send_message("❌ Nenhum canal.", ephemeral=True); return
+        config[key] = int(val); save_config(config)
+        guild = interaction.guild
+        channel = guild.get_channel(int(val))
+        await log_admin_action(interaction, f"set_voice:{key}", f"canal={val}")
+        if channel and isinstance(channel, discord.VoiceChannel):
+            try:
+                if not guild.voice_client: await channel.connect()
+                else: await guild.voice_client.move_to(channel)
+                await update_voice_name_impl()
+                await update_voice_mute()
+                if FFMPEG_AVAILABLE:
+                    try: await _play_silence(guild.voice_client)
+                    except Exception: pass
+            except Exception: pass
+        await interaction.response.send_message(f"✅ **{title}:** {channel.name if channel else val}", ephemeral=True)
+    sel.callback = cb
+    layout.add_item(ui.Container(
+        ui.TextDisplay(f"# 🔊 {title}"),
+        ui.Section(ui.TextDisplay("Escolha o canal de voz desejado no menu abaixo."),
+                   accessory=ui.Thumbnail(media=_thumb())),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(sel),
+        accent_color=color_primary(),
+    ))
+    return layout
+
+def single_category_view(key, title):
+    layout = ui.LayoutView(timeout=180)
+    opts = category_options()
+    sel = _safe_select(placeholder=title, options=opts, min_values=1, max_values=1)
+    async def cb(interaction):
+        val = sel.values[0]
+        if val == "none":
+            await interaction.response.send_message("❌ Nenhuma categoria.", ephemeral=True); return
+        config[key] = int(val); save_config(config)
+        await log_admin_action(interaction, f"set_category:{key}", f"cat={val}")
+        await interaction.response.send_message(f"✅ **{title}** definida.", ephemeral=True)
+    sel.callback = cb
+    layout.add_item(ui.Container(
+        ui.TextDisplay(f"# 📂 {title}"),
+        ui.Section(ui.TextDisplay("Escolha a categoria no menu abaixo."),
+                   accessory=ui.Thumbnail(media=_thumb())),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(sel),
+        accent_color=color_primary(),
+    ))
+    return layout
+
+def status_view():
+    layout = ui.LayoutView(timeout=180)
+    sel = _safe_select(
+        placeholder="Escolha o status de presença",
+        options=[
+            discord.SelectOption(label="Online",        value="online",    emoji="🟢"),
+            discord.SelectOption(label="Ausente",       value="idle",      emoji="🟡"),
+            discord.SelectOption(label="Não perturbar", value="dnd",       emoji="🔴"),
+            discord.SelectOption(label="Invisível",     value="invisible", emoji="⚫"),
+        ], min_values=1, max_values=1,
+    )
+    async def cb(interaction):
+        config["bot_status"] = sel.values[0]; save_config(config)
+        await update_status(force=True)
+        await log_admin_action(interaction, "set_status", f"status={sel.values[0]}")
+        await interaction.response.send_message(f"✅ Status: **{sel.values[0]}**", ephemeral=True)
+    sel.callback = cb
+    layout.add_item(ui.Container(
+        ui.TextDisplay("# 🎭 Status do Bot"),
+        ui.Section(ui.TextDisplay("Escolha como o bot aparecerá na lista de membros."),
+                   accessory=ui.Thumbnail(media=_thumb())),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(sel),
+        accent_color=color_primary(),
+    ))
+    return layout
+
+def activity_type_view():
+    layout = ui.LayoutView(timeout=180)
+    sel = _safe_select(
+        placeholder="Escolha o tipo da atividade rotativa",
+        options=[
+            discord.SelectOption(label="Assistindo", value="watching",  emoji="👁️"),
+            discord.SelectOption(label="Jogando",    value="playing",   emoji="🎮"),
+            discord.SelectOption(label="Ouvindo",    value="listening", emoji="🎧"),
+            discord.SelectOption(label="Competindo", value="competing", emoji="🏆"),
+        ], min_values=1, max_values=1,
+    )
+    async def cb(interaction):
+        config["activity_type"] = sel.values[0]; save_config(config)
+        await update_status(force=True)
+        await log_admin_action(interaction, "set_activity_type", f"tipo={sel.values[0]}")
+        await interaction.response.send_message(f"✅ Tipo: **{sel.values[0]}**", ephemeral=True)
+    sel.callback = cb
+    layout.add_item(ui.Container(
+        ui.TextDisplay("# 🎯 Tipo da Atividade"),
+        ui.Section(ui.TextDisplay("Escolha o tipo que aparece na atividade rotativa."),
+                   accessory=ui.Thumbnail(media=_thumb())),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(sel),
+        accent_color=color_primary(),
+    ))
+    return layout
+
+def verification_method_view():
+    layout = ui.LayoutView(timeout=180)
+    sel = _safe_select(
+        placeholder="Escolha o método de verificação",
+        options=[
+            discord.SelectOption(label="🧮 Matemática", value="math", description="Resolver conta para verificar"),
+            discord.SelectOption(label="🔘 Botão",      value="button", description="Apenas clicar em verificar"),
+        ], min_values=1, max_values=1,
+    )
+    async def cb(interaction):
+        config["verification_method"] = sel.values[0]; save_config(config)
+        await log_admin_action(interaction, "set_verif_method", f"metodo={sel.values[0]}")
+        await interaction.response.send_message(f"✅ Método: **{sel.values[0]}**", ephemeral=True)
+    sel.callback = cb
+    layout.add_item(ui.Container(
+        ui.TextDisplay("# 🔀 Método de Verificação"),
+        ui.Section(ui.TextDisplay("Escolha como os usuários irão se verificar."),
+                   accessory=ui.Thumbnail(media=_thumb())),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(sel),
+        accent_color=color_secondary(),
+    ))
+    return layout
+
+def verification_diff_view():
+    layout = ui.LayoutView(timeout=180)
+    sel = _safe_select(
+        placeholder="Escolha a dificuldade da matemática",
+        options=[
+            discord.SelectOption(label="Fácil",   value="1", description="Números de 1 a 10"),
+            discord.SelectOption(label="Médio",   value="2", description="Números de 10 a 50 + multiplicação"),
+            discord.SelectOption(label="Difícil", value="3", description="Números de 100 a 500"),
+        ], min_values=1, max_values=1,
+    )
+    async def cb(interaction):
+        config["verification_difficulty"] = int(sel.values[0]); save_config(config)
+        await log_admin_action(interaction, "set_verif_diff", f"diff={sel.values[0]}")
+        await interaction.response.send_message("✅ Dificuldade atualizada!", ephemeral=True)
+    sel.callback = cb
+    layout.add_item(ui.Container(
+        ui.TextDisplay("# 🎚️ Dificuldade"),
+        ui.Section(ui.TextDisplay("Escolha a dificuldade do desafio de matemática."),
+                   accessory=ui.Thumbnail(media=_thumb())),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(sel),
+        accent_color=color_secondary(),
+    ))
+    return layout
+
+# ===================== PAINÉIS PÚBLICOS =====================
+def verification_panel_layout():
+    comps = [
+        ui.TextDisplay(f"# {E('verificado')} Verificação — {bname()}"),
+        ui.Section(
+            ui.TextDisplay(
+                "### 🔐 Sistema de Verificação\n"
+                f"Olá! Para ter acesso completo ao **{bname()}**, você precisa se verificar.\n\n"
+                "**Como funciona:**\n"
+                "> • Clique no botão **✅ Verificar Agora**\n"
+                "> • Um **canal temporário** será criado para você\n"
+                "> • Resolva o desafio e receba os cargos\n"
+                "> • O canal se apaga automaticamente 🖤"
+            ),
+            accessory=ui.Thumbnail(media=_thumb()),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+    ]
+    banner = banner_welcome() or banner_painel()
+    if banner:
+        mg = _safe_media_gallery(banner)
+        if mg is not None: comps.append(mg)
+    comps.append(ui.ActionRow(_btn("Verificar Agora", "verify_now", SU, E("verificado"))))
+    comps.append(ui.TextDisplay(f"-# {bfooter()}"))
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(*comps, accent_color=color_secondary()))
+    return layout
+
+def ticket_panel_layout():
+    raw_title = config.get("ticket_panel_title") or "🎫 Central de Tickets — {brand}"
+    raw_desc  = config.get("ticket_panel_description") or ""
+    raw_ph    = config.get("ticket_panel_select_placeholder") or "🎫 Selecione o tipo de ticket..."
+    d_label = config.get("ticket_doubt_label") or "Dúvidas"
+    d_desc  = config.get("ticket_doubt_desc") or ""
+    d_emoji = config.get("ticket_doubt_emoji") or "❓"
+    p_label = config.get("ticket_purchase_label") or "Compras"
+    p_desc  = config.get("ticket_purchase_desc") or ""
+    p_emoji = config.get("ticket_purchase_emoji") or "🛒"
+    title = _fmt_text(raw_title); desc = _fmt_text(raw_desc); ph = _fmt_text(raw_ph)
+    if not title.startswith("#"): title = f"# {title}"
+    comps = [
+        ui.TextDisplay(title),
+        ui.Section(ui.TextDisplay(desc or "-# Configure uma descrição no painel admin."),
+                   accessory=ui.Thumbnail(media=_thumb())),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+    ]
+    banner = banner_ticket()
+    if banner:
+        mg = _safe_media_gallery(banner)
+        if mg is not None: comps.append(mg)
+    ticket_sel = _safe_select(
+        placeholder=ph,
+        options=[
+            discord.SelectOption(label=d_label[:100], value="doubt", emoji=d_emoji,
+                                 description=d_desc[:100] or None),
+            discord.SelectOption(label=p_label[:100], value="purchase", emoji=p_emoji,
+                                 description=p_desc[:100] or None),
+        ], custom_id="ticket_panel_select", min_values=1, max_values=1,
+    )
+    async def on_ticket_select(interaction: discord.Interaction):
+        val = ticket_sel.values[0]
+        await log_admin_action(interaction, "ticket_open", f"tipo={val}")
+        if val == "doubt": await handle_ticket_open(interaction, "doubt", d_label)
+        elif val == "purchase": await handle_ticket_open(interaction, "purchase", p_label)
+    ticket_sel.callback = on_ticket_select
+    comps.append(ui.ActionRow(ticket_sel))
+    comps.append(ui.TextDisplay(f"-# {bfooter()}"))
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(*comps, accent_color=color_primary()))
+    return layout
+
+def ticket_actions_layout():
+    comps = [
+        ui.TextDisplay("### 🔧 Ações do Ticket"),
+        ui.TextDisplay("-# Use os botões abaixo para gerenciar este atendimento."),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(
+            _btn("Avaliar",     "rate_ticket",      P, E("insta")),
+            _btn("Fechar",      "close_ticket",     D, E("seta")),
+            _btn("Adicionar",   "add_member",       S, E("tdj_1")),
+            _btn("Editar Nome", "edit_ticket_name", P, E("tdj_2")),
+        ),
+    ]
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(*comps, accent_color=color_primary()))
+    return layout
+
+# ===================== HANDLER GLOBAL =====================
+@bot.event
+async def on_interaction(interaction: discord.Interaction):
+    if interaction.type != discord.InteractionType.component:
+        return
+    cid = interaction.data.get("custom_id", "")
+    if not cid: return
+    if cid in ("pxk_main_menu", "cleanup_multi_select", "cleanup_start",
+               "antibot_counter_display", "ticket_panel_select"):
+        return
+    try:
+        # ===== IDENTIDADE =====
+        if cid == "id_name":
+            await interaction.response.send_modal(BrandNameModal())
+        elif cid == "id_emoji":
+            await interaction.response.send_modal(BrandEmojiModal())
+        elif cid == "id_footer":
+            await interaction.response.send_modal(BrandFooterModal())
+        elif cid == "id_c1":
+            await interaction.response.send_modal(ColorModal("brand_color_primary", "Cor Primária"))
+        elif cid == "id_c2":
+            await interaction.response.send_modal(ColorModal("brand_color_secondary", "Cor Secundária"))
+        elif cid == "id_c3":
+            await interaction.response.send_modal(ColorModal("brand_color_success", "Cor de Sucesso"))
+        elif cid == "id_c4":
+            await interaction.response.send_modal(ColorModal("brand_color_danger", "Cor de Perigo"))
+        elif cid == "id_avatar":
+            await interaction.response.send_modal(URLModal("avatar_url", "URL do Avatar"))
+        elif cid == "id_bp":
+            await interaction.response.send_modal(URLModal("banner_painel_url", "URL do Banner do Painel"))
+        elif cid == "id_bt":
+            await interaction.response.send_modal(URLModal("banner_ticket_url", "URL do Banner de Tickets", refresh="ticket"))
+        elif cid == "id_bw":
+            await interaction.response.send_modal(URLModal("banner_welcome_url", "URL do Banner de Boas-vindas"))
+        elif cid == "id_apply":
+            await interaction.response.defer(ephemeral=True)
+            ok = await apply_avatar_if_needed(force=True)
+            await log_admin_action(interaction, "apply_avatar", f"ok={ok}")
+            await interaction.followup.send("✅ Avatar aplicado!" if ok else "❌ Falha ao aplicar avatar.", ephemeral=True)
+        elif cid == "id_preview":
+            await interaction.response.send_message(view=painel_layout(), ephemeral=True)
+
+        # ===== AUTO-EMOJI =====
+        elif cid == "ae_toggle":
+            config["auto_emoji_channels"] = not config.get("auto_emoji_channels", True)
+            save_config(config)
+            await log_admin_action(interaction, "toggle_autoemoji", f"valor={config['auto_emoji_channels']}")
+            await interaction.response.send_message(
+                f"✅ Auto-Emoji **{'ativado' if config['auto_emoji_channels'] else 'desativado'}**.",
+                ephemeral=True)
+        elif cid == "ae_sync":
+            await interaction.response.defer(ephemeral=True)
+            total = await sync_all_channels_emoji(interaction.guild)
+            await log_admin_action(interaction, "sync_autoemoji", f"alterados={total}")
+            await interaction.followup.send(
+                f"✨ **{total}** canal(is) atualizado(s) com emoji automático!",
+                ephemeral=True)
+        elif cid == "ae_rules":
+            lines = []
+            for keywords, emoji in CHANNEL_EMOJI_RULES.items():
+                lines.append(f"{emoji} → `{', '.join(keywords)}`")
+            text = "\n".join(lines) or "_Nenhuma regra._"
+            await interaction.response.send_message(
+                f"### ✨ Regras de Auto-Emoji\n{text}",
+                ephemeral=True)
+
+        # ===== ANTIBOT =====
+        elif cid == "ab_ch":
+            await interaction.response.send_message(view=single_channel_view("antibot_channel_id", "Canal Anti-Bot"), ephemeral=True)
+        elif cid == "ab_log":
+            await interaction.response.send_message(view=single_channel_view("antibot_log_channel_id", "Canal de Log AntiBot", admin_only=True), ephemeral=True)
+        elif cid == "ab_banner":
+            await interaction.response.send_modal(URLModal("antibot_banner_url", "URL do Banner AntiBot", refresh="antibot"))
+        elif cid == "ab_title":
+            await interaction.response.send_modal(AntibotTitleModal())
+        elif cid == "ab_desc":
+            await interaction.response.send_modal(AntibotDescModal())
+        elif cid == "ab_toggle_ban":
+            config["antibot_punish_ban"] = not config.get("antibot_punish_ban", True)
+            save_config(config)
+            await log_admin_action(interaction, "antibot_toggle_ban", f"valor={config['antibot_punish_ban']}")
+            await interaction.response.send_message(
+                f"✅ Banimento **{'ativado' if config['antibot_punish_ban'] else 'desativado'}**.",
+                ephemeral=True)
+        elif cid == "ab_toggle_del":
+            config["antibot_delete_messages"] = not config.get("antibot_delete_messages", True)
+            save_config(config)
+            await log_admin_action(interaction, "antibot_toggle_del", f"valor={config['antibot_delete_messages']}")
+            await interaction.response.send_message(
+                f"✅ Apagar mensagens **{'ativado' if config['antibot_delete_messages'] else 'desativado'}**.",
+                ephemeral=True)
+        elif cid == "ab_post":
+            await post_antibot_panel(interaction)
+        elif cid == "ab_preview":
+            await interaction.response.send_message(view=antibot_panel_view(), ephemeral=True)
+
+        # ===== CAPTCHA =====
+        elif cid == "cap_roles":
+            await interaction.response.send_message(view=multi_role_view("verified_role_ids", "Cargos Entregues (verificados)", config.get("verified_role_ids", [])), ephemeral=True)
+        elif cid == "cap_unver":
+            await interaction.response.send_message(view=multi_role_view("verification_unverified_role_ids", "Cargos Não Verificado", config.get("verification_unverified_role_ids", [])), ephemeral=True)
+        elif cid == "cap_method":
+            await interaction.response.send_message(view=verification_method_view(), ephemeral=True)
+        elif cid == "cap_diff":
+            await interaction.response.send_message(view=verification_diff_view(), ephemeral=True)
+        elif cid == "cap_kick":
+            await interaction.response.send_modal(KickTimeModal())
+        elif cid == "cap_ch":
+            await interaction.response.send_message(view=single_channel_view("verification_channel_id", "Canal de Verificação"), ephemeral=True)
+        elif cid == "cap_pch":
+            await interaction.response.send_message(view=single_channel_view("verification_panel_channel_id", "Canal do Painel"), ephemeral=True)
+        elif cid == "cap_log":
+            await interaction.response.send_message(view=single_channel_view("verification_log_channel_id", "Canal de Log", admin_only=True), ephemeral=True)
+        elif cid == "cap_tmpcat":
+            await interaction.response.send_message(view=single_category_view("verification_temp_category_id", "Categoria do Canal Temporário"), ephemeral=True)
+
+        # ===== WELCOME =====
+        elif cid == "wel_ch":
+            await interaction.response.send_message(view=single_channel_view("welcome_channel_id", "Canal de Boas-vindas"), ephemeral=True)
+        elif cid == "wel_msg":
+            await interaction.response.send_modal(WelcomeDefaultMessageModal())
+        elif cid == "wel_img":
+            await interaction.response.send_modal(URLModal("welcome_image_url", "URL da Imagem de Boas-vindas"))
+        elif cid == "wel_test":
+            await interaction.response.defer(ephemeral=True)
+            await send_welcome_message(interaction.user)
+            await log_admin_action(interaction, "test_welcome", "")
+            await interaction.followup.send("✅ Teste de boas-vindas enviado!", ephemeral=True)
+        elif cid == "lev_ch":
+            await interaction.response.send_message(view=single_channel_view("leave_channel_id", "Canal de Saída"), ephemeral=True)
+        elif cid == "lev_msg":
+            await interaction.response.send_modal(LeaveMessageModal())
+        elif cid == "lev_test":
+            await interaction.response.defer(ephemeral=True)
+            await send_leave_message(interaction.user)
+            await log_admin_action(interaction, "test_leave", "")
+            await interaction.followup.send("✅ Teste de saída enviado!", ephemeral=True)
+
+        # ===== VOICE LOGS =====
+        elif cid == "vl_join_ch":
+            await interaction.response.send_message(view=single_channel_view("voice_join_log_channel_id", "Canal de Log — Entrou", admin_only=True), ephemeral=True)
+        elif cid == "vl_leave_ch":
+            await interaction.response.send_message(view=single_channel_view("voice_leave_log_channel_id", "Canal de Log — Saiu", admin_only=True), ephemeral=True)
+        elif cid == "vl_join_test":
+            await interaction.response.defer(ephemeral=True)
+            vc = interaction.guild.voice_client
+            fake_channel = vc.channel if vc and vc.channel else (interaction.guild.voice_channels[0] if interaction.guild.voice_channels else None)
+            if fake_channel:
+                await send_voice_log(interaction.user, fake_channel, "join")
+                await log_admin_action(interaction, "test_voice_join", f"canal={fake_channel.id}")
+                await interaction.followup.send("✅ Teste de log de entrada enviado!", ephemeral=True)
+            else:
+                await interaction.followup.send("❌ Nenhum canal de voz disponível.", ephemeral=True)
+        elif cid == "vl_leave_test":
+            await interaction.response.defer(ephemeral=True)
+            vc = interaction.guild.voice_client
+            fake_channel = vc.channel if vc and vc.channel else (interaction.guild.voice_channels[0] if interaction.guild.voice_channels else None)
+            if fake_channel:
+                await send_voice_log(interaction.user, fake_channel, "leave")
+                await log_admin_action(interaction, "test_voice_leave", f"canal={fake_channel.id}")
+                await interaction.followup.send("✅ Teste de log de saída enviado!", ephemeral=True)
+            else:
+                await interaction.followup.send("❌ Nenhum canal de voz disponível.", ephemeral=True)
+
+        # ===== VOZ / STATUS =====
+        elif cid == "v_mute":
+            config["voice_mute"] = not config.get("voice_mute", True)
+            save_config(config); await update_voice_mute()
+            await log_admin_action(interaction, "toggle_voice_mute", f"valor={config['voice_mute']}")
+            await interaction.response.send_message(f"✅ Mute {'ativado' if config['voice_mute'] else 'desativado'}.", ephemeral=True)
+        elif cid == "v_status":
+            await interaction.response.send_message(view=status_view(), ephemeral=True)
+        elif cid == "v_ch":
+            await interaction.response.send_message(view=single_voice_view("voice_channel_id", "Canal de Voz 24h"), ephemeral=True)
+
+        # ===== ATIVIDADE =====
+        elif cid == "act_toggle":
+            config["activity_rotate_enabled"] = not config.get("activity_rotate_enabled", False)
+            save_config(config); await update_status(force=True)
+            await log_admin_action(interaction, "toggle_activity_rotate", f"valor={config['activity_rotate_enabled']}")
+            await interaction.response.send_message(
+                f"✅ Rotação **{'ativada' if config['activity_rotate_enabled'] else 'desativada'}**.",
+                ephemeral=True)
+        elif cid == "act_msgs":
+            await interaction.response.send_modal(ActivityMessagesModal())
+        elif cid == "act_type":
+            await interaction.response.send_message(view=activity_type_view(), ephemeral=True)
+        elif cid == "act_interval":
+            await interaction.response.send_modal(ActivityIntervalModal())
+        elif cid == "act_preview":
+            msgs = config.get("activity_messages") or []
+            tipo = config.get("activity_type", "watching")
+            intervalo = config.get("activity_rotate_seconds", 30)
+            rot = config.get("activity_rotate_enabled", False)
+            body = "\n".join(f"• {_fmt_text(m)}" for m in msgs) or "_Nenhuma mensagem cadastrada._"
+            await interaction.response.send_message(
+                f"### 🎞️ Atividade Rotativa\n"
+                f"**Rotação:** `{'ON' if rot else 'OFF'}` | **Tipo:** `{tipo}` | **Intervalo:** `{intervalo}s`\n\n"
+                f"{body}\n\n**Atual:** `{_current_activity_text()}`",
+                ephemeral=True)
+
+        # ===== ADMIN ROLES =====
+        elif cid == "adm_roles":
+            await interaction.response.send_message(view=multi_role_view("admin_role_ids", "Cargos de Admin", config.get("admin_role_ids", [])), ephemeral=True)
+
+        # ===== ADDCARGO =====
+        elif cid == "acfg_roles":
+            await interaction.response.send_message(view=multi_role_view(
+                "addcargo_allowed_role_ids", "Cargos Autorizados a usar /addcargo",
+                config.get("addcargo_allowed_role_ids", [])), ephemeral=True)
+        elif cid == "acfg_ch":
+            await interaction.response.send_message(view=single_channel_view(
+                "addcargo_panel_channel_id", "Canal do Painel /addcargo"), ephemeral=True)
+        elif cid == "acfg_post":
+            await post_addcargo_panel(interaction)
+        elif cid == "acfg_preview":
+            await interaction.response.send_message(view=addcargo_public_panel(), ephemeral=True)
+        elif cid == "addcargo_open":
+            if not user_can_use_addcargo(interaction.user):
+                await interaction.response.send_message(
+                    "❌ Você não tem permissão para usar este painel.", ephemeral=True)
+                return
+            await interaction.response.send_message(view=build_addcargo_panel(), ephemeral=True)
+
+        # ===== PAINEL FIXO =====
+        elif cid == "pf_ch":
+            await interaction.response.send_message(view=single_channel_view("painel_channel_id", "Canal do Painel Principal"), ephemeral=True)
+
+        # ===== TICKETS =====
+        elif cid == "tk_cat_d":
+            await interaction.response.send_message(view=single_category_view("ticket_category_doubt_id", "Categoria Dúvidas"), ephemeral=True)
+        elif cid == "tk_cat_p":
+            await interaction.response.send_message(view=single_category_view("ticket_category_purchase_id", "Categoria Compras"), ephemeral=True)
+        elif cid == "tk_sup":
+            await interaction.response.send_message(view=multi_role_view("ticket_support_role_ids", "Cargos de Suporte", config.get("ticket_support_role_ids", [])), ephemeral=True)
+        elif cid == "tk_logs":
+            await interaction.response.send_message(view=single_channel_view("ticket_logs_channel_id", "Logs de Tickets"), ephemeral=True)
+        elif cid == "tk_panel":
+            await interaction.response.send_message(view=single_channel_view("ticket_panel_channel_id", "Canal do Painel de Tickets"), ephemeral=True)
+        elif cid == "tk_mod":
+            await interaction.response.send_message(view=single_channel_view("moderation_logs_channel_id", "Logs de Moderação"), ephemeral=True)
+        elif cid == "tk_customize":
+            await interaction.response.send_message(view=ticket_panel_custom_view(), ephemeral=True)
+        elif cid == "tpc_title":
+            await interaction.response.send_modal(GenericTextModal(
+                "ticket_panel_title", "✏️ Título do Painel de Tickets",
+                "Novo título (use {brand}, {emoji}, {members})",
+                default=config.get("ticket_panel_title") or "",
+                max_length=200, refresh="ticket"))
+        elif cid == "tpc_desc":
+            await interaction.response.send_modal(GenericTextModal(
+                "ticket_panel_description", "📝 Descrição do Painel de Tickets",
+                "Nova descrição (use {brand}, {emoji}, {members})",
+                default=config.get("ticket_panel_description") or "",
+                style=discord.TextStyle.paragraph, max_length=2000, refresh="ticket"))
+        elif cid == "tpc_banner":
+            await interaction.response.send_modal(URLModal("banner_ticket_url", "URL do Banner de Tickets", refresh="ticket"))
+        elif cid == "tpc_ph":
+            await interaction.response.send_modal(GenericTextModal(
+                "ticket_panel_select_placeholder", "✏️ Placeholder do Menu",
+                "Placeholder do select",
+                default=config.get("ticket_panel_select_placeholder") or "",
+                max_length=150, refresh="ticket"))
+        elif cid == "tpc_dlabel":
+            await interaction.response.send_modal(GenericTextModal(
+                "ticket_doubt_label", "✏️ Label — Opção Dúvidas", "Label da opção",
+                default=config.get("ticket_doubt_label") or "", max_length=100, refresh="ticket"))
+        elif cid == "tpc_ddesc":
+            await interaction.response.send_modal(GenericTextModal(
+                "ticket_doubt_desc", "📝 Descrição — Opção Dúvidas", "Descrição da opção",
+                default=config.get("ticket_doubt_desc") or "", max_length=100, refresh="ticket"))
+        elif cid == "tpc_demoji":
+            await interaction.response.send_modal(GenericTextModal(
+                "ticket_doubt_emoji", "✨ Emoji — Opção Dúvidas", "Emoji (1-2 caracteres)",
+                default=config.get("ticket_doubt_emoji") or "", max_length=10, refresh="ticket"))
+        elif cid == "tpc_plabel":
+            await interaction.response.send_modal(GenericTextModal(
+                "ticket_purchase_label", "✏️ Label — Opção Compras", "Label da opção",
+                default=config.get("ticket_purchase_label") or "", max_length=100, refresh="ticket"))
+        elif cid == "tpc_pdesc":
+            await interaction.response.send_modal(GenericTextModal(
+                "ticket_purchase_desc", "📝 Descrição — Opção Compras", "Descrição da opção",
+                default=config.get("ticket_purchase_desc") or "", max_length=100, refresh="ticket"))
+        elif cid == "tpc_pemoji":
+            await interaction.response.send_modal(GenericTextModal(
+                "ticket_purchase_emoji", "✨ Emoji — Opção Compras", "Emoji (1-2 caracteres)",
+                default=config.get("ticket_purchase_emoji") or "", max_length=10, refresh="ticket"))
+        elif cid == "tpc_refresh":
+            await interaction.response.defer(ephemeral=True)
+            ok = await refresh_ticket_panel()
+            await log_admin_action(interaction, "refresh_ticket_panel", f"ok={ok}")
+            await interaction.followup.send(
+                "✅ Painel atualizado!" if ok else "❌ Nenhum painel configurado. Use `/painelticket`.",
+                ephemeral=True)
+        elif cid == "tpc_preview":
+            await interaction.response.send_message(view=ticket_panel_layout(), ephemeral=True)
+        elif cid == "tpc_reset":
+            await interaction.response.send_message(
+                "⚠️ **Restaurar todas as personalizações do painel de tickets?**",
+                view=ConfirmResetTicketPanelView(), ephemeral=True)
+
+        # ===== FEEDBACK PANEL =====
+        elif cid == "fbp_ch":
+            await interaction.response.send_message(view=single_channel_view(
+                "feedback_panel_channel_id", "Canal do Painel de Avaliações"), ephemeral=True)
+        elif cid == "fbp_log":
+            await interaction.response.send_message(view=single_channel_view(
+                "feedback_channel_id", "Canal de Logs de Feedback"), ephemeral=True)
+        elif cid == "fbp_post":
+            await post_feedback_panel(interaction)
+        elif cid == "fbp_prev":
+            await interaction.response.send_message(view=feedback_panel_layout(), ephemeral=True)
+        elif cid == "fbp_title":
+            await interaction.response.send_modal(GenericTextModal(
+                "feedback_panel_title", "✏️ Título do Painel de Feedback",
+                "Novo título (use {brand}, {emoji}, {members})",
+                default=config.get("feedback_panel_title") or "",
+                max_length=200, refresh="feedback"))
+        elif cid == "fbp_desc":
+            await interaction.response.send_modal(GenericTextModal(
+                "feedback_panel_description", "📝 Descrição do Painel de Feedback",
+                "Nova descrição (use {brand}, {emoji}, {members})",
+                default=config.get("feedback_panel_description") or "",
+                style=discord.TextStyle.paragraph, max_length=2000, refresh="feedback"))
+        elif cid == "fbp_refresh":
+            await interaction.response.defer(ephemeral=True)
+            ok = await refresh_feedback_panel()
+            await interaction.followup.send(
+                "✅ Painel atualizado!" if ok else "❌ Nenhum painel configurado. Use `/painelfeedback`.",
+                ephemeral=True)
+
+        # ===== FEEDBACK — botões do painel público =====
+        elif cid == "fb_open_modal":
+            await interaction.response.send_modal(DirectFeedbackModal())
+        elif cid == "fb_help_btn":
+            await interaction.response.send_message(
+                "### ❓ Como funciona o Feedback\n"
+                "> **1.** Escolha uma nota de **1 a 5 estrelas**\n"
+                "> **2.** Adicione um comentário *(opcional)*\n"
+                "> **3.** Envie — sua avaliação chega direto para a equipe\n\n"
+                "-# 💜 Sua opinião ajuda a melhorar o servidor!",
+                ephemeral=True)
+
+        # ===== SUGESTÕES — botões de voto =====
+        elif cid.startswith("sug_up_") or cid.startswith("sug_down_"):
+            await handle_suggestion_vote(interaction, cid)
+        elif cid == "sug_rules_btn":
+            await interaction.response.send_message(
+                "### 📜 Regras de Sugestões\n"
+                "> 1. Seja **claro e objetivo**\n"
+                "> 2. **Não** faça sugestões ofensivas ou spam\n"
+                "> 3. Vote com **consciência** — você pode mudar seu voto\n"
+                "> 4. Sugestões com **muitos votos** são analisadas pela equipe\n"
+                "> 5. A decisão final é sempre da **administração**",
+                ephemeral=True)
+        elif cid == "suggest_btn":
+            await interaction.response.send_modal(SuggestionModal())
+        elif cid == "sg_pch":
+            await interaction.response.send_message(view=single_channel_view("suggestions_panel_channel_id", "Canal do Painel de Sugestões"), ephemeral=True)
+        elif cid == "sg_ch":
+            await interaction.response.send_message(view=single_channel_view("suggestions_channel_id", "Canal de Sugestões"), ephemeral=True)
+        elif cid == "sg_refresh":
+            await interaction.response.defer(ephemeral=True)
+            ok = await _refresh_suggestions_panel()
+            await interaction.followup.send(
+                "✅ Painel atualizado!" if ok else "❌ Nenhum painel configurado. Use `/painelsugestoes`.",
+                ephemeral=True)
+        elif cid == "sg_prev":
+            await interaction.response.send_message(view=suggestion_panel_layout(), ephemeral=True)
+
+        # ===== VOLTAR =====
+        elif cid == "back_main":
+            await interaction.response.edit_message(view=painel_layout())
+
+        # ===== LIMPEZA =====
+        elif cid == "cleanup_voice_open":
+            await interaction.response.send_message(view=voice_cleanup_view(), ephemeral=True)
+
+        # ===== OUTROS =====
+        elif cid == "verify_now":
+            await handle_captcha_start(interaction)
+        elif cid == "captcha_solve":
+            await interaction.response.send_modal(CaptchaModal.from_button(interaction))
+        elif cid == "captcha_button_verify":
+            await handle_button_verify(interaction)
+        elif cid == "rate_ticket":
+            await interaction.response.send_modal(TicketRatingModal(interaction.channel.name))
+        elif cid == "close_ticket":
+            await interaction.response.send_message("⚠️ Fechar este ticket?", view=ConfirmCloseView(interaction.channel.id), ephemeral=True)
+        elif cid == "add_member":
+            await interaction.response.send_message(view=AddMemberView(), ephemeral=True)
+        elif cid == "edit_ticket_name":
+            await interaction.response.send_modal(TicketNameModal(interaction.channel.name))
+
+    except discord.errors.NotFound:
+        pass
+    except discord.errors.InteractionResponded:
+        pass
+    except Exception as e:
+        logger.error(f"Erro interaction {cid}: {e}", exc_info=True)
+
+async def _refresh_suggestions_panel():
+    cid = config.get("suggestions_panel_channel_id")
+    mid = config.get("suggestions_panel_message_id")
+    if not cid or not mid: return False
+    guild = get_guild()
+    if not guild: return False
+    ch = guild.get_channel(cid)
+    if not ch: return False
+    try:
+        msg = await ch.fetch_message(mid)
+        await msg.edit(view=suggestion_panel_layout())
+        return True
+    except Exception as e:
+        logger.debug(f"refresh suggestions: {e}")
+        return False
+
+# ===================== POSTS =====================
+async def post_antibot_panel(interaction: discord.Interaction):
+    cid = config.get("antibot_channel_id")
+    if not cid:
+        await interaction.response.send_message("❌ Defina o **Canal Anti-Bot** primeiro.", ephemeral=True); return
+    ch = interaction.guild.get_channel(cid)
+    if not ch:
+        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
+    try:
+        msg = await ch.send(view=antibot_panel_view())
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Erro: `{e}`", ephemeral=True); return
+    config["antibot_panel_message_id"] = msg.id; save_config(config)
+    await log_admin_action(interaction, "post_antibot_panel", f"canal={ch.id}")
+    await interaction.response.send_message(f"✅ Painel AntiBot enviado em {ch.mention}!", ephemeral=True)
+
+async def post_addcargo_panel(interaction: discord.Interaction):
+    cid = config.get("addcargo_panel_channel_id")
+    if not cid:
+        await interaction.response.send_message("❌ Defina o **Canal do Painel /addcargo** primeiro.", ephemeral=True); return
+    ch = interaction.guild.get_channel(cid)
+    if not ch:
+        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
+    try:
+        msg = await ch.send(view=addcargo_public_panel())
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Erro: `{e}`", ephemeral=True); return
+    config["addcargo_panel_message_id"] = msg.id; save_config(config)
+    await log_admin_action(interaction, "post_addcargo_panel", f"canal={ch.id}")
+    await interaction.response.send_message(f"✅ Painel /addcargo enviado em {ch.mention}!", ephemeral=True)
+
+async def post_feedback_panel(interaction: discord.Interaction):
+    cid = config.get("feedback_panel_channel_id")
+    if not cid:
+        await interaction.response.send_message(
+            "❌ Defina o **Canal do Painel** primeiro.", ephemeral=True); return
+    ch = interaction.guild.get_channel(cid)
+    if not ch:
+        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
+    try:
+        msg = await ch.send(view=feedback_panel_layout())
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Erro: `{e}`", ephemeral=True); return
+    config["feedback_panel_message_id"] = msg.id; save_config(config)
+    await log_admin_action(interaction, "post_feedback_panel", f"canal={ch.id}")
+    await interaction.response.send_message(f"✅ Painel enviado em {ch.mention}!", ephemeral=True)
+
+# ===================== MODAIS =====================
+class BrandNameModal(ui.Modal, title="✏️ Nome da Marca"):
+    v = ui.TextInput(label="Nome da marca", required=True, max_length=50)
+    async def on_submit(self, interaction):
+        config["brand_name"] = self.v.value.strip(); save_config(config)
+        await update_status(force=True); await refresh_all_panels()
+        await log_admin_action(interaction, "set_brand_name", f"nome={config['brand_name']}")
+        await interaction.response.send_message(f"✅ Marca: **{config['brand_name']}**", ephemeral=True)
+
+class BrandEmojiModal(ui.Modal, title="✨ Emoji da Marca"):
+    v = ui.TextInput(label="Emoji", required=True, max_length=10)
+    async def on_submit(self, interaction):
+        config["brand_emoji"] = self.v.value.strip(); save_config(config)
+        await update_status(force=True); await refresh_all_panels()
+        await log_admin_action(interaction, "set_brand_emoji", f"emoji={config['brand_emoji']}")
+        await interaction.response.send_message(f"✅ Emoji: {config['brand_emoji']}", ephemeral=True)
+
+class BrandFooterModal(ui.Modal, title="📝 Rodapé Padrão"):
+    v = ui.TextInput(label="Texto do rodapé", required=True, max_length=120)
+    async def on_submit(self, interaction):
+        config["brand_footer"] = self.v.value.strip(); save_config(config)
+        await refresh_all_panels()
+        await log_admin_action(interaction, "set_brand_footer", f"texto={config['brand_footer']}")
+        await interaction.response.send_message("✅ Rodapé atualizado!", ephemeral=True)
+
+class ColorModal(ui.Modal):
+    def __init__(self, key, label):
+        super().__init__(title=f"🎨 {label}")
+        self.key = key
+        self.v = ui.TextInput(label="HEX (ex: 3D1A5C)", required=True, min_length=6, max_length=7)
+        self.add_item(self.v)
+    async def on_submit(self, interaction):
+        raw = self.v.value.strip().replace("#", "")
+        try: val = int(raw, 16)
+        except ValueError:
+            await interaction.response.send_message("❌ HEX inválido.", ephemeral=True); return
+        config[self.key] = val; save_config(config)
+        await refresh_all_panels()
+        await log_admin_action(interaction, f"set_color:{self.key}", f"hex={raw.upper()}")
+        await interaction.response.send_message(f"✅ Cor: `#{raw.upper()}`", ephemeral=True)
+
+class URLModal(ui.Modal):
+    def __init__(self, key, label, refresh=None):
+        super().__init__(title=f"🖼️ {label}")
+        self.key = key
+        self.refresh = refresh
+        self.v = ui.TextInput(label="URL (ou 'limpar')", required=True)
+        self.add_item(self.v)
+    async def on_submit(self, interaction):
+        val = self.v.value.strip()
+        if val.lower() in ("limpar", "clear", "none", "remover"):
+            config[self.key] = ""; save_config(config)
+            await self._do_refresh()
+            await log_admin_action(interaction, f"clear_url:{self.key}", "")
+            await interaction.response.send_message("✅ URL removida.", ephemeral=True); return
+        if not (val.startswith("http://") or val.startswith("https://")):
+            await interaction.response.send_message("❌ URL inválida.", ephemeral=True); return
+        config[self.key] = val; save_config(config)
+        await self._do_refresh()
+        await log_admin_action(interaction, f"set_url:{self.key}", f"url={val[:80]}")
+        await interaction.response.send_message("✅ URL salva!", ephemeral=True)
+    async def _do_refresh(self):
+        try: await refresh_antibot_panel()
+        except Exception: pass
+        try: await refresh_ticket_panel()
+        except Exception: pass
+        try: await refresh_feedback_panel()
+        except Exception: pass
+        try: await refresh_all_panels()
+        except Exception: pass
+
+class GenericTextModal(ui.Modal):
+    def __init__(self, key, title, label, default="", style=discord.TextStyle.short,
+                 max_length=200, refresh=None):
+        super().__init__(title=title[:45])
+        self.key = key
+        self.refresh = refresh
+        self.input = ui.TextInput(
+            label=label[:45], default=(default or "")[:max_length],
+            style=style, required=True, max_length=max_length,
+        )
+        self.add_item(self.input)
+    async def on_submit(self, interaction):
+        config[self.key] = self.input.value.strip(); save_config(config)
+        if self.refresh == "antibot":
+            try: await refresh_antibot_panel()
+            except Exception: pass
+        elif self.refresh == "ticket":
+            try: await refresh_ticket_panel()
+            except Exception: pass
+        elif self.refresh == "feedback":
+            try: await refresh_feedback_panel()
+            except Exception: pass
+        await log_admin_action(interaction, f"set_text:{self.key}", f"valor={config[self.key][:80]}")
+        await interaction.response.send_message("✅ Atualizado!", ephemeral=True)
+
+class AntibotTitleModal(ui.Modal, title="✏️ Título do Painel AntiBot"):
+    v = ui.TextInput(label="Título", default="• Não envie mensagem nesse canal!",
+                     required=True, max_length=200)
+    async def on_submit(self, interaction):
+        config["antibot_title"] = self.v.value.strip(); save_config(config)
+        await refresh_antibot_panel()
+        await log_admin_action(interaction, "set_antibot_title", f"titulo={config['antibot_title'][:80]}")
+        await interaction.response.send_message("✅ Título atualizado!", ephemeral=True)
+
+class AntibotDescModal(ui.Modal, title="📝 Descrição do Painel AntiBot"):
+    v = ui.TextInput(
+        label="Descrição", style=discord.TextStyle.paragraph,
+        default=("Sistema criado para prevenir bots de divulgação e outros SelfBots.\n"
+                 "Quem enviar mensagem aqui será punido imediatamente."),
+        required=True, max_length=500)
+    async def on_submit(self, interaction):
+        config["antibot_description"] = self.v.value; save_config(config)
+        await refresh_antibot_panel()
+        await log_admin_action(interaction, "set_antibot_desc", "descricao atualizada")
+        await interaction.response.send_message("✅ Descrição atualizada!", ephemeral=True)
+
+class WelcomeDefaultMessageModal(ui.Modal, title="Mensagem de Boas-vindas"):
+    msg = ui.TextInput(label="Nova mensagem", style=discord.TextStyle.paragraph, required=True)
+    async def on_submit(self, interaction):
+        config["welcome_message"] = self.msg.value; save_config(config)
+        await log_admin_action(interaction, "set_welcome_message", self.msg.value[:100])
+        await interaction.response.send_message("✅ Mensagem de entrada atualizada!", ephemeral=True)
+
+class LeaveMessageModal(ui.Modal, title="Mensagem de Saída"):
+    msg = ui.TextInput(label="Nova mensagem", style=discord.TextStyle.paragraph, required=True)
+    async def on_submit(self, interaction):
+        config["leave_message"] = self.msg.value; save_config(config)
+        await log_admin_action(interaction, "set_leave_message", self.msg.value[:100])
+        await interaction.response.send_message("✅ Mensagem de saída atualizada!", ephemeral=True)
+
+class KickTimeModal(ui.Modal, title="⏰ Tempo para Verificar"):
+    def __init__(self):
+        super().__init__()
+        cur = config.get("verification_kick_minutes", 0)
+        self.v = ui.TextInput(label="Minutos (0 = desativar)", default=str(cur),
+                              required=True, min_length=1, max_length=4)
+        self.add_item(self.v)
+    async def on_submit(self, interaction):
+        try:
+            val = int(self.v.value.strip())
+            if val < 0: raise ValueError
+        except ValueError:
+            await interaction.response.send_message("❌ Número inválido.", ephemeral=True); return
+        config["verification_kick_minutes"] = val; save_config(config)
+        await log_admin_action(interaction, "set_verif_kick", f"min={val}")
+        msg = "✅ Kick automático desativado." if val == 0 else f"✅ Kick em **{val} min**."
+        await interaction.response.send_message(msg, ephemeral=True)
+
+class ActivityMessagesModal(ui.Modal, title="💬 Mensagens da Atividade"):
+    def __init__(self):
+        super().__init__()
+        cur = "\n".join(config.get("activity_messages") or [])
+        self.v = ui.TextInput(
+            label="Uma mensagem por linha",
+            style=discord.TextStyle.paragraph,
+            default=cur,
+            placeholder="🖤 {members} membros em {brand}\n🎮 Jogando com a galera\n💜 Venha nos visitar!",
+            required=False, max_length=2000,
+        )
+        self.add_item(self.v)
+    async def on_submit(self, interaction):
+        raw = (self.v.value or "").replace("\r\n", "\n")
+        msgs = [line.strip() for line in raw.split("\n") if line.strip()]
+        config["activity_messages"] = msgs; save_config(config)
+        await update_status(force=True)
+        await log_admin_action(interaction, "set_activity_messages", f"total={len(msgs)}")
+        await interaction.response.send_message(f"✅ {len(msgs)} mensagem(ns) salva(s).", ephemeral=True)
+
+class ActivityIntervalModal(ui.Modal, title="⏱️ Intervalo de Rotação"):
+    def __init__(self):
+        super().__init__()
+        cur = config.get("activity_rotate_seconds", 30)
+        self.v = ui.TextInput(label="Segundos (mín. 10)", default=str(cur),
+                              required=True, min_length=2, max_length=5)
+        self.add_item(self.v)
+    async def on_submit(self, interaction):
+        try: val = max(10, int(self.v.value.strip()))
+        except ValueError:
+            await interaction.response.send_message("❌ Número inválido.", ephemeral=True); return
+        config["activity_rotate_seconds"] = val; save_config(config)
+        await log_admin_action(interaction, "set_activity_interval", f"seg={val}")
+        await interaction.response.send_message(f"✅ Intervalo: **{val}s**", ephemeral=True)
+
+class SuggestionModal(ui.Modal, title="💡 Enviar Sugestão"):
+    sugestao = ui.TextInput(
+        label="Sua sugestão",
+        style=discord.TextStyle.paragraph,
+        placeholder="Descreva sua ideia de forma clara e objetiva...",
+        required=True, max_length=1500,
+    )
+    async def on_submit(self, interaction: discord.Interaction):
+        cid = config.get("suggestions_channel_id")
+        if not cid:
+            await interaction.response.send_message(
+                "❌ Canal de sugestões não configurado.", ephemeral=True); return
+        channel = interaction.guild.get_channel(cid)
+        if not channel:
+            await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
+
+        placeholder_view = ui.LayoutView(timeout=None)
+        placeholder_view.add_item(ui.Container(
+            ui.TextDisplay("# 💡 Nova Sugestão"),
+            ui.TextDisplay("-# Carregando..."),
+            accent_color=color_primary(),
+        ))
+        msg = await channel.send(view=placeholder_view)
+
+        try:
+            sid = add_suggestion(msg.id, channel.id, interaction.user.id, self.sugestao.value)
+        except Exception as e:
+            logger.error(f"Erro add_suggestion: {e}")
+            await msg.delete()
+            await interaction.response.send_message("❌ Erro ao registrar sugestão.", ephemeral=True); return
+
+        card = suggestion_card_layout(
+            sid=sid, author=interaction.user, content=self.sugestao.value,
+            up=0, down=0, status="open",
+        )
+        try:
+            await msg.edit(view=card)
+        except Exception as e:
+            logger.error(f"Erro edit sugestão: {e}")
+
+        await interaction.response.send_message(
+            f"✅ Sugestão enviada! {msg.jump_url}", ephemeral=True)
+        await log_admin_action(interaction, "suggestion_create", f"id={sid} canal={channel.id}")
+
+class DirectFeedbackModal(ui.Modal, title="⭐ Enviar Feedback"):
+    def __init__(self):
+        super().__init__()
+        self.rating = ui.Select(placeholder="Escolha sua nota", options=[
+            discord.SelectOption(
+                label=f"{i} - {['Péssimo','Ruim','Regular','Bom','Excelente'][i-1]}",
+                value=str(i), emoji="⭐",
+            )
+            for i in range(1, 6)
+        ])
+        self.add_item(self.rating)
+        self.comment = ui.TextInput(
+            label="Comentário (opcional)",
+            style=discord.TextStyle.paragraph,
+            placeholder="Conte-nos sua experiência...",
+            required=False, max_length=1000,
+        )
+        self.add_item(self.comment)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not self.rating.values:
+            await interaction.response.send_message("❌ Selecione uma nota.", ephemeral=True); return
+        rating = int(self.rating.values[0])
+        comment = (self.comment.value or "").strip() or "Sem comentário"
+
+        try: add_general_feedback(interaction.user.id, rating, comment)
+        except Exception: pass
+
+        cid = config.get("feedback_channel_id")
+        if cid:
+            ch = interaction.guild.get_channel(cid)
+            if ch:
+                try:
+                    stars = "⭐" * rating
+                    e = discord.Embed(
+                        title=f"⭐ Nova Avaliação — {bname()}",
+                        color=color_primary(),
+                        timestamp=datetime.datetime.now(),
+                    )
+                    e.set_author(name=interaction.user.display_name,
+                                 icon_url=interaction.user.display_avatar.url)
+                    e.add_field(name="👤 Usuário", value=interaction.user.mention, inline=True)
+                    e.add_field(name="📊 Nota", value=f"{stars} ({rating}/5)", inline=True)
+                    e.add_field(name="💬 Comentário", value=comment[:1024], inline=False)
+                    e.set_footer(text=bfooter())
+                    await ch.send(embed=e)
+                except Exception as e:
+                    logger.error(f"Erro enviando feedback: {e}")
+
+        await interaction.response.send_message(
+            "✅ **Obrigado pela sua avaliação!** 💜", ephemeral=True)
+        await log_admin_action(interaction, "direct_feedback", f"nota={rating}")
+
+class TicketRatingModal(ui.Modal, title="⭐ Avaliar Atendimento"):
+    def __init__(self, ticket_name):
+        super().__init__()
+        self.ticket_name = ticket_name
+        self.rating = ui.Select(placeholder="Nota", options=[
+            discord.SelectOption(label=f"{i} - {['Péssimo','Ruim','Regular','Bom','Excelente'][i-1]}",
+                                 value=str(i), emoji="⭐")
+            for i in range(1, 6)
+        ])
+        self.add_item(self.rating)
+        self.comment = ui.TextInput(label="Comentário (opcional)",
+                                    style=discord.TextStyle.paragraph, required=False)
+        self.add_item(self.comment)
+    async def on_submit(self, interaction):
+        rating = int(self.rating.values[0])
+        comment = self.comment.value or "Sem comentário"
+        try: add_ticket_feedback(interaction.channel.id, interaction.user.id, rating, comment)
+        except Exception: pass
+        fb_id = config.get("feedback_channel_id")
+        if fb_id:
+            ch = interaction.guild.get_channel(fb_id)
+            if ch:
+                e = discord.Embed(
+                    title=f"⭐ Nova Avaliação — {bname()}",
+                    description=f"**Usuário:** {interaction.user.mention}\n**Ticket:** {self.ticket_name}\n**Nota:** {'⭐'*rating} ({rating}/5)\n**Comentário:** {comment}",
+                    color=color_primary(), timestamp=datetime.datetime.now())
+                try: await ch.send(embed=e)
+                except Exception: pass
+        await interaction.response.send_message("✅ Obrigado!", ephemeral=True)
+
+class TicketNameModal(ui.Modal, title="✏️ Editar Nome do Ticket"):
+    def __init__(self, current_name: str):
+        super().__init__()
+        pretty = current_name
+        if pretty.startswith("ticket-"): pretty = pretty[7:]
+        self.v = ui.TextInput(
+            label="Novo nome do canal", default=pretty[:100],
+            placeholder="ex: compra-vip-joao", required=True,
+            min_length=1, max_length=100, style=discord.TextStyle.short)
+        self.add_item(self.v)
+    async def on_submit(self, interaction: discord.Interaction):
+        new_name = sanitize_channel_name(self.v.value.strip())
+        if not new_name:
+            await interaction.response.send_message("❌ Nome inválido.", ephemeral=True); return
+        try:
+            old_name = interaction.channel.name
+            await interaction.channel.edit(
+                name=new_name,
+                reason=f"Renomeado por {interaction.user} ({interaction.user.id})")
+            await log_admin_action(interaction, "ticket_rename", f"de={old_name} para={new_name}")
+            await interaction.response.send_message(
+                f"✅ Ticket renomeado!\n**Antes:** `{old_name}`\n**Agora:** `{new_name}`",
+                ephemeral=True)
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                "❌ Não tenho permissão para renomear este canal (`Gerenciar Canais`).",
+                ephemeral=True)
+        except discord.HTTPException as e:
+            await interaction.response.send_message(f"❌ Erro: `{e}`", ephemeral=True)
+
+# ===================== VIEWS SIMPLES =====================
+class ConfirmCloseView(ui.View):
+    def __init__(self, channel_id):
+        super().__init__(timeout=60)
+        self.channel_id = channel_id
+    @ui.button(label="✅ Sim, fechar", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction, button):
+        ch = interaction.guild.get_channel(self.channel_id)
+        if ch:
+            log_id = config.get("ticket_logs_channel_id")
+            if log_id:
+                log_ch = interaction.guild.get_channel(log_id)
+                if log_ch:
+                    try: await log_ch.send(f"🔒 Ticket `{ch.name}` fechado por {interaction.user.mention}.")
+                    except Exception: pass
+            try: remove_open_ticket(ch.id)
+            except Exception: pass
+            try: await ch.delete()
+            except Exception: pass
+        await interaction.response.send_message("✅ Ticket fechado.", ephemeral=True)
+
+class ConfirmResetTicketPanelView(ui.View):
+    def __init__(self):
+        super().__init__(timeout=60)
+    @ui.button(label="✅ Sim, restaurar", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction, button):
+        keys = [
+            "ticket_panel_title", "ticket_panel_description",
+            "ticket_panel_select_placeholder",
+            "ticket_doubt_label", "ticket_doubt_desc", "ticket_doubt_emoji",
+            "ticket_purchase_label", "ticket_purchase_desc", "ticket_purchase_emoji",
+        ]
+        for k in keys: config[k] = DEFAULT_CONFIG[k]
+        save_config(config)
+        try: await refresh_ticket_panel()
+        except Exception: pass
+        await log_admin_action(interaction, "reset_ticket_panel", "")
+        await interaction.response.send_message("✅ Padrões restaurados!", ephemeral=True)
+
+class AddMemberView(ui.View):
+    def __init__(self):
+        super().__init__(timeout=60)
+        guild = get_guild()
+        opts = []
+        if guild:
+            for m in guild.members:
+                if not m.bot:
+                    opts.append(discord.SelectOption(label=m.display_name[:100], value=str(m.id)))
+        if not opts: opts = [discord.SelectOption(label="Nenhum", value="none")]
+        sel = ui.Select(placeholder="Escolha um membro", options=opts[:25])
+        sel.callback = self.on_select
+        self.add_item(sel)
+    async def on_select(self, interaction):
+        val = interaction.data["values"][0]
+        if val == "none":
+            await interaction.response.send_message("❌ Nenhum.", ephemeral=True); return
+        member = interaction.guild.get_member(int(val))
+        if member:
+            try:
+                await interaction.channel.set_permissions(
+                    member, view_channel=True, send_messages=True, read_message_history=True)
+                await log_admin_action(interaction, "ticket_add_member", f"membro={member.id}")
+                await interaction.response.send_message(f"✅ {member.mention} adicionado.", ephemeral=True)
+            except Exception as e:
+                await interaction.response.send_message(f"❌ Erro: {e}", ephemeral=True)
+
+# ===================== TICKETS =====================
+async def handle_ticket_open(interaction, tipo, nome):
+    try: count = count_user_tickets_last_hours(interaction.user.id, 8)
+    except Exception: count = 0
+    if count >= 3:
+        await interaction.response.send_message("❌ Limite de 3 tickets em 8h.", ephemeral=True); return
+    guild = interaction.guild
+    cid = config.get(f"ticket_category_{tipo}_id")
+    if not cid:
+        await interaction.response.send_message("❌ Categoria não configurada.", ephemeral=True); return
+    category = guild.get_channel(cid)
+    if not category or not isinstance(category, discord.CategoryChannel):
+        await interaction.response.send_message("❌ Categoria inválida.", ephemeral=True); return
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True,
+                                                       read_message_history=True, attach_files=True),
+    }
+    mentions = []
+    for rid in config.get("ticket_support_role_ids", []):
+        role = guild.get_role(rid)
+        if role:
+            overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True,
+                                                           read_message_history=True)
+            mentions.append(role.mention)
+    nome_canal = f"ticket-{tipo}-{interaction.user.name[:20]}".lower().replace(" ", "-")
+    try:
+        channel = await guild.create_text_channel(name=nome_canal, category=category,
+                                                   overwrites=overwrites,
+                                                   reason=f"Ticket {nome} por {interaction.user}")
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Erro: {e}", ephemeral=True); return
+    try: add_open_ticket(interaction.user.id, channel.id)
+    except Exception: pass
+    welcome_comps = [
+        ui.TextDisplay(f"# {bemoji()} Ticket de {nome} — {bname()}"),
+        ui.Section(
+            ui.TextDisplay(
+                f"**Olá {interaction.user.mention}!** Bem-vindo(a) ao atendimento. 💜\n\n"
+                "Descreva seu pedido abaixo e nossa equipe responderá em breve.\n"
+                "-# Ações disponíveis no painel fixado abaixo."
+            ),
+            accessory=ui.Thumbnail(media=interaction.user.display_avatar.url),
+        ),
+    ]
+    banner = banner_ticket()
+    if banner:
+        mg = _safe_media_gallery(banner)
+        if mg is not None: welcome_comps.append(mg)
+    welcome_layout = ui.LayoutView(timeout=None)
+    welcome_layout.add_item(ui.Container(*welcome_comps, accent_color=color_primary()))
+    await channel.send(view=welcome_layout)
+    if mentions:
+        await channel.send(view=ui.LayoutView(
+            ui.Container(ui.TextDisplay(f"📢 {', '.join(mentions)} — novo ticket de {interaction.user.mention}."))))
+    await channel.send(view=ticket_actions_layout())
+    await interaction.response.send_message(f"✅ Ticket criado em {channel.mention}!", ephemeral=True)
+
+# ===================== CAPTCHA =====================
+_pending_kicks = {}
+_math_answers = {}
+_button_verification_target = {}
+_temp_verification_channels = {}
+
+def schedule_verification_kick(guild, member):
+    minutes = config.get("verification_kick_minutes", 0)
+    if minutes <= 0: return
+    key = (guild.id, member.id)
+    if key in _pending_kicks:
+        _pending_kicks[key].cancel()
+    async def _kick_later():
+        try:
+            await asyncio.sleep(minutes * 60)
+            m = guild.get_member(member.id)
+            if not m: return
+            unver_ids = config.get("verification_unverified_role_ids", [])
+            if any(r.id in unver_ids for r in m.roles):
+                try:
+                    await guild.kick(m, reason="Não completou a verificação a tempo")
+                    await _delete_temp_channel(guild, member.id)
+                except Exception as e: logger.error(f"Falha ao kickar {m}: {e}")
+        except asyncio.CancelledError:
+            pass
+        finally:
+            _pending_kicks.pop(key, None)
+    _pending_kicks[key] = asyncio.create_task(_kick_later())
+
+def cancel_verification_kick(guild_id, user_id):
+    key = (guild_id, user_id)
+    task = _pending_kicks.pop(key, None)
+    if task: task.cancel()
+
+def _generate_math_challenge():
+    diff = config.get("verification_difficulty", 1)
+    if diff == 1:
+        a, b = random.randint(1, 10), random.randint(1, 10)
+        return f"{a} + {b}", a + b
+    elif diff == 2:
+        if random.random() < 0.5:
+            a, b = random.randint(10, 50), random.randint(10, 50)
+            return f"{a} + {b}", a + b
+        a, b = random.randint(2, 12), random.randint(2, 12)
+        return f"{a} × {b}", a * b
+    else:
+        if random.random() < 0.5:
+            a, b = random.randint(100, 500), random.randint(100, 500)
+            return f"{a} + {b}", a + b
+        a, b = random.randint(2, 15), random.randint(2, 15)
+        return f"{a} × {b}", a * b
+
+async def _create_temp_verification_channel(guild, member):
+    cat_id = config.get("verification_temp_category_id")
+    category = guild.get_channel(cat_id) if cat_id else None
+    if category and not isinstance(category, discord.CategoryChannel):
+        category = None
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        member: discord.PermissionOverwrite(view_channel=True, send_messages=True,
+                                             read_message_history=True),
+        guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True,
+                                               manage_channels=True, manage_messages=True),
+    }
+    try:
+        ch = await guild.create_text_channel(
+            name=f"verificar-{member.name}"[:100],
+            category=category,
+            overwrites=overwrites,
+            reason=f"Canal temporário de verificação para {member}",
+        )
+        _temp_verification_channels[member.id] = ch.id
+        return ch
+    except Exception as e:
+        logger.error(f"Erro criando canal temporário: {e}")
+        return None
+
+async def _delete_temp_channel(guild, user_id, delay=None):
+    cid = _temp_verification_channels.pop(user_id, None)
+    if not cid: return
+    if delay: await asyncio.sleep(delay)
+    ch = guild.get_channel(cid)
+    if ch:
+        try: await ch.delete(reason="Verificação concluída — canal temporário")
+        except Exception as e: logger.debug(f"Erro apagando temp: {e}")
+
+async def _log_verification(guild, member, success, extra=""):
+    cid = config.get("verification_log_channel_id")
+    if not cid: return
+    ch = guild.get_channel(cid)
+    if not ch: return
+    icon = "✅" if success else "❌"
+    try:
+        await ch.send(f"{icon} **{member}** (`{member.id}`) — {extra or ('verificado' if success else 'falhou')}")
+    except Exception: pass
+
+async def send_captcha_challenge(member, channel):
+    method = config.get("verification_method", "math")
+    if method == "button":
+        comps = [
+            ui.TextDisplay(f"# ✅ Verificação — {bname()}"),
+            ui.Section(
+                ui.TextDisplay(f"Olá {member.mention}! Clique no botão abaixo para se verificar."),
+                accessory=ui.Thumbnail(media=member.display_avatar.url),
+            ),
+            ui.Separator(spacing=discord.SeparatorSpacing.small),
+            ui.ActionRow(_btn("Verificar Agora", "captcha_button_verify", SU, E("verificado"))),
+        ]
+        layout = ui.LayoutView(timeout=None)
+        layout.add_item(ui.Container(*comps, accent_color=color_primary()))
+        _button_verification_target[member.id] = True
+        try: await channel.send(view=layout)
+        except Exception as e: logger.error(f"Erro enviando verif botão: {e}")
+        return
+    question, answer = _generate_math_challenge()
+    _math_answers[member.id] = answer
+    comps = [
+        ui.TextDisplay(f"# 🧮 Verificação — {bname()}"),
+        ui.Section(
+            ui.TextDisplay(
+                f"Olá {member.mention}!\n\n"
+                f"Resolva o desafio abaixo clicando em **🔐 Resolver**:\n\n"
+                f"# `{question}`"
+            ),
+            accessory=ui.Thumbnail(media=member.display_avatar.url),
+        ),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(_btn("Resolver", "captcha_solve", SU, E("tdj_1"))),
+    ]
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(*comps, accent_color=color_primary()))
+    try: await channel.send(view=layout)
+    except Exception as e: logger.error(f"Erro enviando verif math: {e}")
+
+async def _grant_verification(guild, member):
+    for rid in config.get("verified_role_ids", []):
+        r = guild.get_role(rid)
+        if r and r not in member.roles:
+            try: await member.add_roles(r)
+            except Exception: pass
+    for rid in config.get("verification_unverified_role_ids", []):
+        r = guild.get_role(rid)
+        if r and r in member.roles:
+            try: await member.remove_roles(r)
+            except Exception: pass
+    cancel_verification_kick(guild.id, member.id)
+    _math_answers.pop(member.id, None)
+    _button_verification_target.pop(member.id, None)
+    await _log_verification(guild, member, True, "verificado")
+    delay = max(1, int(config.get("verification_temp_delete_seconds", 5)))
+    asyncio.create_task(_delete_temp_channel(guild, member.id, delay=delay))
+
+async def handle_captcha_start(interaction):
+    member = interaction.user
+    guild = interaction.guild
+    existing_cid = _temp_verification_channels.get(member.id)
+    existing = guild.get_channel(existing_cid) if existing_cid else None
+    if not existing:
+        existing = await _create_temp_verification_channel(guild, member)
+    if not existing:
+        await interaction.response.send_message(
+            "❌ Não consegui criar o canal temporário. Contate a administração.",
+            ephemeral=True)
+        return
+    await send_captcha_challenge(member, existing)
+    await interaction.response.send_message(
+        f"✅ Canal temporário criado: {existing.mention}\n"
+        f"-# Ele será apagado automaticamente após a verificação.",
+        ephemeral=True)
+
+async def handle_button_verify(interaction):
+    member = interaction.user
+    await _grant_verification(interaction.guild, member)
+    await interaction.response.send_message("✅ **Verificado!** Bem-vindo(a)! 🖤", ephemeral=True)
+    delay = max(1, int(config.get("verification_temp_delete_seconds", 5)))
+    asyncio.create_task(_delete_temp_channel(interaction.guild, member.id, delay=delay))
+
+class CaptchaModal(ui.Modal, title="🧮 Verificação"):
+    def __init__(self, guild_id, user_id):
+        super().__init__()
+        self.guild_id = guild_id
+        self.user_id = user_id
+        self.resposta = ui.TextInput(label="Resposta", required=True, max_length=10)
+        self.add_item(self.resposta)
+    @classmethod
+    def from_button(cls, interaction):
+        return cls(guild_id=interaction.guild.id, user_id=interaction.user.id)
+    async def on_submit(self, interaction):
+        guild = bot.get_guild(self.guild_id)
+        if not guild:
+            await interaction.response.send_message("❌ Servidor não encontrado.", ephemeral=True); return
+        member = guild.get_member(self.user_id) or interaction.user
+        expected = _math_answers.get(self.user_id)
+        if expected is None:
+            await _grant_verification(guild, member)
+            await interaction.response.send_message("✅ Verificado!", ephemeral=True); return
+        try: val = int(self.resposta.value.strip())
+        except ValueError:
+            await interaction.response.send_message("❌ Digite apenas números.", ephemeral=True); return
+        if val == expected:
+            await _grant_verification(guild, member)
+            await interaction.response.send_message("✅ **Verificado com sucesso!** 🖤", ephemeral=True)
+        else:
+            await _log_verification(guild, member, False, "errou o desafio")
+            await interaction.response.send_message("❌ Resposta incorreta. Tente novamente.", ephemeral=True)
+            cid = _temp_verification_channels.get(member.id)
+            ch = guild.get_channel(cid) if cid else None
+            if ch: await send_captcha_challenge(member, ch)
+
+# ===================== COMANDOS =====================
+@bot.tree.command(name="painelpxkadmin", description="🖤 Painel administrativo do servidor")
+@app_commands.default_permissions(administrator=True)
+async def cmd_painel(interaction: discord.Interaction):
+    cid = config.get("painel_channel_id")
+    if cid:
+        channel = interaction.guild.get_channel(cid)
+        if channel and config.get("painel_message_id"):
+            try:
+                msg = await channel.fetch_message(config["painel_message_id"])
+                await msg.edit(view=painel_layout())
+                await interaction.response.send_message(f"✅ Painel atualizado em {channel.mention}", ephemeral=True)
+                return
+            except Exception: pass
+    layout = painel_layout()
+    msg = await interaction.channel.send(view=layout)
+    config["painel_channel_id"] = interaction.channel.id
+    config["painel_message_id"] = msg.id
+    save_config(config)
+    await interaction.response.send_message(f"✅ Painel do **{bname()}** enviado!", ephemeral=True)
+
+@bot.tree.command(name="painelantibot", description="🚫 Envia o painel Anti-Bot no canal configurado")
+@app_commands.default_permissions(administrator=True)
+async def cmd_antibot(interaction: discord.Interaction):
+    cid = config.get("antibot_channel_id")
+    if not cid:
+        await interaction.response.send_message(
+            "❌ Configure o **Canal Anti-Bot** no painel admin.", ephemeral=True); return
+    ch = interaction.guild.get_channel(cid)
+    if not ch:
+        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
+    try:
+        msg = await ch.send(view=antibot_panel_view())
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Erro: `{e}`", ephemeral=True); return
+    config["antibot_panel_message_id"] = msg.id; save_config(config)
+    await interaction.response.send_message(f"✅ Painel AntiBot enviado em {ch.mention}!", ephemeral=True)
+
+@bot.tree.command(name="painelticket", description="🎫 Envia o painel de tickets (V2 com select)")
+@app_commands.default_permissions(administrator=True)
+async def cmd_pt(interaction):
+    cid = config.get("ticket_panel_channel_id")
+    if not cid:
+        await interaction.response.send_message("❌ Configure em Tickets > Canal do Painel.", ephemeral=True); return
+    ch = interaction.guild.get_channel(cid)
+    if not ch:
+        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
+    msg = await ch.send(view=ticket_panel_layout())
+    config["ticket_panel_message_id"] = msg.id; save_config(config)
+    await interaction.response.send_message(f"✅ Painel de tickets enviado em {ch.mention}!", ephemeral=True)
+
+@bot.tree.command(name="painelsugestoes", description="💡 Envia o painel de sugestões (V2 com botões)")
+@app_commands.default_permissions(administrator=True)
+async def cmd_ps(interaction):
+    cid = config.get("suggestions_panel_channel_id")
+    if not cid:
+        await interaction.response.send_message("❌ Configure em Sugestões > Canal do Painel.", ephemeral=True); return
+    ch = interaction.guild.get_channel(cid)
+    if not ch:
+        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
+    msg = await ch.send(view=suggestion_panel_layout())
+    config["suggestions_panel_message_id"] = msg.id; save_config(config)
+    await interaction.response.send_message(f"✅ Painel de sugestões enviado em {ch.mention}!", ephemeral=True)
+
+@bot.tree.command(name="painelfeedback", description="⭐ Envia o painel público de avaliações")
+@app_commands.default_permissions(administrator=True)
+async def cmd_painel_feedback(interaction: discord.Interaction):
+    cid = config.get("feedback_panel_channel_id")
+    if not cid:
+        await interaction.response.send_message(
+            "❌ Configure em **⭐ Painel de Avaliações > Canal do Painel**.", ephemeral=True); return
+    ch = interaction.guild.get_channel(cid)
+    if not ch:
+        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
+    try:
+        msg = await ch.send(view=feedback_panel_layout())
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Erro: `{e}`", ephemeral=True); return
+    config["feedback_panel_message_id"] = msg.id; save_config(config)
+    await interaction.response.send_message(f"✅ Painel de feedback enviado em {ch.mention}!", ephemeral=True)
+
+@bot.tree.command(name="painelverificacao", description="✅ Envia o painel de verificação (V2)")
+@app_commands.default_permissions(administrator=True)
+async def cmd_pv(interaction):
+    cid = config.get("verification_panel_channel_id")
+    if not cid:
+        await interaction.response.send_message("❌ Configure em Verificação > Canal do Painel.", ephemeral=True); return
+    ch = interaction.guild.get_channel(cid)
+    if not ch:
+        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
+    msg = await ch.send(view=verification_panel_layout())
+    config["verification_panel_message_id"] = msg.id; save_config(config)
+    await interaction.response.send_message(f"✅ Painel de verificação enviado em {ch.mention}!", ephemeral=True)
+
+@bot.tree.command(name="paineladdcargo", description="➕ Envia o painel público do /addcargo")
+@app_commands.default_permissions(administrator=True)
+async def cmd_painel_addcargo(interaction: discord.Interaction):
+    cid = config.get("addcargo_panel_channel_id")
+    if not cid:
+        await interaction.response.send_message(
+            "❌ Configure em **➕ Cargos Autorizados (/addcargo) > Canal**.", ephemeral=True); return
+    ch = interaction.guild.get_channel(cid)
+    if not ch:
+        await interaction.response.send_message("❌ Canal inválido.", ephemeral=True); return
+    try:
+        msg = await ch.send(view=addcargo_public_panel())
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Erro: `{e}`", ephemeral=True); return
+    config["addcargo_panel_message_id"] = msg.id; save_config(config)
+    await interaction.response.send_message(f"✅ Painel enviado em {ch.mention}!", ephemeral=True)
+
+@bot.tree.command(name="addcargo", description="➕ Adiciona cargo(s) a um usuário (sem args abre o painel)")
+@app_commands.describe(cargo="Cargo a adicionar (opcional)", usuario="Usuário que vai receber (opcional)")
+async def cmd_addcargo(interaction: discord.Interaction,
+                       cargo: discord.Role = None,
+                       usuario: discord.Member = None):
+    if not user_can_use_addcargo(interaction.user):
+        await interaction.response.send_message(
+            "❌ Você não tem permissão para usar este comando.", ephemeral=True)
+        return
+    if cargo is None and usuario is None:
+        await interaction.response.send_message(view=build_addcargo_panel(), ephemeral=True)
+        return
+    if cargo is None or usuario is None:
+        await interaction.response.send_message(
+            "❌ Informe **cargo e usuário** juntos, ou use `/addcargo` sem argumentos para abrir o painel.",
+            ephemeral=True)
+        return
+    me = interaction.guild.me
+    if not me.guild_permissions.manage_roles:
+        await interaction.response.send_message("❌ Não tenho permissão `Gerenciar Cargos`.", ephemeral=True); return
+    if cargo.is_default():
+        await interaction.response.send_message("❌ Não posso adicionar o cargo @everyone.", ephemeral=True); return
+    if cargo >= me.top_role:
+        await interaction.response.send_message(
+            "❌ Esse cargo é **igual ou superior** ao meu cargo mais alto.", ephemeral=True); return
+    if cargo in usuario.roles:
+        await interaction.response.send_message(f"ℹ️ {usuario.mention} já possui {cargo.mention}.", ephemeral=True); return
+    try:
+        await usuario.add_roles(cargo, reason=f"Adicionado por {interaction.user} ({interaction.user.id})")
+    except discord.Forbidden:
+        await interaction.response.send_message("❌ Sem permissão para adicionar esse cargo.", ephemeral=True); return
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Erro: `{e}`", ephemeral=True); return
+    try: log_moderation("add_role", interaction.user.id, usuario.id, f"{cargo.name} ({cargo.id})")
+    except Exception: pass
+    await log_admin_action(interaction, "addcargo_direct",
+                           f"target={usuario.id} cargo={cargo.name}")
+    await interaction.response.send_message(
+        f"✅ Cargo {cargo.mention} adicionado a {usuario.mention}.", ephemeral=True)
+
+@bot.tree.command(name="sincronizaremojis", description="✨ Adiciona emojis automáticos em todos os canais")
+@app_commands.default_permissions(administrator=True)
+async def cmd_sync_emoji(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    total = await sync_all_channels_emoji(interaction.guild)
+    await log_admin_action(interaction, "sync_autoemoji_cmd", f"alterados={total}")
+    await interaction.followup.send(
+        f"✨ **{total}** canal(is) atualizado(s) com emoji automático!", ephemeral=True)
+
+@bot.tree.command(name="limparchat", description="🧹 Apaga TODAS as mensagens de um canal de texto")
+@app_commands.default_permissions(administrator=True)
+@app_commands.describe(canal="Canal que será totalmente limpo")
+async def cmd_limpar(interaction: discord.Interaction, canal: discord.TextChannel):
+    perms = canal.permissions_for(interaction.guild.me)
+    if not perms.manage_messages or not perms.read_message_history:
+        await interaction.response.send_message(f"❌ Sem permissão em {canal.mention}.", ephemeral=True); return
+    await interaction.response.defer(ephemeral=True)
+    start_time = datetime.datetime.now()
+    init_view = _build_cleanup_progress_view(0, 1, None, 0, start_time)
+    progress_msg = await interaction.edit_original_response(view=init_view)
+    last_update = {"t": datetime.datetime.now()}
+    async def on_progress(d, phase):
+        now = datetime.datetime.now()
+        if (now - last_update["t"]).total_seconds() < 1.8: return
+        last_update["t"] = now
+        v = _build_cleanup_progress_view(0, 1, canal, d, start_time, phase)
+        try: await progress_msg.edit(view=v)
+        except Exception: pass
+    total, erro = await _purge_channel(canal, interaction.guild, on_progress)
+    elapsed = (datetime.datetime.now() - start_time).total_seconds()
+    m, s = int(elapsed // 60), int(elapsed % 60)
+    summary = (
+        f"### ✅ Resumo\n**Tempo:** `{m:02d}m {s:02d}s`\n"
+        f"**Apagadas:** `{total}`\n**Canal:** {canal.mention}"
+        + (f"\n**Erro:** `{erro}`" if erro else "")
+    )
+    await progress_msg.edit(view=_build_cleanup_final_view(summary))
+    await log_admin_action(interaction, "limparchat", f"canal={canal.id} apagadas={total}")
+
+@bot.tree.command(name="limparchatvoz", description="🔊 Limpa o chat interno de um canal de voz")
+@app_commands.default_permissions(administrator=True)
+@app_commands.describe(canal="Canal de voz cujo chat será limpo")
+async def cmd_limparvoz(interaction: discord.Interaction, canal: discord.VoiceChannel):
+    perms = canal.permissions_for(interaction.guild.me)
+    if not perms.manage_messages or not perms.read_message_history:
+        await interaction.response.send_message(f"❌ Sem permissão em {canal.mention}.", ephemeral=True); return
+    await interaction.response.defer(ephemeral=True)
+    start_time = datetime.datetime.now()
+    init_view = _build_cleanup_progress_view(0, 1, None, 0, start_time)
+    progress_msg = await interaction.edit_original_response(view=init_view)
+    last_update = {"t": datetime.datetime.now()}
+    async def on_progress(d, phase):
+        now = datetime.datetime.now()
+        if (now - last_update["t"]).total_seconds() < 1.8: return
+        last_update["t"] = now
+        v = _build_cleanup_progress_view(0, 1, canal, d, start_time, phase)
+        try: await progress_msg.edit(view=v)
+        except Exception: pass
+    total, erro = await _purge_channel(canal, interaction.guild, on_progress)
+    elapsed = (datetime.datetime.now() - start_time).total_seconds()
+    m, s = int(elapsed // 60), int(elapsed % 60)
+    summary = (
+        f"### ✅ Resumo\n**Tempo:** `{m:02d}m {s:02d}s`\n"
+        f"**Apagadas:** `{total}`\n**Canal:** {canal.mention}"
+        + (f"\n**Erro:** `{erro}`" if erro else "")
+    )
+    await progress_msg.edit(view=_build_cleanup_final_view(summary))
+    await log_admin_action(interaction, "limparchatvoz", f"canal={canal.id} apagadas={total}")
+
+@bot.tree.command(name="mutar", description="🔇 Muta o bot na call")
+async def cmd_mutar(interaction):
+    guild = interaction.guild
+    vc = guild.voice_client if guild else None
+    if not vc or not vc.is_connected():
+        await interaction.response.send_message("❌ Bot não está em call.", ephemeral=True); return
+    try:
+        await guild.me.edit(mute=True)
+        config["voice_mute"] = True; save_config(config)
+        await interaction.response.send_message("🔇 Mutado.", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ {e}", ephemeral=True)
+
+@bot.tree.command(name="desmutar", description="🔊 Desmuta o bot na call")
+async def cmd_desmutar(interaction):
+    guild = interaction.guild
+    vc = guild.voice_client if guild else None
+    if not vc or not vc.is_connected():
+        await interaction.response.send_message("❌ Bot não está em call.", ephemeral=True); return
+    try:
+        await guild.me.edit(mute=False)
+        config["voice_mute"] = False; save_config(config)
+        await interaction.response.send_message("🔊 Desmutado.", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ {e}", ephemeral=True)
+
+@bot.tree.command(name="status", description="🎭 Altera o status do bot")
+async def cmd_status(interaction, modo: str):
+    if modo.lower() not in ["online", "idle", "dnd", "invisible"]:
+        await interaction.response.send_message("❌ Use: online, idle, dnd, invisible", ephemeral=True); return
+    config["bot_status"] = modo.lower(); save_config(config)
+    await update_status(force=True)
+    await interaction.response.send_message(f"✅ Status: **{modo}**", ephemeral=True)
+
+# ===================== KEEPALIVE DE VOZ =====================
+async def _play_silence(vc: discord.VoiceClient):
+    if not FFMPEG_AVAILABLE or not vc or not vc.is_connected(): return
+    if vc.is_playing() or vc.is_paused(): return
+    try:
+        source = discord.FFmpegPCMAudio(
+            "anullsrc=channel_layout=stereo:sample_rate=48000",
+            before_options="-f lavfi", options="-t 300",
+        )
+        vc.play(source)
+        logger.debug("🔇 Keepalive: reproduzindo silêncio (5 min).")
+    except Exception as e:
+        logger.debug(f"Keepalive play: {e}")
+
+@tasks.loop(seconds=60)
+async def task_voice_keepalive():
+    if not FFMPEG_AVAILABLE: return
+    guild = get_guild()
+    if not guild: return
+    vc = guild.voice_client
+    if not vc or not vc.is_connected(): return
+    if not vc.is_playing() and not vc.is_paused():
+        await _play_silence(vc)
+
+# ===================== TASKS =====================
+@tasks.loop(minutes=1)
+async def task_voice():
+    await update_voice_name_impl()
+
+@tasks.loop(seconds=5)
+async def task_activity_rotate():
+    if not config.get("activity_rotate_enabled"): return
+    await update_status()
+
+@tasks.loop(minutes=3)
+async def task_refresh_panels():
+    try: await refresh_all_panels()
+    except Exception as e: logger.debug(f"refresh panels: {e}")
+
+@tasks.loop(minutes=2)
+async def task_voice_watchdog():
+    guild = get_guild()
+    if not guild: return
+    cid = config.get("voice_channel_id")
+    if not cid: return
+    ch = guild.get_channel(cid)
+    if not ch or not isinstance(ch, discord.VoiceChannel): return
+    vc = guild.voice_client
+    if vc and vc.is_connected(): return
+    try:
+        if not vc: await ch.connect(timeout=15.0, reconnect=True)
+        else: await vc.move_to(ch)
+        await update_voice_mute()
+        await _play_silence(guild.voice_client)
+    except Exception as e:
+        logger.debug(f"Voice watchdog: {e}")
+
+@tasks.loop(minutes=2)
+async def task_antibot_refresh():
+    try: await refresh_antibot_panel()
+    except Exception as e: logger.debug(f"Antibot refresh: {e}")
+
+@tasks.loop(minutes=10)
+async def task_auto_emoji_sync():
+    if not config.get("auto_emoji_channels", True): return
+    guild = get_guild()
+    if not guild: return
+    try:
+        await sync_all_channels_emoji(guild)
+    except Exception as e:
+        logger.debug(f"auto-emoji sync: {e}")
+
+# ===================== AUX =====================
+async def bot_join_voice():
+    guild = get_guild()
+    if not guild: return
+    cid = config.get("voice_channel_id")
+    if not cid: return
+    ch = guild.get_channel(cid)
+    if not ch or not isinstance(ch, discord.VoiceChannel): return
+    try:
+        if not guild.voice_client: await ch.connect(timeout=15.0, reconnect=True)
+        else: await guild.voice_client.move_to(ch)
+        await update_voice_name_impl()
+        await update_voice_mute()
+        await _play_silence(guild.voice_client)
+    except Exception as e:
+        logger.warning(f"Voz: {e}")
+
+async def apply_avatar_if_needed(force=False):
+    url = avatar_url()
+    if not url: return False
+    if not force and config.get("_last_avatar_url") == url: return True
+    try:
+        async with aiohttp.ClientSession() as s:
+            async with s.get(url) as r:
+                if r.status != 200: return False
+                data = await r.read()
+        await bot.user.edit(avatar=data)
+        config["_last_avatar_url"] = url; save_config(config)
+        return True
+    except Exception as e:
+        logger.warning(f"Avatar: {e}"); return False
+
+# ===================== EVENTOS =====================
+@bot.event
+async def on_ready():
+    logger.info(f"{bemoji()} {bname()} conectado como {bot.user}")
+    try: init_db()
+    except Exception as e: logger.error(f"DB: {e}")
+    if not config.get("guild_id") and bot.guilds:
+        config["guild_id"] = bot.guilds[0].id; save_config(config)
+    try:
+        await bot.tree.sync()
+        logger.info("✅ Comandos sincronizados")
+    except Exception as e:
+        logger.error(f"Sync: {e}")
+    await apply_avatar_if_needed()
+    await bot_join_voice()
+    await update_status(force=True)
+
+    for t in (task_voice, task_activity_rotate, task_refresh_panels,
+              task_voice_watchdog, task_antibot_refresh, task_reload_config,
+              task_voice_keepalive, task_auto_emoji_sync):
+        if not t.is_running(): t.start()
+
+    try:
+        await refresh_all_panels()
+        logger.info("✅ Painéis re-registrados")
+    except Exception as e:
+        logger.error(f"refresh_all_panels: {e}")
+
+    if config.get("auto_emoji_channels", True):
+        try:
+            g = get_guild()
+            if g:
+                n = await sync_all_channels_emoji(g)
+                if n: logger.info(f"✨ Auto-emoji: {n} canal(is) atualizado(s).")
+        except Exception as e:
+            logger.debug(f"auto emoji on ready: {e}")
+
+@bot.event
+async def on_message(message: discord.Message):
+    if message.author.bot: return
+    if not message.guild: return
+    ab_cid = config.get("antibot_channel_id")
+    if ab_cid and message.channel.id == ab_cid:
+        await handle_antibot_punish(message)
+        return
+    await bot.process_commands(message)
+
+@bot.event
+async def on_member_join(member):
+    if member.bot: return
+    guild = member.guild
+    try: await send_welcome_message(member)
+    except Exception as e: logger.error(f"Erro send_welcome: {e}")
+    for rid in config.get("verification_unverified_role_ids", []):
+        r = guild.get_role(rid)
+        if r:
+            try: await member.add_roles(r)
+            except Exception: pass
+    ch_id = config.get("verification_channel_id")
+    if ch_id:
+        try:
+            temp_ch = await _create_temp_verification_channel(guild, member)
+            if temp_ch:
+                await send_captcha_challenge(member, temp_ch)
+        except Exception as e:
+            logger.error(f"Erro criando temp verification: {e}")
+    schedule_verification_kick(guild, member)
+    await update_voice_name_impl()
+    await update_status(force=True)
+
+@bot.event
+async def on_member_remove(member):
+    if member.bot: return
+    try: await send_leave_message(member)
+    except Exception as e: logger.error(f"Erro send_leave: {e}")
+    cancel_verification_kick(member.guild.id, member.id)
+    _temp_verification_channels.pop(member.id, None)
+    await update_voice_name_impl()
+    await update_status(force=True)
+
+@bot.event
+async def on_voice_state_update(member, before, after):
+    if member.bot: return
+    if before.channel is None and after.channel is not None:
+        try: await send_voice_log(member, after.channel, "join")
+        except Exception as e: logger.error(f"Erro voice join: {e}")
+    elif before.channel is not None and after.channel is None:
+        try: await send_voice_log(member, before.channel, "leave")
+        except Exception as e: logger.error(f"Erro voice leave: {e}")
+
+@bot.event
+async def on_guild_join(guild):
+    config["guild_id"] = guild.id; save_config(config)
+    if config.get("auto_emoji_channels", True):
+        try: await sync_all_channels_emoji(guild)
+        except Exception as e: logger.debug(f"auto emoji on join: {e}")
+
+@bot.event
+async def on_guild_channel_create(channel):
+    try:
+        await asyncio.sleep(1.5)
+        await auto_emoji_channel(channel)
+    except Exception as e:
+        logger.debug(f"auto emoji on create: {e}")
+
+@bot.event
+async def on_guild_channel_update(before, after):
+    try:
+        if before.name == after.name: return
+        if not config.get("auto_emoji_channels", True): return
+        await auto_emoji_channel(after)
+    except Exception as e:
+        logger.debug(f"auto emoji on update: {e}")
+
+# ===================== EXECUÇÃO =====================
+if __name__ == "__main__":
+    bot.run(TOKEN)
