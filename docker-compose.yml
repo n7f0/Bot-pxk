@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # ==================== BOT DISCORD ====================
   discord-bot:
     build: .
     container_name: pxk-bot
@@ -11,24 +10,18 @@ services:
     volumes:
       - ./data:/app/data
 
-  # ==================== DASHBOARD PÚBLICO ====================
   painel:
     build: .
     container_name: pxk-painel
     restart: unless-stopped
     command: ["python", "-u", "dashboard.py"]
     environment:
-      # Token do bot (usado para puxar lista de canais/cargos no dashboard)
       - DISCORD_TOKEN=${DISCORD_TOKEN}
-      # Credenciais do OAuth2 do Discord (Developer Portal)
       - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
       - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET}
-      # Níveis de permissão (IDs numéricos separados por vírgula)
       - OWNER_IDS=${OWNER_IDS}
       - DEV_IDS=${DEV_IDS}
-      # Permissões de staff (JSON)
       - STAFF_PERMS=${STAFF_PERMS}
-      # URL pública e chave de sessão
       - BASE_URL=${BASE_URL}
       - PANEL_SECRET=${PANEL_SECRET}
     ports:
@@ -36,7 +29,6 @@ services:
     volumes:
       - ./data:/app/data
 
-  # ==================== CLOUDFLARE TUNNEL ====================
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared
