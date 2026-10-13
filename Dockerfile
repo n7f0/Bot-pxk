@@ -1,6 +1,5 @@
 FROM python:3.11-slim
 
-# Instala ffmpeg (necessário para o keepalive de voz) e gosu (para o entrypoint)
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg \
         gosu \
@@ -11,7 +10,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# ⚠️ Copia o CONTEÚDO de src/ para /app/ (não a pasta em si)
+COPY src/ ./
 
 RUN useradd -m -u 1000 botuser
 RUN chown -R botuser:botuser /app
