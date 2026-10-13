@@ -22,3 +22,12 @@ services:
       - "8080:8080"
     volumes:
       - ./data:/app/data
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    network_mode: "host"
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
