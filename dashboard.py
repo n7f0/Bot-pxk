@@ -437,4 +437,98 @@ aside button:hover{background:var(--card2);color:var(--tx)}
 aside button.on{background:linear-gradient(90deg,var(--pri),#4c1d95);color:#fff;font-weight:600}
 main{padding:28px 32px 130px;max-width:900px}
 main h2{margin:0 0 4px;font-size:22px}
-main .su
+main .sub{color:var(--mut);font-size:13px;margin-bottom:22px}
+section{display:none;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px}
+section.on{display:block;animation:fade .2s}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
+.f{margin-bottom:18px}
+label{display:block;font-size:13px;color:var(--mut);margin-bottom:6px;font-weight:500}
+input[type=text],input[type=number],textarea,select{width:100%;padding:11px 13px;border-radius:9px;border:1px solid var(--line);background:#0d0718;color:var(--tx);font:inherit;transition:border-color .15s}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--pri2)}
+textarea{min-height:110px;resize:vertical;font-family:inherit}
+select[multiple]{min-height:140px}
+input[type=color]{width:64px;height:40px;border:1px solid var(--line);border-radius:9px;background:none;padding:3px;cursor:pointer}
+.sw{display:flex;align-items:center;gap:12px;padding:10px 0}
+.sw input{width:22px;height:22px;accent-color:var(--pri2);cursor:pointer}
+.sw label{margin:0;color:var(--tx);font-size:15px}
+.bar{position:fixed;bottom:0;left:250px;right:0;padding:16px 32px;background:#08040ff2;backdrop-filter:blur(10px);border-top:1px solid var(--line);text-align:right;z-index:9}
+.bar button{padding:13px 40px;border:0;border-radius:11px;background:linear-gradient(90deg,var(--pri2),#a78bfa);color:#fff;font-weight:700;font-size:15px;cursor:pointer;transition:transform .15s;box-shadow:0 8px 20px #7c3aed44}
+.bar button:hover{transform:translateY(-1px)}
+.ok{background:#0d2e1a;border:1px solid #10b981;color:#6ee7b7;padding:12px 16px;border-radius:11px;margin-bottom:18px;font-size:14px}
+.hint{font-size:12px;color:var(--mut);margin-top:5px}
+.empty{text-align:center;padding:60px 20px;color:var(--mut)}
+.empty .ic{font-size:52px;margin-bottom:12px}
+@media(max-width:820px){.wrap{grid-template-columns:1fr}aside{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line);display:flex;gap:6px;overflow-x:auto;padding:12px}aside h3{display:none}aside button{white-space:nowrap;width:auto}main{padding:20px}.bar{left:0}}
+</style>
+<div class="top">
+  <div class="brand">🖤 <span>PXKK Dashboard</span></div>
+  <div class="user">
+    <span>{{user.global_name}}</span>
+    <span class="badge {{user.role}}">
+      {% if user.role=='owner' %}👑 Dono{% elif user.role=='dev' %}⚙️ Dev{% else %}👥 Staff{% endif %}
+    </span>
+    <img src="https://cdn.discordapp.com/avatars/{{user.id}}/{{user.avatar}}.png?size=64" alt="">
+    <a href="/logout">Sair</a>
+  </div>
+</div>
+<div class="wrap">
+  <aside>
+    <h3>Seções</h3>
+    {% if sections %}
+      {% for title, _ in sections %}
+        <button data-t="{{loop.index0}}" class="{{'on' if loop.first}}">{{title}}</button>
+      {% endfor %}
+    {% endif %}
+  </aside>
+  <main>
+    {% for m in get_flashed_messages() %}<div class="ok">{{m}}</div>{% endfor %}
+    {% if not cfg.get('guild_id') %}<div class="ok" style="background:#2c1a12;border-color:#a16207;color:#fcd34d">⚠️ O bot ainda não registrou um servidor. Inicie o bot primeiro.</div>{% endif %}
+
+    {% if not sections %}
+      <div class="empty">
+        <div class="ic">🔒</div>
+        <h2>Nenhuma seção liberada</h2>
+        <p>Você ainda não tem permissão para editar nenhuma seção. Fale com o administrador.</p>
+      </div>
+    {% else %}
+    <form method="post"><input type="hidden" name="_csrf" value="{{csrf()}}">
+      {% for title, fields in sections %}
+      <section id="s{{loop.index0}}" class="{{'on' if loop.first}}">
+        <h2>{{title}}</h2>
+        <div class="sub">Configure os campos abaixo e salve para aplicar.</div>
+        {% for key,label,typ in fields %}{% set v = cfg.get(key) %}
+        <div class="f">
+          {% if typ=='bool' %}
+            <div class="sw"><input type="checkbox" id="{{key}}" name="{{key}}" {{'checked' if v}}><label for="{{key}}">{{label}}</label></div>
+          {% else %}
+            <label for="{{key}}">{{label}}</label>
+            {% if typ=='text' %}<input type="text" id="{{key}}" name="{{key}}" value="{{v or ''}}">
+            {% elif typ=='area' %}<textarea id="{{key}}" name="{{key}}">{{v or ''}}</textarea>
+            {% elif typ=='list' %}<textarea id="{{key}}" name="{{key}}">{{ (v or [])|join('\n') }}</textarea><div class="hint">Uma mensagem por linha. Use {brand}, {emoji}, {members}.</div>
+            {% elif typ=='num' %}<input type="number" id="{{key}}" name="{{key}}" value="{{v or 0}}" min="0">
+            {% elif typ=='color' %}<input type="color" id="{{key}}" name="{{key}}" value="{{hexcolor(v)}}">
+            {% elif typ.startswith('choice') %}<select id="{{key}}" name="{{key}}">{% for o in typ[7:].split(',') %}{% set kv=o.split('=') %}<option value="{{kv[0]}}" {{'selected' if v==kv[0]}}>{{kv[1]}}</option>{% endfor %}</select>
+            {% elif typ=='role' %}<select id="{{key}}" name="{{key}}" multiple>{% for i,n in dd.role %}<option value="{{i}}" {{'selected' if i|int in (v or [])}}>{{n}}</option>{% endfor %}</select><div class="hint">Ctrl/Cmd + clique para selecionar vários.</div>
+            {% else %}<select id="{{key}}" name="{{key}}"><option value="">— nenhum —</option>{% for i,n in dd[typ] %}<option value="{{i}}" {{'selected' if v and i|int==v}}>{{n}}</option>{% endfor %}</select>
+            {% endif %}
+          {% endif %}
+        </div>
+        {% endfor %}
+      </section>
+      {% endfor %}
+      <div class="bar"><button type="submit">💾 Salvar alterações</button></div>
+    </form>
+    {% endif %}
+  </main>
+</div>
+<script>
+document.querySelectorAll('aside button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('aside button,section').forEach(e=>e.classList.remove('on'));
+  b.classList.add('on');document.getElementById('s'+b.dataset.t).classList.add('on');
+  window.scrollTo({top:0,behavior:'smooth'});
+});
+</script>
+</html>"""
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8080)
