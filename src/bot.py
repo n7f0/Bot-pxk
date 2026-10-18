@@ -194,9 +194,11 @@ DEFAULT_CONFIG = {
     "auto_emoji_channels": True,
     "auto_emoji_ignore_prefixes": ["verificar-", "ticket-"],
 
+    "verification_enabled": True,
     "verification_method": "math",
     "verification_difficulty": 1,
     "verification_kick_minutes": 0,
+    "verification_timeout_delete_minutes": 5,
     "verified_role_ids": [],
     "verification_unverified_role_ids": [],
     "verification_channel_id": None,
@@ -211,6 +213,12 @@ DEFAULT_CONFIG = {
     "welcome_image_url": "",
     "leave_channel_id": None,
     "leave_message": "Sentiremos sua falta. Volte quando quiser! 💜",
+
+    # ===== NOVO: AUTO ROLE + WELCOME MENTION =====
+    "auto_role_id": None,
+    "welcome_mention_channel_id": None,
+    "welcome_mention_message": "Bem-vindo(a) {user}! 🎉",
+    "welcome_mention_delete_seconds": 5,
 
     "voice_join_log_channel_id": None,
     "voice_leave_log_channel_id": None,
@@ -256,7 +264,6 @@ DEFAULT_CONFIG = {
     "ticket_purchase_desc": "Produtos, serviços e pagamentos",
     "ticket_purchase_emoji": "🛒",
 
-    # ===== FEEDBACK =====
     "feedback_channel_id": None,
     "feedback_panel_channel_id": None,
     "feedback_panel_message_id": None,
@@ -271,7 +278,6 @@ DEFAULT_CONFIG = {
         "-# Cada avaliação ajuda a melhorar a comunidade 🚀"
     ),
 
-    # ===== SUGESTÕES =====
     "suggestions_channel_id": None,
     "suggestions_panel_channel_id": None,
     "suggestions_panel_message_id": None,
@@ -356,6 +362,87 @@ def _fmt_text(t: str) -> str:
              .replace("{emoji}", bemoji())
              .replace("{members}", str(members)))
 
+def _fmt_ts(dt=None, style="f"):
+    ts = int((dt or datetime.datetime.now()).timestamp())
+    return f"<t:{ts}:{style}>"
+
+async def _delete_message_after(message, delay_seconds):
+    try:
+        await asyncio.sleep(max(1, int(delay_seconds)))
+        await message.delete()
+    except Exception:
+        pass
+
+# ===================== CARD DE LOG PREMIUM =====================
+async def send_log_card(
+    channel,
+    title: str,
+    *,
+    subtitle: str = None,
+    user: discord.abc.User = None,
+    fields: list = None,
+    thumbnail_url: str = None,
+    accent: int = None,
+    extra: str = None,
+    compact: bool = False,
+):
+    """Envia log formatado como card premium (Components V2)."""
+    if not channel:
+        return False
+
+    comps = [ui.TextDisplay(f"## {title}")]
+
+    thumb = thumbnail_url
+    if user and not thumb:
+        try:
+            thumb = user.display_avatar.with_size(256).url
+        except Exception:
+            thumb = None
+
+    if user:
+        try:
+            header_text = f"### {user.display_name}\n-# {user.mention}"
+        except Exception:
+            header_text = f"### {getattr(user, 'name', 'Usuário')}"
+        comps.append(ui.Section(
+            ui.TextDisplay(header_text),
+            accessory=ui.Thumbnail(media=thumb or _thumb()),
+        ))
+    elif subtitle and thumb:
+        comps.append(ui.Section(
+            ui.TextDisplay(f"### {subtitle}"),
+            accessory=ui.Thumbnail(media=thumb),
+        ))
+    elif subtitle:
+        comps.append(ui.TextDisplay(f"### {subtitle}"))
+
+    if fields:
+        comps.append(ui.Separator(spacing=discord.SeparatorSpacing.small))
+        for item in fields:
+            if isinstance(item, tuple) and len(item) == 2:
+                name, value = item
+                comps.append(ui.TextDisplay(f"**{name}**\n> {value}"))
+            else:
+                comps.append(ui.TextDisplay(str(item)))
+
+    if extra:
+        comps.append(ui.Separator(spacing=discord.SeparatorSpacing.small))
+        comps.append(ui.TextDisplay(extra))
+
+    if not compact:
+        comps.append(ui.Separator(spacing=discord.SeparatorSpacing.small))
+    comps.append(ui.TextDisplay(f"-# {bfooter()} • {_fmt_ts()}"))
+
+    layout = ui.LayoutView(timeout=None)
+    layout.add_item(ui.Container(*comps, accent_color=accent or color_primary()))
+
+    try:
+        await channel.send(view=layout)
+        return True
+    except Exception as e:
+        logger.error(f"send_log_card '{title}': {e}")
+        return False
+
 # ===================== LOG DE MODERAÇÃO CENTRAL =====================
 async def log_admin_action(interaction: discord.Interaction, action: str, detail: str = ""):
     guild = interaction.guild
@@ -368,16 +455,71 @@ async def log_admin_action(interaction: discord.Interaction, action: str, detail
     if not cid: return
     ch = guild.get_channel(cid)
     if not ch: return
-    try:
-        await ch.send(
-            f"🛡️ **Log de Painel** — `{action}`\n"
-            f"**Autor:** {interaction.user.mention} (`{interaction.user.id}`)\n"
-            f"**Canal:** {interaction.channel.mention if interaction.channel else '—'}\n"
-            f"**Detalhe:** {detail or '—'}\n"
-            f"**Horário:** <t:{int(datetime.datetime.now().timestamp())}:f>"
-        )
-    except Exception as e:
-        logger.debug(f"log_admin_action: {e}")
+
+    ACTION_LABELS = {
+        "menu_open":         "🗂️ Abriu uma categoria do painel",
+        "cleanup_select":    "🧹 Selecionou canais para limpar",
+        "cleanup_start":     "🧹 Iniciou limpeza de chat",
+        "cleanup_voice":     "🧹 Iniciou limpeza de chat de voz",
+        "ticket_open":       "🎫 Abriu um ticket",
+        "ticket_add_member": "➕ Adicionou membro ao ticket",
+        "ticket_rename":     "✏️ Renomeou um ticket",
+        "addcargo_panel":    "➕ Aplicou cargos via painel",
+        "addcargo_direct":   "➕ Aplicou cargo via comando",
+        "sync_autoemoji":    "✨ Sincronizou auto-emojis",
+        "post_antibot_panel":"🚫 Postou painel AntiBot",
+        "post_feedback_panel":"⭐ Postou painel de feedback",
+        "post_addcargo_panel":"➕ Postou painel de addcargo",
+        "refresh_ticket_panel":"🔄 Atualizou painel de tickets",
+        "reset_ticket_panel":"↩️ Restaurou painel de tickets",
+        "toggle_verification":"✅ Alternou status da verificação",
+        "toggle_voice_mute": "🎙️ Alternou mute do bot",
+        "toggle_activity_rotate":"🎞️ Alternou rotação de atividade",
+        "toggle_autoemoji":  "✨ Alternou auto-emoji",
+        "test_welcome":      "🧪 Testou mensagem de boas-vindas",
+        "test_leave":        "🧪 Testou mensagem de saída",
+        "apply_avatar":      "🖼️ Aplicou novo avatar",
+        "suggestion_create": "💡 Nova sugestão criada",
+        "direct_feedback":   "⭐ Nova avaliação enviada",
+    }
+
+    if action in ACTION_LABELS:
+        label = ACTION_LABELS[action]
+    elif action.startswith("set_"):
+        label = f"⚙️ Alterou `{action[4:]}`"
+    elif action.startswith("toggle_"):
+        label = f"🔁 Alternou `{action[7:]}`"
+    elif action.startswith("clear_url:"):
+        label = f"🗑️ Removeu URL `{action.split(':',1)[1]}`"
+    elif action.startswith("set_url:"):
+        label = f"🖼️ Alterou URL `{action.split(':',1)[1]}`"
+    elif action.startswith("set_color:"):
+        label = f"🎨 Alterou cor `{action.split(':',1)[1]}`"
+    elif action.startswith("set_roles:"):
+        label = f"👑 Alterou cargos `{action.split(':',1)[1]}`"
+    elif action.startswith("set_channel:"):
+        label = f"📢 Alterou canal `{action.split(':',1)[1]}`"
+    elif action.startswith("set_category:"):
+        label = f"📂 Alterou categoria `{action.split(':',1)[1]}`"
+    elif action.startswith("set_voice:"):
+        label = f"🔊 Alterou canal de voz `{action.split(':',1)[1]}`"
+    elif action.startswith("set_text:"):
+        label = f"📝 Alterou texto `{action.split(':',1)[1]}`"
+    else:
+        label = f"⚙️ `{action}`"
+
+    fields = [("🛠️ Ação", label)]
+    if interaction.channel:
+        fields.append(("📍 Canal", interaction.channel.mention))
+    if detail:
+        fields.append(("📄 Detalhes", f"`{detail[:300]}`"))
+
+    await send_log_card(
+        ch, "🛡️ Ação Administrativa",
+        user=interaction.user,
+        fields=fields,
+        accent=color_primary(),
+    )
 
 # ===================== BOT =====================
 intents = discord.Intents.default()
@@ -418,7 +560,6 @@ async def update_voice_name_impl():
         try: await channel.edit(name=new_name)
         except Exception: pass
 
-# ---------- ATIVIDADE ROTATIVA ----------
 _last_activity_time = 0.0
 _activity_index = 0
 _last_activity_signature = None
@@ -642,7 +783,7 @@ def _build_cleanup_final_view(summary):
     ))
     return layout
 
-# ===================== CARD DE MEMBRO (CLEAN) =====================
+# ===================== CARD DE MEMBRO =====================
 async def _fetch_banner_url(user_id: int):
     try:
         user = await bot.fetch_user(user_id)
@@ -721,44 +862,39 @@ async def send_leave_message(member):
 async def send_voice_log(member, channel, action):
     if action == "join":
         cid = config.get("voice_join_log_channel_id")
-        title = f"🔊 {member.display_name} entrou na call"
-        subtitle = f"> Entrou em **{channel.name}**"
-        accent = color_primary()
+        title = "🔊 Entrou na Call"
+        accent = color_success()
     else:
         cid = config.get("voice_leave_log_channel_id")
-        title = f"🔇 {member.display_name} saiu da call"
-        subtitle = f"> Saiu de **{channel.name}**"
-        accent = color_primary()
+        title = "🔇 Saiu da Call"
+        accent = color_danger()
+
     if not cid: return
     log_ch = member.guild.get_channel(cid)
     if not log_ch: return
 
-    now_ts = int(datetime.datetime.now().timestamp())
-    avatar = member.display_avatar.with_size(256).url
-    info = [f"👤 {member.mention}"]
+    fields = [("🎧 Canal de Voz", channel.mention)]
     if action == "join":
-        info.append(f"🔊 Canal: {channel.mention}")
-        info.append(f"👥 No canal: **{len(channel.members)}**")
+        try:
+            current = len([m for m in channel.members if not m.bot])
+        except Exception:
+            current = len(channel.members)
+        fields.append(("👥 Membros na Call", f"**{current}**"))
+        fields.append(("🕐 Entrou às", _fmt_ts(style="T")))
     else:
-        info.append(f"🔊 Canal: {channel.mention}")
-        info.append(f"📤 Saiu <t:{now_ts}:T>")
+        try:
+            current = len([m for m in channel.members if not m.bot])
+        except Exception:
+            current = len(channel.members)
+        fields.append(("👥 Restam na Call", f"**{current}**"))
+        fields.append(("🕐 Saiu às", _fmt_ts(style="T")))
 
-    comps = [
-        ui.TextDisplay(f"## {title}"),
-        ui.Section(
-            ui.TextDisplay(f"### {member.display_name}"),
-            accessory=ui.Thumbnail(media=avatar),
-        ),
-        ui.Separator(spacing=discord.SeparatorSpacing.small),
-        ui.TextDisplay(subtitle),
-        ui.Separator(spacing=discord.SeparatorSpacing.small),
-        ui.TextDisplay("\n".join(info)),
-        ui.TextDisplay(f"-# {bfooter()}"),
-    ]
-    layout = ui.LayoutView(timeout=None)
-    layout.add_item(ui.Container(*comps, accent_color=accent))
-    try: await log_ch.send(view=layout)
-    except Exception as e: logger.error(f"Erro voice log: {e}")
+    await send_log_card(
+        log_ch, title,
+        user=member,
+        fields=fields,
+        accent=accent,
+    )
 
 async def make_channel_admin_only(channel):
     guild = channel.guild
@@ -983,15 +1119,18 @@ async def handle_antibot_punish(message):
     if log_id:
         log_ch = guild.get_channel(log_id)
         if log_ch:
-            try:
-                await log_ch.send(
-                    f"🚫 **AntiBot** — punição aplicada\n"
-                    f"**Usuário:** {member} (`{member.id}`)\n"
-                    f"**Canal:** {message.channel.mention}\n"
-                    f"**Mensagens apagadas:** `{deleted_count}`\n"
-                    f"**Banido:** `{'Sim' if banned else 'Não'}`"
-                )
-            except Exception: pass
+            await send_log_card(
+                log_ch, "🚫 AntiBot — Punição Aplicada",
+                user=member,
+                fields=[
+                    ("🪤 Canal Armadilha", message.channel.mention),
+                    ("🗑️ Mensagens Apagadas", f"**{deleted_count}**"),
+                    ("🔨 Banido", f"**{'Sim' if banned else 'Não'}**"),
+                    ("📄 Motivo", "`Mensagem em canal protegido`"),
+                    ("🆔 ID do Usuário", f"`{member.id}`"),
+                ],
+                accent=color_danger(),
+            )
 
 # ===================== TICKET / REFRESH =====================
 async def refresh_ticket_panel():
@@ -1189,10 +1328,7 @@ def autoemoji_view():
         "**emoji que combina** com o propósito dele.\n\n"
         f"**Status:** `{'Ativado' if on else 'Desativado'}`\n"
         f"**Separador:** `{EMOJI_SEPARATOR}`\n"
-        f"**Regras cadastradas:** `{len(CHANNEL_EMOJI_RULES)}`\n\n"
-        "**Exemplos:**\n"
-        "> `✨・bem-vindo`  `🔒・saiu`  `📜・regras`\n"
-        "> `💬・chat-geral`  `🎫・tickets`  `💡・sugestoes`",
+        f"**Regras cadastradas:** `{len(CHANNEL_EMOJI_RULES)}`",
         [
             {"title": "⚙️ Controle", "rows": [[
                 _btn(f"Auto-Emoji: {'ON' if on else 'OFF'}", "ae_toggle", SU if on else D, "✨"),
@@ -1213,7 +1349,7 @@ def antibot_view():
     total = get_antibot_count()
     return premium_submenu(
         "🚫 Anti-Bot",
-        "Configure o canal protegido onde **qualquer mensagem** resulta em banimento e deleção total.\n\n"
+        "Configure o canal protegido onde **qualquer mensagem** resulta em banimento.\n\n"
         f"**Canal protegido:** {ch_set}\n**Canal de log:** {log_set}\n"
         f"**Banir:** `{'Ativo' if ban_on else 'Desativado'}`  |  "
         f"**Apagar msgs:** `{'Ativo' if del_on else 'Desativado'}`\n"
@@ -1244,17 +1380,25 @@ def captcha_view():
     method = config.get("verification_method", "math")
     diff   = config.get("verification_difficulty", 1)
     kick   = config.get("verification_kick_minutes", 0)
+    timeout_delete = config.get("verification_timeout_delete_minutes", 5)
+    enabled = config.get("verification_enabled", True)
     method_label = "🧮 Matemática" if method == "math" else "🔘 Botão"
     diff_labels = {1: "Fácil", 2: "Médio", 3: "Difícil"}
     kick_label = "Desativado" if not kick else f"{kick} min"
+    timeout_label = "Desativado" if timeout_delete <= 0 else f"{timeout_delete} min"
     return premium_submenu(
         "✅ Verificação Captcha",
-        f"Sistema avançado com método, dificuldade e expulsão automática.\n"
-        f"Cria um **canal temporário** para o membro se verificar.\n\n"
-        f"**Método atual:** `{method_label}`\n"
+        f"Sistema avançado de verificação com canal temporário.\n\n"
+        f"**Status:** `{'🟢 Ativado' if enabled else '🔴 Desativado'}`\n"
+        f"**Método:** `{method_label}`\n"
         f"**Dificuldade:** `{diff_labels.get(diff, 'Fácil')}`\n"
-        f"**Kick automático:** `{kick_label}`",
+        f"**Kick auto:** `{kick_label}`\n"
+        f"**Deletar canal após:** `{timeout_label}`",
         [
+            {"title": "🔛 Controle Geral", "rows": [
+                [_btn(f"Verificação: {'ON' if enabled else 'OFF'}", "cap_toggle",
+                      SU if enabled else D, E("verificado"))],
+            ]},
             {"title": "👑 Cargos", "rows": [
                 [_btn("Cargos Entregues (verificados)", "cap_roles", P, E("verificado"))],
                 [_btn("Cargos Não Verificado", "cap_unver", P, E("tdj_1"))],
@@ -1263,26 +1407,31 @@ def captcha_view():
                 [_btn("Mudar Método",      "cap_method", P, E("tdj_2")),
                  _btn("Mudar Dificuldade", "cap_diff",   P, E("tdj_3"))],
             ]},
-            {"title": "⏰ Expulsão Automática", "rows": [
-                [_btn("Configurar Tempo", "cap_kick", D, E("tdj_4"))],
+            {"title": "⏰ Expulsão / Deleção Automática", "rows": [
+                [_btn("Kick Automático", "cap_kick", D, E("tdj_4")),
+                 _btn("Deletar Canal Após", "cap_timeout", D, E("tdj_5"))],
             ]},
             {"title": "📢 Canais", "rows": [
-                [_btn("Canal de Verificação", "cap_ch",   P, E("tdj_5")),
-                 _btn("Canal do Painel",      "cap_pch",  P, E("tdj_6"))],
-                [_btn("Canal de Log", "cap_log", P, E("tdj_7"))],
-                [_btn("Categoria Temporária", "cap_tmpcat", P, E("tdj_8"))],
+                [_btn("Canal de Verificação", "cap_ch",   P, E("tdj_6")),
+                 _btn("Canal do Painel",      "cap_pch",  P, E("tdj_7"))],
+                [_btn("Canal de Log", "cap_log", P, E("tdj_8"))],
+                [_btn("Categoria Temporária", "cap_tmpcat", P, E("tdj_9"))],
             ]},
         ],
         accent=color_secondary(),
     )
 
 def welcome_view():
+    mention_ch = "✅" if config.get("welcome_mention_channel_id") else "❌"
+    auto_role = "✅" if config.get("auto_role_id") else "❌"
+    delay = config.get("welcome_mention_delete_seconds", 5)
     return premium_submenu(
         "💌 Boas-vindas & Saída",
-        "Configure as mensagens premium de **entrada** e **saída** do servidor.\n"
-        "-# Visual clean, moderno e em tom roxo.",
+        "Configure mensagens, cargo automático e menção de boas-vindas.\n\n"
+        f"**Cargo automático:** {auto_role}\n"
+        f"**Menção no chat:** {mention_ch} (apaga em `{delay}s`)",
         [
-            {"title": "🎉 Entrada no Servidor", "rows": [
+            {"title": "🎉 Card de Entrada", "rows": [
                 [_btn("Canal de Boas-vindas", "wel_ch",  P, E("tdj_1")),
                  _btn("Mensagem de Entrada",  "wel_msg", P, E("tdj_2"))],
                 [_btn("Banner de Entrada", "wel_img", S, E("tdj_3")),
@@ -1292,6 +1441,14 @@ def welcome_view():
                 [_btn("Canal de Saída",    "lev_ch",  P, E("tdj_4")),
                  _btn("Mensagem de Saída", "lev_msg", P, E("tdj_5"))],
                 [_btn("Testar Saída", "lev_test", SU, E("verificado"))],
+            ]},
+            {"title": "🤖 Cargo Automático ao Entrar", "rows": [
+                [_btn("Definir Cargo", "wel_autorole", P, E("tdj_6"))],
+            ]},
+            {"title": "💬 Menção de Boas-vindas (auto-delete)", "rows": [
+                [_btn("Canal da Menção", "wel_mention_ch", P, E("tdj_7")),
+                 _btn("Mensagem", "wel_mention_msg", P, E("tdj_8"))],
+                [_btn("Segundos p/ Apagar", "wel_mention_delay", S, E("tdj_9"))],
             ]},
         ],
         accent=color_primary(),
@@ -1365,10 +1522,9 @@ def addcargo_cfg_view():
     ch_ok = "✅" if config.get("addcargo_panel_channel_id") else "❌"
     return premium_submenu(
         "➕ Configurar /addcargo",
-        "Defina **quais cargos** podem usar o comando `/addcargo` para dar cargos a outros membros.\n\n"
+        "Defina **quais cargos** podem usar o comando `/addcargo`.\n\n"
         f"**Cargos autorizados:** `{len(allowed)}`\n"
-        f"**Painel público:** {ch_ok}\n"
-        "-# Administradores do servidor sempre podem usar.",
+        f"**Painel público:** {ch_ok}",
         [
             {"title": "👑 Cargos Autorizados", "rows": [
                 [_btn("Selecionar Cargos (múltiplos)", "acfg_roles", P, E("tdj_1"))],
@@ -1385,8 +1541,7 @@ def addcargo_cfg_view():
 def painel_fixo_view():
     return premium_submenu(
         "📌 Painel Fixo",
-        "Escolha o canal onde o **painel administrativo** ficará fixado.\n"
-        "-# O bot re-registra os painéis automaticamente sempre que reiniciar.",
+        "Escolha o canal onde o **painel administrativo** ficará fixado.",
         [
             {"title": "📢 Canal", "rows": [[
                 _btn("Definir Canal do Painel", "pf_ch", P, E("tdj_1")),
@@ -1428,8 +1583,8 @@ def ticket_panel_custom_view():
     p_emoji = config.get("ticket_purchase_emoji") or ""
     return premium_submenu(
         "🎨 Personalizar Painel de Tickets",
-        "Edite **qualquer informação** que aparece no painel público de tickets.\n"
-        "-# Placeholders disponíveis: `{brand}`, `{emoji}`, `{members}`",
+        "Edite **qualquer informação** que aparece no painel público.\n"
+        "-# Placeholders: `{brand}`, `{emoji}`, `{members}`",
         [
             {"title": "🏷️ Cabeçalho", "rows": [
                 [_btn("Título",   "tpc_title", P, E("tdj_1")),
@@ -1459,7 +1614,6 @@ def ticket_panel_custom_view():
     )
 
 def feedback_view():
-    """Submenu antigo (mantido por compatibilidade)."""
     return feedback_panel_view()
 
 def feedback_panel_view():
@@ -1535,9 +1689,8 @@ def suggestion_panel_layout():
                 "Tem uma ideia, melhoria ou projeto? **Compartilhe com a gente!**\n\n"
                 "**Como funciona:**\n"
                 "> 📝 **Envie** sua sugestão pelo botão abaixo\n"
-                "> 👍 A comunidade **vota com botões** (sem reactions)\n"
-                "> 🏆 As mais votadas são analisadas pela equipe\n"
-                "> 🚀 Ideias aprovadas entram em produção"
+                "> 👍 A comunidade **vota com botões**\n"
+                "> 🏆 As mais votadas são analisadas pela equipe"
             ),
             accessory=ui.Thumbnail(media=_thumb()),
         ),
@@ -1545,8 +1698,7 @@ def suggestion_panel_layout():
         ui.TextDisplay(
             f"### 📊 Estatísticas\n"
             f"> **Sugestões enviadas:** `{total}`\n"
-            f"> **Votação:** por **botões** direto no card\n"
-            f"> **Sistema:** transparente e democrático"
+            f"> **Votação:** por **botões** direto no card"
         ),
         ui.Separator(spacing=discord.SeparatorSpacing.small),
         ui.ActionRow(
@@ -1698,9 +1850,9 @@ def chat_cleanup_view():
         ui.TextDisplay("# 🧹 Limpeza de Chat"),
         ui.Section(
             ui.TextDisplay(
-                "Escolha entre **canais de texto** e **canais de voz** (o **chat interno da call** também é limpo).\n"
+                "Escolha entre **canais de texto** e **canais de voz**.\n"
                 "Uma **barra de progresso detalhada** mostrará o andamento em tempo real.\n"
-                "-# ⚠️ Ação irreversível. O bot precisa de `Gerenciar Mensagens` em cada canal."
+                "-# ⚠️ Ação irreversível."
             ),
             accessory=ui.Thumbnail(media=_thumb()),
         ),
@@ -1711,7 +1863,6 @@ def chat_cleanup_view():
         ui.ActionRow(start_btn, back_btn),
         ui.Separator(spacing=discord.SeparatorSpacing.large),
         ui.TextDisplay("### 🔊 Limpar apenas o Chat de uma Call"),
-        ui.TextDisplay("-# Abre um painel com menu SELECT só de canais de voz."),
         ui.ActionRow(voice_btn),
         accent_color=color_primary(),
     ))
@@ -1763,8 +1914,8 @@ def voice_cleanup_view():
         ui.TextDisplay("# 🔊 Limpar Chat de Voz"),
         ui.Section(
             ui.TextDisplay(
-                "Escolha um **canal de voz** abaixo. O **chat interno** dessa call será totalmente limpo.\n"
-                "-# ⚠️ Ação irreversível. O bot precisa de `Gerenciar Mensagens` no canal."
+                "Escolha um **canal de voz** abaixo. O **chat interno** será totalmente limpo.\n"
+                "-# ⚠️ Ação irreversível."
             ),
             accessory=ui.Thumbnail(media=_thumb()),
         ),
@@ -1869,12 +2020,22 @@ async def run_multi_cleanup(interaction: discord.Interaction):
     if log_id:
         log_ch = interaction.guild.get_channel(log_id)
         if log_ch:
-            try:
-                await log_ch.send(
-                    f"🧹 **Limpeza Múltipla** por {interaction.user.mention}\n"
-                    f"**Canais:** {len(results)} | **Total:** `{total_deleted}`\n" +
-                    "\n".join(f"• {ch.mention} — `{cnt}`" for ch, cnt in results))
-            except Exception: pass
+            ch_list = "\n".join(
+                f"> {'🔊' if isinstance(c, discord.VoiceChannel) else '💬'} {c.mention} — `{cnt}`"
+                for c, cnt in results
+            )
+            await send_log_card(
+                log_ch,
+                "🧹 Limpeza de Chat Concluída",
+                user=interaction.user,
+                fields=[
+                    ("📂 Canais Limpos", f"**{len(results)}**"),
+                    ("🗑️ Mensagens Apagadas", f"**{total_deleted}**"),
+                    ("⏱️ Tempo Total", f"`{m:02d}m {s:02d}s`"),
+                    ("📋 Detalhes", ch_list),
+                ],
+                accent=color_primary(),
+            )
     _cleanup_selection.pop(user_id, None)
 
 def show_config_view():
@@ -1889,11 +2050,15 @@ def show_config_view():
     method_labels = {"math": "🧮 Matemática", "button": "🔘 Botão"}
     diff_labels = {1: "Fácil", 2: "Médio", 3: "Difícil"}
     kick = config.get("verification_kick_minutes", 0)
+    timeout_del = config.get("verification_timeout_delete_minutes", 5)
     msgs = config.get("activity_messages") or []
     act_info = (f"**Rotação:** `{'ON' if config.get('activity_rotate_enabled') else 'OFF'}` | "
                 f"**Tipo:** `{config.get('activity_type')}` | "
                 f"**Intervalo:** `{config.get('activity_rotate_seconds')}s` | "
                 f"**Msgs:** `{len(msgs)}`")
+    auto_role = "—"
+    if config.get("auto_role_id"):
+        auto_role = f"<@&{config['auto_role_id']}>"
     lines = [
         "### 🏷️ Marca",
         f"**Nome:** {bname()} {bemoji()}",
@@ -1901,6 +2066,10 @@ def show_config_view():
         f"**Admin Roles:** {role_list('admin_role_ids')}",
         "", "### ✨ Auto-Emoji",
         f"**Ativado:** `{'Sim' if config.get('auto_emoji_channels', True) else 'Não'}`",
+        "", "### 👋 Boas-vindas",
+        f"**Cargo automático:** {auto_role}",
+        f"**Canal da menção:** {ch('welcome_mention_channel_id')}",
+        f"**Apagar menção após:** `{config.get('welcome_mention_delete_seconds', 5)}s`",
         "", "### ➕ /addcargo",
         f"**Cargos autorizados:** {role_list('addcargo_allowed_role_ids')}",
         f"**Painel público:** {ch('addcargo_panel_channel_id')}",
@@ -1909,9 +2078,11 @@ def show_config_view():
         f"**Log:** {ch('antibot_log_channel_id')}",
         f"**Total punidos:** `{get_antibot_count()}`",
         "", "### ✅ Captcha",
+        f"**Habilitado:** `{'Sim' if config.get('verification_enabled', True) else 'Não'}`",
         f"**Método:** `{method_labels.get(config.get('verification_method','math'),'—')}`",
         f"**Dificuldade:** `{diff_labels.get(config.get('verification_difficulty',1),'—')}`",
         f"**Kick auto:** `{'Desativado' if not kick else f'{kick} min'}`",
+        f"**Deletar canal após:** `{'Desativado' if timeout_del <= 0 else f'{timeout_del} min'}`",
         f"**Cargos Verif:** {role_list('verified_role_ids')}",
         f"**Cargos Não Verif:** {role_list('verification_unverified_role_ids')}",
         "", "### 🎫 Tickets",
@@ -2059,6 +2230,35 @@ def single_category_view(key, title):
     ))
     return layout
 
+def single_role_view(key, title, current_id=None):
+    layout = ui.LayoutView(timeout=180)
+    default = []
+    if current_id:
+        try:
+            r = get_guild().get_role(current_id)
+            if r: default = [r]
+        except Exception: pass
+    sel = ui.RoleSelect(placeholder="Selecione um cargo",
+                        min_values=1, max_values=1,
+                        default_values=default if default else None)
+    async def cb(interaction):
+        rid = int(sel.values[0].id) if sel.values else None
+        config[key] = rid
+        save_config(config)
+        await log_admin_action(interaction, f"set_role:{key}", f"role={rid}")
+        await interaction.response.send_message(
+            f"✅ **{title}:** <@&{rid}>" if rid else "✅ Removido.", ephemeral=True)
+    sel.callback = cb
+    layout.add_item(ui.Container(
+        ui.TextDisplay(f"# 👑 {title}"),
+        ui.Section(ui.TextDisplay("Selecione o cargo desejado."),
+                   accessory=ui.Thumbnail(media=_thumb())),
+        ui.Separator(spacing=discord.SeparatorSpacing.small),
+        ui.ActionRow(sel),
+        accent_color=color_primary(),
+    ))
+    return layout
+
 def status_view():
     layout = ui.LayoutView(timeout=180)
     sel = _safe_select(
@@ -2184,7 +2384,13 @@ def verification_panel_layout():
     if banner:
         mg = _safe_media_gallery(banner)
         if mg is not None: comps.append(mg)
-    comps.append(ui.ActionRow(_btn("Verificar Agora", "verify_now", SU, E("verificado"))))
+    if config.get("verification_enabled", True):
+        comps.append(ui.ActionRow(_btn("Verificar Agora", "verify_now", SU, E("verificado"))))
+    else:
+        comps.append(ui.ActionRow(ui.Button(
+            label="Verificação Desativada",
+            style=discord.ButtonStyle.secondary,
+            custom_id="verify_disabled", disabled=True)))
     comps.append(ui.TextDisplay(f"-# {bfooter()}"))
     layout = ui.LayoutView(timeout=None)
     layout.add_item(ui.Container(*comps, accent_color=color_secondary()))
@@ -2356,6 +2562,18 @@ async def on_interaction(interaction: discord.Interaction):
             await interaction.response.send_message(view=verification_diff_view(), ephemeral=True)
         elif cid == "cap_kick":
             await interaction.response.send_modal(KickTimeModal())
+        elif cid == "cap_timeout":
+            await interaction.response.send_modal(VerifTimeoutModal())
+        elif cid == "cap_toggle":
+            config["verification_enabled"] = not config.get("verification_enabled", True)
+            save_config(config)
+            await log_admin_action(interaction, "toggle_verification",
+                                   f"valor={config['verification_enabled']}")
+            try: await refresh_all_panels()
+            except Exception: pass
+            await interaction.response.send_message(
+                f"✅ Verificação **{'ativada' if config['verification_enabled'] else 'desativada'}**.",
+                ephemeral=True)
         elif cid == "cap_ch":
             await interaction.response.send_message(view=single_channel_view("verification_channel_id", "Canal de Verificação"), ephemeral=True)
         elif cid == "cap_pch":
@@ -2364,6 +2582,8 @@ async def on_interaction(interaction: discord.Interaction):
             await interaction.response.send_message(view=single_channel_view("verification_log_channel_id", "Canal de Log", admin_only=True), ephemeral=True)
         elif cid == "cap_tmpcat":
             await interaction.response.send_message(view=single_category_view("verification_temp_category_id", "Categoria do Canal Temporário"), ephemeral=True)
+        elif cid == "verify_disabled":
+            await interaction.response.send_message("❌ A verificação está desativada.", ephemeral=True)
 
         # ===== WELCOME =====
         elif cid == "wel_ch":
@@ -2386,6 +2606,25 @@ async def on_interaction(interaction: discord.Interaction):
             await send_leave_message(interaction.user)
             await log_admin_action(interaction, "test_leave", "")
             await interaction.followup.send("✅ Teste de saída enviado!", ephemeral=True)
+
+        # ===== AUTO-ROLE + WELCOME MENTION (NOVOS) =====
+        elif cid == "wel_autorole":
+            cur = config.get("auto_role_id")
+            await interaction.response.send_message(
+                view=single_role_view("auto_role_id", "Cargo Automático ao Entrar", cur),
+                ephemeral=True)
+        elif cid == "wel_mention_ch":
+            await interaction.response.send_message(
+                view=single_channel_view("welcome_mention_channel_id", "Canal da Menção de Boas-vindas"),
+                ephemeral=True)
+        elif cid == "wel_mention_msg":
+            await interaction.response.send_modal(GenericTextModal(
+                "welcome_mention_message", "💬 Mensagem de Menção",
+                "Use {user} para mencionar o membro",
+                default=config.get("welcome_mention_message") or "",
+                max_length=500))
+        elif cid == "wel_mention_delay":
+            await interaction.response.send_modal(WelcomeMentionDelayModal())
 
         # ===== VOICE LOGS =====
         elif cid == "vl_join_ch":
@@ -2601,8 +2840,7 @@ async def on_interaction(interaction: discord.Interaction):
                 "> 1. Seja **claro e objetivo**\n"
                 "> 2. **Não** faça sugestões ofensivas ou spam\n"
                 "> 3. Vote com **consciência** — você pode mudar seu voto\n"
-                "> 4. Sugestões com **muitos votos** são analisadas pela equipe\n"
-                "> 5. A decisão final é sempre da **administração**",
+                "> 4. Sugestões com **muitos votos** são analisadas pela equipe",
                 ephemeral=True)
         elif cid == "suggest_btn":
             await interaction.response.send_modal(SuggestionModal())
@@ -2862,6 +3100,37 @@ class KickTimeModal(ui.Modal, title="⏰ Tempo para Verificar"):
         msg = "✅ Kick automático desativado." if val == 0 else f"✅ Kick em **{val} min**."
         await interaction.response.send_message(msg, ephemeral=True)
 
+class WelcomeMentionDelayModal(ui.Modal, title="⏱️ Segundos para Apagar Menção"):
+    def __init__(self):
+        super().__init__()
+        cur = config.get("welcome_mention_delete_seconds", 5)
+        self.v = ui.TextInput(label="Segundos (mín. 1)", default=str(cur),
+                              required=True, max_length=4)
+        self.add_item(self.v)
+    async def on_submit(self, interaction):
+        try: val = max(1, int(self.v.value.strip()))
+        except ValueError:
+            await interaction.response.send_message("❌ Número inválido.", ephemeral=True); return
+        config["welcome_mention_delete_seconds"] = val; save_config(config)
+        await log_admin_action(interaction, "set_welcome_mention_delay", f"seg={val}")
+        await interaction.response.send_message(f"✅ Apagar após **{val}s**", ephemeral=True)
+
+class VerifTimeoutModal(ui.Modal, title="⏰ Deletar Canal de Verificação"):
+    def __init__(self):
+        super().__init__()
+        cur = config.get("verification_timeout_delete_minutes", 5)
+        self.v = ui.TextInput(label="Minutos (0 = desativar)", default=str(cur),
+                              required=True, max_length=4)
+        self.add_item(self.v)
+    async def on_submit(self, interaction):
+        try: val = max(0, int(self.v.value.strip()))
+        except ValueError:
+            await interaction.response.send_message("❌ Número inválido.", ephemeral=True); return
+        config["verification_timeout_delete_minutes"] = val; save_config(config)
+        await log_admin_action(interaction, "set_verif_timeout", f"min={val}")
+        msg = "✅ Desativado." if val == 0 else f"✅ Deletar canal após **{val} min**."
+        await interaction.response.send_message(msg, ephemeral=True)
+
 class ActivityMessagesModal(ui.Modal, title="💬 Mensagens da Atividade"):
     def __init__(self):
         super().__init__()
@@ -2870,7 +3139,7 @@ class ActivityMessagesModal(ui.Modal, title="💬 Mensagens da Atividade"):
             label="Uma mensagem por linha",
             style=discord.TextStyle.paragraph,
             default=cur,
-            placeholder="🖤 {members} membros em {brand}\n🎮 Jogando com a galera\n💜 Venha nos visitar!",
+            placeholder="🖤 {members} membros em {brand}\n🎮 Jogando com a galera",
             required=False, max_length=2000,
         )
         self.add_item(self.v)
@@ -2941,6 +3210,22 @@ class SuggestionModal(ui.Modal, title="💡 Enviar Sugestão"):
             f"✅ Sugestão enviada! {msg.jump_url}", ephemeral=True)
         await log_admin_action(interaction, "suggestion_create", f"id={sid} canal={channel.id}")
 
+        log_id = config.get("moderation_logs_channel_id")
+        if log_id:
+            log_ch = interaction.guild.get_channel(log_id)
+            if log_ch:
+                await send_log_card(
+                    log_ch, "💡 Nova Sugestão Enviada",
+                    user=interaction.user,
+                    fields=[
+                        ("🆔 ID", f"`#{sid}`"),
+                        ("📍 Canal", channel.mention),
+                        ("📝 Conteúdo", f"```{self.sugestao.value[:500]}```"),
+                        ("🔗 Link", f"[Ir para a sugestão]({msg.jump_url})"),
+                    ],
+                    accent=color_primary(),
+                )
+
 class DirectFeedbackModal(ui.Modal, title="⭐ Enviar Feedback"):
     def __init__(self):
         super().__init__()
@@ -2973,22 +3258,16 @@ class DirectFeedbackModal(ui.Modal, title="⭐ Enviar Feedback"):
         if cid:
             ch = interaction.guild.get_channel(cid)
             if ch:
-                try:
-                    stars = "⭐" * rating
-                    e = discord.Embed(
-                        title=f"⭐ Nova Avaliação — {bname()}",
-                        color=color_primary(),
-                        timestamp=datetime.datetime.now(),
-                    )
-                    e.set_author(name=interaction.user.display_name,
-                                 icon_url=interaction.user.display_avatar.url)
-                    e.add_field(name="👤 Usuário", value=interaction.user.mention, inline=True)
-                    e.add_field(name="📊 Nota", value=f"{stars} ({rating}/5)", inline=True)
-                    e.add_field(name="💬 Comentário", value=comment[:1024], inline=False)
-                    e.set_footer(text=bfooter())
-                    await ch.send(embed=e)
-                except Exception as e:
-                    logger.error(f"Erro enviando feedback: {e}")
+                stars = "⭐" * rating
+                await send_log_card(
+                    ch, "⭐ Nova Avaliação",
+                    user=interaction.user,
+                    fields=[
+                        ("📊 Nota", f"{stars} **({rating}/5)**"),
+                        ("💬 Comentário", f"```{comment[:800]}```"),
+                    ],
+                    accent=color_primary(),
+                )
 
         await interaction.response.send_message(
             "✅ **Obrigado pela sua avaliação!** 💜", ephemeral=True)
@@ -3012,17 +3291,24 @@ class TicketRatingModal(ui.Modal, title="⭐ Avaliar Atendimento"):
         comment = self.comment.value or "Sem comentário"
         try: add_ticket_feedback(interaction.channel.id, interaction.user.id, rating, comment)
         except Exception: pass
+
         fb_id = config.get("feedback_channel_id")
         if fb_id:
             ch = interaction.guild.get_channel(fb_id)
             if ch:
-                e = discord.Embed(
-                    title=f"⭐ Nova Avaliação — {bname()}",
-                    description=f"**Usuário:** {interaction.user.mention}\n**Ticket:** {self.ticket_name}\n**Nota:** {'⭐'*rating} ({rating}/5)\n**Comentário:** {comment}",
-                    color=color_primary(), timestamp=datetime.datetime.now())
-                try: await ch.send(embed=e)
-                except Exception: pass
-        await interaction.response.send_message("✅ Obrigado!", ephemeral=True)
+                stars = "⭐" * rating
+                await send_log_card(
+                    ch, "⭐ Avaliação de Ticket",
+                    user=interaction.user,
+                    fields=[
+                        ("🎫 Ticket", f"`{self.ticket_name}`"),
+                        ("📊 Nota", f"{stars} **({rating}/5)**"),
+                        ("💬 Comentário", f"```{comment[:500]}```"),
+                    ],
+                    accent=color_primary(),
+                )
+
+        await interaction.response.send_message("✅ Obrigado pela avaliação!", ephemeral=True)
 
 class TicketNameModal(ui.Modal, title="✏️ Editar Nome do Ticket"):
     def __init__(self, current_name: str):
@@ -3044,6 +3330,20 @@ class TicketNameModal(ui.Modal, title="✏️ Editar Nome do Ticket"):
                 name=new_name,
                 reason=f"Renomeado por {interaction.user} ({interaction.user.id})")
             await log_admin_action(interaction, "ticket_rename", f"de={old_name} para={new_name}")
+            log_id = config.get("ticket_logs_channel_id")
+            if log_id:
+                log_ch = interaction.guild.get_channel(log_id)
+                if log_ch:
+                    await send_log_card(
+                        log_ch, "✏️ Ticket Renomeado",
+                        user=interaction.user,
+                        fields=[
+                            ("📛 Nome Antigo", f"`{old_name}`"),
+                            ("✨ Nome Novo", f"`{new_name}`"),
+                            ("📍 Canal", interaction.channel.mention),
+                        ],
+                        accent=color_primary(),
+                    )
             await interaction.response.send_message(
                 f"✅ Ticket renomeado!\n**Antes:** `{old_name}`\n**Agora:** `{new_name}`",
                 ephemeral=True)
@@ -3059,16 +3359,26 @@ class ConfirmCloseView(ui.View):
     def __init__(self, channel_id):
         super().__init__(timeout=60)
         self.channel_id = channel_id
+
     @ui.button(label="✅ Sim, fechar", style=discord.ButtonStyle.danger)
     async def confirm(self, interaction, button):
         ch = interaction.guild.get_channel(self.channel_id)
         if ch:
+            ticket_name = ch.name
             log_id = config.get("ticket_logs_channel_id")
             if log_id:
                 log_ch = interaction.guild.get_channel(log_id)
                 if log_ch:
-                    try: await log_ch.send(f"🔒 Ticket `{ch.name}` fechado por {interaction.user.mention}.")
-                    except Exception: pass
+                    await send_log_card(
+                        log_ch, "🔒 Ticket Fechado",
+                        user=interaction.user,
+                        fields=[
+                            ("🎫 Ticket", f"`{ticket_name}`"),
+                            ("📍 Categoria", ch.category.name if ch.category else "—"),
+                            ("🕐 Fechado em", _fmt_ts(style="f")),
+                        ],
+                        accent=color_danger(),
+                    )
             try: remove_open_ticket(ch.id)
             except Exception: pass
             try: await ch.delete()
@@ -3116,6 +3426,20 @@ class AddMemberView(ui.View):
                 await interaction.channel.set_permissions(
                     member, view_channel=True, send_messages=True, read_message_history=True)
                 await log_admin_action(interaction, "ticket_add_member", f"membro={member.id}")
+                log_id = config.get("ticket_logs_channel_id")
+                if log_id:
+                    log_ch = interaction.guild.get_channel(log_id)
+                    if log_ch:
+                        await send_log_card(
+                            log_ch, "➕ Membro Adicionado ao Ticket",
+                            user=interaction.user,
+                            fields=[
+                                ("👤 Membro", member.mention),
+                                ("🎫 Ticket", f"`{interaction.channel.name}`"),
+                                ("📍 Canal", interaction.channel.mention),
+                            ],
+                            accent=color_primary(),
+                        )
                 await interaction.response.send_message(f"✅ {member.mention} adicionado.", ephemeral=True)
             except Exception as e:
                 await interaction.response.send_message(f"❌ Erro: {e}", ephemeral=True)
@@ -3159,8 +3483,7 @@ async def handle_ticket_open(interaction, tipo, nome):
         ui.Section(
             ui.TextDisplay(
                 f"**Olá {interaction.user.mention}!** Bem-vindo(a) ao atendimento. 💜\n\n"
-                "Descreva seu pedido abaixo e nossa equipe responderá em breve.\n"
-                "-# Ações disponíveis no painel fixado abaixo."
+                "Descreva seu pedido abaixo e nossa equipe responderá em breve."
             ),
             accessory=ui.Thumbnail(media=interaction.user.display_avatar.url),
         ),
@@ -3176,6 +3499,23 @@ async def handle_ticket_open(interaction, tipo, nome):
         await channel.send(view=ui.LayoutView(
             ui.Container(ui.TextDisplay(f"📢 {', '.join(mentions)} — novo ticket de {interaction.user.mention}."))))
     await channel.send(view=ticket_actions_layout())
+
+    log_id = config.get("ticket_logs_channel_id")
+    if log_id:
+        log_ch = guild.get_channel(log_id)
+        if log_ch:
+            type_label = "❓ Dúvidas" if tipo == "doubt" else "🛒 Compras"
+            await send_log_card(
+                log_ch, "🎫 Novo Ticket Aberto",
+                user=interaction.user,
+                fields=[
+                    ("📁 Tipo", type_label),
+                    ("📍 Canal", channel.mention),
+                    ("📂 Categoria", category.name if category else "—"),
+                    ("🕐 Aberto em", _fmt_ts(style="f")),
+                ],
+                accent=color_primary(),
+            )
     await interaction.response.send_message(f"✅ Ticket criado em {channel.mention}!", ephemeral=True)
 
 # ===================== CAPTCHA =====================
@@ -3183,6 +3523,7 @@ _pending_kicks = {}
 _math_answers = {}
 _button_verification_target = {}
 _temp_verification_channels = {}
+_verification_timeouts = {}
 
 def schedule_verification_kick(guild, member):
     minutes = config.get("verification_kick_minutes", 0)
@@ -3210,6 +3551,29 @@ def schedule_verification_kick(guild, member):
 def cancel_verification_kick(guild_id, user_id):
     key = (guild_id, user_id)
     task = _pending_kicks.pop(key, None)
+    if task: task.cancel()
+
+def _schedule_verification_timeout(guild, member):
+    minutes = config.get("verification_timeout_delete_minutes", 5)
+    if minutes <= 0: return
+    key = (guild.id, member.id)
+    if key in _verification_timeouts:
+        _verification_timeouts[key].cancel()
+    async def _timeout():
+        try:
+            await asyncio.sleep(minutes * 60)
+            if member.id not in _temp_verification_channels: return
+            await _delete_temp_channel(guild, member.id, delay=0)
+            logger.info(f"⏰ Canal temp de verificação deletado (timeout): {member}")
+        except asyncio.CancelledError:
+            pass
+        finally:
+            _verification_timeouts.pop(key, None)
+    _verification_timeouts[key] = asyncio.create_task(_timeout())
+
+def cancel_verification_timeout(guild_id, user_id):
+    key = (guild_id, user_id)
+    task = _verification_timeouts.pop(key, None)
     if task: task.cancel()
 
 def _generate_math_challenge():
@@ -3269,10 +3633,32 @@ async def _log_verification(guild, member, success, extra=""):
     if not cid: return
     ch = guild.get_channel(cid)
     if not ch: return
-    icon = "✅" if success else "❌"
-    try:
-        await ch.send(f"{icon} **{member}** (`{member.id}`) — {extra or ('verificado' if success else 'falhou')}")
-    except Exception: pass
+
+    if success:
+        title = "✅ Verificação Concluída"
+        accent = color_success()
+        icon_status = "🟢 **Sucesso**"
+    else:
+        title = "❌ Verificação Falhou"
+        accent = color_danger()
+        icon_status = "🔴 **Falhou**"
+
+    method = config.get("verification_method", "math")
+    method_label = "🧮 Matemática" if method == "math" else "🔘 Botão"
+
+    fields = [
+        ("📊 Resultado", icon_status),
+        ("🔀 Método", method_label),
+    ]
+    if extra:
+        fields.append(("📄 Detalhes", f"`{extra}`"))
+
+    await send_log_card(
+        ch, title,
+        user=member,
+        fields=fields,
+        accent=accent,
+    )
 
 async def send_captcha_challenge(member, channel):
     method = config.get("verification_method", "math")
@@ -3324,6 +3710,7 @@ async def _grant_verification(guild, member):
             try: await member.remove_roles(r)
             except Exception: pass
     cancel_verification_kick(guild.id, member.id)
+    cancel_verification_timeout(guild.id, member.id)
     _math_answers.pop(member.id, None)
     _button_verification_target.pop(member.id, None)
     await _log_verification(guild, member, True, "verificado")
@@ -3331,12 +3718,19 @@ async def _grant_verification(guild, member):
     asyncio.create_task(_delete_temp_channel(guild, member.id, delay=delay))
 
 async def handle_captcha_start(interaction):
+    if not config.get("verification_enabled", True):
+        await interaction.response.send_message(
+            "❌ A verificação está temporariamente **desativada**. Fale com a administração.",
+            ephemeral=True)
+        return
     member = interaction.user
     guild = interaction.guild
     existing_cid = _temp_verification_channels.get(member.id)
     existing = guild.get_channel(existing_cid) if existing_cid else None
     if not existing:
         existing = await _create_temp_verification_channel(guild, member)
+        if existing:
+            _schedule_verification_timeout(guild, member)
     if not existing:
         await interaction.response.send_message(
             "❌ Não consegui criar o canal temporário. Contate a administração.",
@@ -3345,7 +3739,7 @@ async def handle_captcha_start(interaction):
     await send_captcha_challenge(member, existing)
     await interaction.response.send_message(
         f"✅ Canal temporário criado: {existing.mention}\n"
-        f"-# Ele será apagado automaticamente após a verificação.",
+        f"-# Ele será apagado automaticamente após a verificação ou timeout.",
         ephemeral=True)
 
 async def handle_button_verify(interaction):
@@ -3576,6 +3970,20 @@ async def cmd_limpar(interaction: discord.Interaction, canal: discord.TextChanne
     )
     await progress_msg.edit(view=_build_cleanup_final_view(summary))
     await log_admin_action(interaction, "limparchat", f"canal={canal.id} apagadas={total}")
+    log_id = config.get("moderation_logs_channel_id")
+    if log_id:
+        log_ch = interaction.guild.get_channel(log_id)
+        if log_ch:
+            await send_log_card(
+                log_ch, "🧹 Limpeza de Canal de Texto",
+                user=interaction.user,
+                fields=[
+                    ("💬 Canal", canal.mention),
+                    ("🗑️ Mensagens Apagadas", f"**{total}**"),
+                    ("⏱️ Tempo", f"`{m:02d}m {s:02d}s`"),
+                ] + ([("⚠️ Erro", f"`{erro}`")] if erro else []),
+                accent=color_primary(),
+            )
 
 @bot.tree.command(name="limparchatvoz", description="🔊 Limpa o chat interno de um canal de voz")
 @app_commands.default_permissions(administrator=True)
@@ -3606,6 +4014,20 @@ async def cmd_limparvoz(interaction: discord.Interaction, canal: discord.VoiceCh
     )
     await progress_msg.edit(view=_build_cleanup_final_view(summary))
     await log_admin_action(interaction, "limparchatvoz", f"canal={canal.id} apagadas={total}")
+    log_id = config.get("moderation_logs_channel_id")
+    if log_id:
+        log_ch = interaction.guild.get_channel(log_id)
+        if log_ch:
+            await send_log_card(
+                log_ch, "🧹 Limpeza de Chat de Voz",
+                user=interaction.user,
+                fields=[
+                    ("🔊 Canal de Voz", canal.mention),
+                    ("🗑️ Mensagens Apagadas", f"**{total}**"),
+                    ("⏱️ Tempo", f"`{m:02d}m {s:02d}s`"),
+                ] + ([("⚠️ Erro", f"`{erro}`")] if erro else []),
+                accent=color_primary(),
+            )
 
 @bot.tree.command(name="mutar", description="🔇 Muta o bot na call")
 async def cmd_mutar(interaction):
@@ -3796,22 +4218,56 @@ async def on_message(message: discord.Message):
 async def on_member_join(member):
     if member.bot: return
     guild = member.guild
+
+    # 1) Cargo automático ao entrar
+    auto_role_id = config.get("auto_role_id")
+    if auto_role_id:
+        role = guild.get_role(auto_role_id)
+        if role:
+            try:
+                await member.add_roles(role, reason="Auto-cargo ao entrar")
+            except Exception as e:
+                logger.error(f"Auto-role: {e}")
+
+    # 2) Card de boas-vindas
     try: await send_welcome_message(member)
     except Exception as e: logger.error(f"Erro send_welcome: {e}")
-    for rid in config.get("verification_unverified_role_ids", []):
-        r = guild.get_role(rid)
-        if r:
-            try: await member.add_roles(r)
-            except Exception: pass
-    ch_id = config.get("verification_channel_id")
-    if ch_id:
-        try:
-            temp_ch = await _create_temp_verification_channel(guild, member)
-            if temp_ch:
-                await send_captcha_challenge(member, temp_ch)
-        except Exception as e:
-            logger.error(f"Erro criando temp verification: {e}")
-    schedule_verification_kick(guild, member)
+
+    # 3) Menção no chat geral (auto-delete)
+    mention_ch_id = config.get("welcome_mention_channel_id")
+    if mention_ch_id:
+        mention_ch = guild.get_channel(mention_ch_id)
+        if mention_ch:
+            try:
+                text = (config.get("welcome_mention_message") or "Bem-vindo(a) {user}! 🎉")
+                text = (text.replace("{user}", member.mention)
+                            .replace("{brand}", bname())
+                            .replace("{emoji}", bemoji())
+                            .replace("{members}", str(guild.member_count)))
+                sent = await mention_ch.send(text)
+                delay = max(1, int(config.get("welcome_mention_delete_seconds", 5)))
+                asyncio.create_task(_delete_message_after(sent, delay))
+            except Exception as e:
+                logger.error(f"Welcome mention: {e}")
+
+    # 4) Sistema de verificação
+    if config.get("verification_enabled", True):
+        for rid in config.get("verification_unverified_role_ids", []):
+            r = guild.get_role(rid)
+            if r:
+                try: await member.add_roles(r)
+                except Exception: pass
+        ch_id = config.get("verification_channel_id")
+        if ch_id:
+            try:
+                temp_ch = await _create_temp_verification_channel(guild, member)
+                if temp_ch:
+                    await send_captcha_challenge(member, temp_ch)
+                    _schedule_verification_timeout(guild, member)
+            except Exception as e:
+                logger.error(f"Erro criando temp verification: {e}")
+        schedule_verification_kick(guild, member)
+
     await update_voice_name_impl()
     await update_status(force=True)
 
@@ -3820,7 +4276,39 @@ async def on_member_remove(member):
     if member.bot: return
     try: await send_leave_message(member)
     except Exception as e: logger.error(f"Erro send_leave: {e}")
+
     cancel_verification_kick(member.guild.id, member.id)
+    cancel_verification_timeout(member.guild.id, member.id)
+
+    # Deleta canal temporário de verificação imediatamente
+    await _delete_temp_channel(member.guild, member.id, delay=0)
+
+    # Limpa todas as mensagens do usuário no servidor (background)
+    async def _cleanup_msgs():
+        try:
+            deleted = await _delete_all_user_messages(member.guild, member.id)
+            logger.info(f"🧹 Saída de {member}: {deleted} mensagens apagadas")
+            log_id = config.get("moderation_logs_channel_id")
+            if log_id:
+                log_ch = member.guild.get_channel(log_id)
+                if log_ch:
+                    fields = [
+                        ("👥 Novo Total de Membros", f"**{member.guild.member_count}**"),
+                        ("🗑️ Mensagens Apagadas", f"**{deleted}**"),
+                    ]
+                    if member.joined_at:
+                        delta = datetime.datetime.now(datetime.timezone.utc) - member.joined_at
+                        fields.insert(0, ("⏳ Tempo no Servidor", f"**{delta.days}** dia(s)"))
+                    await send_log_card(
+                        log_ch, "🧹 Limpeza Pós-Saída Concluída",
+                        user=member,
+                        fields=fields,
+                        accent=color_danger(),
+                    )
+        except Exception as e:
+            logger.error(f"Erro limpando msgs na saída: {e}")
+    asyncio.create_task(_cleanup_msgs())
+
     _temp_verification_channels.pop(member.id, None)
     await update_voice_name_impl()
     await update_status(force=True)
