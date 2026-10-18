@@ -46,7 +46,6 @@ DEFAULT_CONFIG = {
     "avatar_url":"","_last_avatar_url":"",
     "banner_painel_url":"","banner_ticket_url":"","banner_welcome_url":"",
     "guild_id":None,
-    # Cores individuais por painel atualizadas para roxo
     "panel_color_main":0x8A2BE2,"panel_color_ticket":0x8A2BE2,
     "panel_color_verification":0x9B30FF,"panel_color_feedback":0x8A2BE2,
     "panel_color_suggestions":0x8A2BE2,"panel_color_levels":0xFFD700,
@@ -72,7 +71,6 @@ DEFAULT_CONFIG = {
     "admin_role_ids":[],"addcargo_allowed_role_ids":[],
     "addcargo_panel_channel_id":None,"addcargo_panel_message_id":None,
     "painel_channel_id":None,"painel_message_id":None,
-    # Tickets 5 tipos
     "ticket_category_movcall_id":None,"ticket_category_movchat_id":None,
     "ticket_category_recrute_id":None,"ticket_category_support_id":None,
     "ticket_category_others_id":None,
@@ -86,35 +84,28 @@ DEFAULT_CONFIG = {
     "ticket_label_recrute":"RECRUTE-S","ticket_emoji_recrute":"📢",
     "ticket_label_support":"SUPORTE","ticket_emoji_support":"🛠️",
     "ticket_label_others":"OUTROS","ticket_emoji_others":"❓",
-    # Feedback
     "feedback_channel_id":None,"feedback_panel_channel_id":None,
     "feedback_panel_message_id":None,
     "feedback_panel_title":"⭐ Avaliações & Feedback — {brand}",
     "feedback_panel_description":"### 💜 Sua opinião é muito importante!\nAvalie o servidor de **1 a 5 estrelas**.",
-    # Sugestões
     "suggestions_channel_id":None,"suggestions_panel_channel_id":None,
     "suggestions_panel_message_id":None,
     "moderation_logs_channel_id":None,
-    # AntiBot
     "antibot_channel_id":None,"antibot_panel_message_id":None,
     "antibot_banner_url":"","antibot_title":"• Não envie mensagem nesse canal!",
     "antibot_description":"Sistema criado para prevenir bots de divulgação.",
     "antibot_punish_ban":True,"antibot_delete_messages":True,
     "antibot_log_channel_id":None,
-    # Levels
     "levels_enabled":True,"levels_xp_per_message":15,"levels_xp_cooldown_seconds":60,
     "levels_announce_channel_id":None,
     "levels_message_up":"🎉 {user} subiu para o **level {level}**!",
-    # Filters
     "filters_enabled":True,"filters_punish_after_warnings":3,
     "filters_links_allowed_role_ids":[],"filters_log_channel_id":None,
     "filters_blocked_words":[],"filters_allowed_domains":[],
-    # VIP
     "vip_enabled":True,"vip_role_base_id":None,
     "vip_allow_custom_color":True,"vip_allow_custom_name":True,
     "vip_allow_custom_tag":True,"vip_max_members":5,
     "vip_panel_channel_id":None,
-    # Staff
     "staff_role_ids":[],"staff_movchat_role_ids":[],
     "staff_movchat_goal":1000,"staff_call_goal_hours":30,
     "staff_report_channel_id":None,"staff_punish_channel_id":None,
@@ -1796,7 +1787,11 @@ class SuggestionModal(ui.Modal, title="💡 Enviar Sugestão"):
 
 def suggestion_card_layout(sid, author, content, up, down, status="open"):
     total = up+down
-    bar = "`[{'░'*14}]`" if total == 0 else f"`[{'█'*int(14*up/total)}{'░'*(14-int(14*up/total))}]` **{int(up/total*100)}%**"
+    if total == 0:
+        bar = "`[" + "░"*14 + "]` **0%**"
+    else:
+        filled = int(14*up/total); empty = 14 - filled
+        bar = "`[" + "█"*filled + "░"*empty + "]` **" + str(int(up/total*100)) + "%**"
     avatar = author.display_avatar.with_size(256).url
     comps = [ui.TextDisplay(f"# 💡 Sugestão #{sid}"),
              ui.Section(ui.TextDisplay(f"### {author.display_name}\n-# Autor • {author.mention}"),
@@ -3042,7 +3037,6 @@ async def on_guild_channel_update(before, after):
         await auto_emoji_channel(after)
     except Exception: pass
 
-# Níveis: contador de mensagens para MOV CHAT
 @bot.event
 async def on_message_staff_count(message):
     if message.author.bot or not message.guild: return
@@ -3054,4 +3048,3 @@ async def on_message_staff_count(message):
 # ===================== RUN =====================
 if __name__ == "__main__":
     bot.run(TOKEN)
-```<ElicitationsGroup></ElicitationsGroup>
