@@ -41,15 +41,15 @@ def E(key): return _parse_emoji(EMOJI.get(key,""))
 # ===================== CONFIG =====================
 DEFAULT_CONFIG = {
     "brand_name":"𝚙𝚡𝚔","brand_emoji":"🖤","brand_footer":"🖤 𝚙𝚡𝚔 • Sistema Oficial",
-    "brand_color_primary":0x3D1A5C,"brand_color_secondary":0x5B2A8E,
+    "brand_color_primary":0x8A2BE2,"brand_color_secondary":0x9B30FF,
     "brand_color_success":0x00FF88,"brand_color_danger":0xFF3366,
     "avatar_url":"","_last_avatar_url":"",
     "banner_painel_url":"","banner_ticket_url":"","banner_welcome_url":"",
     "guild_id":None,
-    # Cores individuais por painel
-    "panel_color_main":0x3D1A5C,"panel_color_ticket":0x3D1A5C,
-    "panel_color_verification":0x5B2A8E,"panel_color_feedback":0x3D1A5C,
-    "panel_color_suggestions":0x3D1A5C,"panel_color_levels":0xFFD700,
+    # Cores individuais por painel atualizadas para roxo
+    "panel_color_main":0x8A2BE2,"panel_color_ticket":0x8A2BE2,
+    "panel_color_verification":0x9B30FF,"panel_color_feedback":0x8A2BE2,
+    "panel_color_suggestions":0x8A2BE2,"panel_color_levels":0xFFD700,
     "panel_color_staff":0xFF3366,"panel_color_vip":0xFFD700,
     "auto_emoji_channels":True,
     "verification_enabled":True,"verification_method":"math","verification_difficulty":1,
@@ -159,11 +159,11 @@ async def task_reload_config():
 def bname(): return config.get("brand_name") or "Bot"
 def bemoji(): return config.get("brand_emoji") or "🖤"
 def bfooter(): return config.get("brand_footer") or "Sistema Oficial"
-def c_primary(): return config.get("brand_color_primary",0x3D1A5C)
-def c_secondary(): return config.get("brand_color_secondary",0x5B2A8E)
+def c_primary(): return config.get("brand_color_primary",0x8A2BE2)
+def c_secondary(): return config.get("brand_color_secondary",0x9B30FF)
 def c_success(): return config.get("brand_color_success",0x00FF88)
 def c_danger(): return config.get("brand_color_danger",0xFF3366)
-def c_panel(key, fallback=0x3D1A5C): return config.get(f"panel_color_{key}") or fallback
+def c_panel(key, fallback=0x8A2BE2): return config.get(f"panel_color_{key}") or fallback
 def avatar_url(): return config.get("avatar_url") or None
 def banner_painel(): return config.get("banner_painel_url") or None
 def banner_ticket(): return config.get("banner_ticket_url") or None
@@ -3054,3 +3054,4 @@ async def on_message_staff_count(message):
 # ===================== RUN =====================
 if __name__ == "__main__":
     bot.run(TOKEN)
+```<ElicitationsGroup></ElicitationsGroup>
