@@ -40,7 +40,8 @@ DISCORD_API     = "https://discord.com/api/v10"
 OAUTH_AUTHORIZE = "https://discord.com/oauth2/authorize"
 OAUTH_TOKEN     = "https://discord.com/api/oauth2/token"
 
-app = Flask(__name__)
+# Adicionado static_folder para carregar a logo
+app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.secret_key = FLASK_SECRET
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
@@ -477,27 +478,18 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
 .hero-top,.hero-mid,.hero-bottom{position:relative;z-index:1}
 .hero-brand{display:flex;align-items:center;gap:14px;font-family:'Archivo Black',sans-serif;
   font-size:20px;letter-spacing:-0.04em;color:var(--white)}
-.hero-brand .mark{width:48px;height:48px;border:1px solid var(--purple);display:grid;place-items:center;font-size:22px;
+.hero-brand .mark{width:48px;height:48px;border:1px solid var(--purple);display:grid;place-items:center;
   background:radial-gradient(circle at 30% 30%,rgba(138,79,255,.15),transparent 70%);
-  box-shadow:0 0 24px -8px var(--purple-glow);color:var(--white)}
+  box-shadow:0 0 24px -8px var(--purple-glow);overflow:hidden}
+.hero-brand .mark img{width:100%;height:100%;object-fit:cover;display:block;}
 .hero-brand .name{display:flex;flex-direction:column;line-height:1}
 .hero-brand .name small{font-family:'Inter',sans-serif;font-size:9.5px;font-weight:700;color:var(--gray-mid);
   letter-spacing:.24em;text-transform:uppercase;margin-top:4px}
 .hero-mid{max-width:560px}
-.eyebrow{display:inline-flex;align-items:center;gap:10px;font-size:11px;font-weight:700;color:var(--purple-hi);
-  letter-spacing:.22em;text-transform:uppercase;padding:8px 14px;border:1px solid var(--border-hi);
-  border-radius:2px;margin-bottom:36px;background:rgba(138,79,255,.05)}
-.eyebrow::before{content:'';width:5px;height:5px;background:var(--purple);box-shadow:0 0 8px var(--purple)}
 .hero-mid h1{font-family:'Archivo Black',sans-serif;font-size:clamp(42px,5.2vw,76px);line-height:.95;
   color:var(--white);margin-bottom:28px;letter-spacing:-0.045em;text-transform:uppercase}
 .hero-mid h1 .accent{color:var(--purple);text-shadow:0 0 40px var(--purple-glow)}
 .hero-mid p{font-size:16px;color:var(--gray-hi);line-height:1.7;max-width:460px}
-.hero-mid .features{display:flex;flex-wrap:wrap;gap:8px;margin-top:40px}
-.feature{display:inline-flex;align-items:center;gap:10px;padding:10px 16px;border:1px solid var(--border);
-  font-size:12.5px;color:var(--gray-hi);font-weight:500;background:rgba(255,255,255,.02);
-  transition:all .2s var(--ease)}
-.feature:hover{border-color:var(--purple);background:rgba(138,79,255,.08);color:var(--white);transform:translateX(2px)}
-.feature svg{color:var(--purple);flex-shrink:0}
 .hero-bottom{display:flex;align-items:center;gap:24px;flex-wrap:wrap;font-size:12px;color:var(--gray-mid);letter-spacing:.02em}
 .stat{display:flex;align-items:center;gap:8px}
 .stat b{color:var(--white);font-weight:700}
@@ -516,13 +508,15 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
   color:var(--white);margin-bottom:10px;text-transform:uppercase;line-height:1.05}
 .card-head p{font-size:13.5px;color:var(--gray-hi);line-height:1.65}
 .btn-discord{display:flex;align-items:center;justify-content:space-between;gap:14px;
-  width:100%;padding:18px 22px;background:var(--purple);color:var(--white);font-weight:700;font-size:14px;
-  text-decoration:none;transition:all .2s var(--ease);letter-spacing:-.005em;position:relative;overflow:hidden;border:1px solid var(--purple)}
+  width:100%;padding:18px 22px;background:linear-gradient(135deg, var(--purple) 0%, #6B2EE0 100%);
+  color:var(--white);font-weight:700;font-size:14px;text-decoration:none;transition:all .25s var(--ease);
+  letter-spacing:-.005em;position:relative;overflow:hidden;border:1px solid rgba(255,255,255,0.15);border-radius:8px;
+  box-shadow:0 8px 24px -8px rgba(138,79,255,0.4);}
 .btn-discord::before{content:'';position:absolute;inset:0;
   background:linear-gradient(120deg,transparent,rgba(255,255,255,.2),transparent);
   transform:translateX(-100%);transition:transform .5s var(--ease)}
-.btn-discord:hover{background:var(--purple-hi);border-color:var(--purple-hi);
-  box-shadow:0 0 40px -8px var(--purple-glow);transform:translateY(-1px);color:var(--white)}
+.btn-discord:hover{background:linear-gradient(135deg, #A370FF 0%, #8A4FFF 100%);
+  box-shadow:0 12px 32px -8px rgba(138,79,255,0.6);transform:translateY(-2px);color:var(--white)}
 .btn-discord:hover::before{transform:translateX(100%)}
 .btn-discord .left{display:flex;align-items:center;gap:12px;position:relative;z-index:1}
 .btn-discord .arrow{position:relative;z-index:1;transition:transform .2s var(--ease)}
@@ -532,10 +526,10 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
 .login-foot .status{display:flex;align-items:center;gap:8px}
 .login-foot .status .dot{width:6px;height:6px;background:var(--ok);box-shadow:0 0 8px var(--ok)}
 .login-foot .secure{display:flex;align-items:center;gap:6px}
-.page-mini-footer{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
-  font-size:11px;color:var(--gray-lo);display:flex;gap:18px;z-index:5;letter-spacing:.04em}
-.page-mini-footer a{color:var(--gray-lo)}
-.page-mini-footer a:hover{color:var(--purple-hi)}
+.page-mini-footer{position:absolute;bottom:20px;left:0;right:0;
+  font-size:11px;color:var(--gray-lo);display:flex;justify-content:center;gap:18px;z-index:10;letter-spacing:.04em;}
+.page-mini-footer a{color:var(--gray-lo);}
+.page-mini-footer a:hover{color:var(--purple-hi);}
 @media(max-width:960px){
   .login-page{grid-template-columns:1fr}
   .hero{padding:36px 28px 44px;min-height:auto;border-right:0;border-bottom:1px solid var(--border)}
@@ -548,7 +542,7 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
 }
 @media(max-width:480px){
   .hero{padding:28px 20px 36px}
-  .hero-brand .mark{width:40px;height:40px;font-size:18px}
+  .hero-brand .mark{width:40px;height:40px;}
   .login-panel{padding:28px 16px 60px}
   .login-card{padding:32px 22px}
 }
@@ -558,21 +552,13 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
   <section class="hero" aria-label="Apresentação">
     <div class="hero-top">
       <div class="hero-brand">
-        <span class="mark">🖤</span>
+        <span class="mark"><img src="/static/logo.gif" alt="Logo"></span>
         <span class="name">PXKK<small>Management</small></span>
       </div>
     </div>
     <div class="hero-mid">
-      <span class="eyebrow">Plano Profissional</span>
       <h1>Gerencie seu<br>servidor com<br><span class="accent">precisão total.</span></h1>
       <p>Toda a configuração do seu bot em um painel único, seguro e intuitivo. Controle tickets, verificação, níveis e muito mais.</p>
-      <div class="features">
-        <span class="feature"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Tickets</span>
-        <span class="feature"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>AntiBot</span>
-        <span class="feature"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Sugestões</span>
-        <span class="feature"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>MEE6</span>
-        <span class="feature"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>VIP</span>
-      </div>
     </div>
     <div class="hero-bottom">
       <div class="stat"><b>OAuth2</b> Discord</div>
@@ -602,13 +588,13 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
       </div>
     </div>
   </section>
+  <footer class="page-mini-footer">
+    <span>© 2026 PXKK</span>
+    <a href="#">Suporte</a>
+    <a href="#">Termos</a>
+    <a href="#">Privacidade</a>
+  </footer>
 </main>
-<footer class="page-mini-footer">
-  <span>© 2026 PXKK</span>
-  <a href="#">Suporte</a>
-  <a href="#">Termos</a>
-  <a href="#">Privacidade</a>
-</footer>
 </body></html>"""
 
 NOT_OWNER_HTML = """<!doctype html><html lang="pt-br"><head>
@@ -680,7 +666,8 @@ DASHBOARD_HTML = """<!doctype html><html lang="pt-br"><head>
 .hamburger.open span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
 .brand{display:flex;align-items:center;gap:12px;color:var(--white);text-decoration:none;flex-shrink:0}
 .brand-icon{width:38px;height:38px;border:1px solid var(--purple);display:grid;place-items:center;font-size:16px;
-  background:radial-gradient(circle at 30% 30%,rgba(138,79,255,.12),transparent 70%);box-shadow:0 0 20px -6px var(--purple-glow)}
+  background:radial-gradient(circle at 30% 30%,rgba(138,79,255,.12),transparent 70%);box-shadow:0 0 20px -6px var(--purple-glow);overflow:hidden}
+.brand-icon img{width:100%;height:100%;object-fit:cover;display:block;}
 .brand-text{display:flex;flex-direction:column;line-height:1}
 .brand-text .name{font-family:'Archivo Black',sans-serif;font-weight:400;font-size:16px;letter-spacing:-.03em;color:var(--white)}
 .brand-text .sub{font-size:9.5px;color:var(--gray-mid);font-weight:700;letter-spacing:.24em;text-transform:uppercase;margin-top:4px}
@@ -799,7 +786,8 @@ input[type=color]::-webkit-color-swatch{border:0}
 .footer-inner{max-width:920px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;
   gap:16px;flex-wrap:wrap;font-size:12px;color:var(--gray-mid);letter-spacing:.02em}
 .footer-brand{display:flex;align-items:center;gap:10px;font-weight:600;color:var(--gray-hi)}
-.footer-brand .mini-icon{width:26px;height:26px;border:1px solid var(--border-hi);display:grid;place-items:center;font-size:12px}
+.footer-brand .mini-icon{width:26px;height:26px;border:1px solid var(--border-hi);display:grid;place-items:center;font-size:12px;overflow:hidden}
+.footer-brand .mini-icon img{width:100%;height:100%;object-fit:cover;display:block;}
 .footer-links{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .footer-links a{color:var(--gray-mid);padding:5px 9px;transition:all .16s var(--ease);font-size:12px}
 .footer-links a:hover{color:var(--white)}
@@ -839,7 +827,7 @@ input[type=color]::-webkit-color-swatch{border:0}
     <span></span><span></span><span></span>
   </button>
   <a href="/" class="brand" aria-label="PXKK Dashboard">
-    <span class="brand-icon" aria-hidden="true">🖤</span>
+    <span class="brand-icon" aria-hidden="true"><img src="/static/logo.gif" alt="Logo"></span>
     <span class="brand-text">
       <span class="name">PXKK</span>
       <span class="sub">Dashboard</span>
@@ -956,7 +944,7 @@ input[type=color]::-webkit-color-swatch{border:0}
 <footer class="footer">
   <div class="footer-inner">
     <div class="footer-brand">
-      <span class="mini-icon" aria-hidden="true">🖤</span>
+      <span class="mini-icon" aria-hidden="true"><img src="/static/logo.gif" alt="Logo"></span>
       <span>© 2026 PXKK · Todos os direitos reservados</span>
     </div>
     <nav class="footer-links" aria-label="Links do rodapé">
