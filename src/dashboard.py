@@ -476,15 +476,13 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
 .hero::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;
   background:linear-gradient(90deg,transparent,var(--purple),transparent);opacity:.5}
 .hero-top,.hero-mid,.hero-bottom{position:relative;z-index:1}
-.hero-brand{display:flex;align-items:center;gap:14px;font-family:'Archivo Black',sans-serif;
-  font-size:20px;letter-spacing:-0.04em;color:var(--white)}
-.hero-brand .mark{width:48px;height:48px;border:1px solid var(--purple);display:grid;place-items:center;
+.hero-brand{display:flex;align-items:center;gap:16px;font-family:'Archivo Black',sans-serif;
+  font-size:28px;letter-spacing:-0.04em;color:var(--white)}
+.hero-brand .mark{width:68px;height:68px;border:1px solid var(--purple);display:grid;place-items:center;
   background:radial-gradient(circle at 30% 30%,rgba(138,79,255,.15),transparent 70%);
-  box-shadow:0 0 24px -8px var(--purple-glow);overflow:hidden}
+  box-shadow:0 0 24px -8px var(--purple-glow);overflow:hidden;border-radius:8px;}
 .hero-brand .mark img{width:100%;height:100%;object-fit:cover;display:block;}
 .hero-brand .name{display:flex;flex-direction:column;line-height:1}
-.hero-brand .name small{font-family:'Inter',sans-serif;font-size:9.5px;font-weight:700;color:var(--gray-mid);
-  letter-spacing:.24em;text-transform:uppercase;margin-top:4px}
 .hero-mid{max-width:560px}
 .hero-mid h1{font-family:'Archivo Black',sans-serif;font-size:clamp(42px,5.2vw,76px);line-height:.95;
   color:var(--white);margin-bottom:28px;letter-spacing:-0.045em;text-transform:uppercase}
@@ -496,40 +494,46 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
 .divider{width:1px;height:12px;background:var(--border)}
 .login-panel{display:flex;align-items:center;justify-content:center;padding:48px 32px;background:var(--black);position:relative}
 .login-panel::before{content:'';position:absolute;inset:0;
-  background:radial-gradient(circle at 50% 40%,rgba(138,79,255,.06),transparent 60%);pointer-events:none}
-.login-card{position:relative;width:100%;max-width:400px;padding:44px 36px;
-  border:1px solid var(--border);background:rgba(10,10,10,.6);backdrop-filter:blur(12px)}
-.login-card::before{content:'';position:absolute;top:-1px;left:24px;right:24px;height:1px;
-  background:linear-gradient(90deg,transparent,var(--purple),transparent)}
-.card-head{margin-bottom:36px}
-.card-head .mini-tag{font-size:10px;font-weight:700;color:var(--purple-hi);
-  letter-spacing:.24em;text-transform:uppercase;margin-bottom:16px;display:block}
-.card-head h2{font-family:'Archivo Black',sans-serif;font-size:28px;letter-spacing:-0.03em;
-  color:var(--white);margin-bottom:10px;text-transform:uppercase;line-height:1.05}
-.card-head p{font-size:13.5px;color:var(--gray-hi);line-height:1.65}
+  background:radial-gradient(circle at 50% 50%,rgba(138,79,255,.08),transparent 60%);pointer-events:none}
+.login-card{position:relative;width:100%;max-width:440px;padding:56px 48px;
+  border:1px solid rgba(255,255,255,0.06);border-top:1px solid rgba(138,79,255,0.4);
+  background:linear-gradient(180deg, rgba(16,16,20,0.95) 0%, rgba(8,8,10,0.98) 100%);
+  border-radius:16px;backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  box-shadow:0 32px 80px -20px rgba(0,0,0,0.9), 0 0 40px -10px rgba(138,79,255,0.15);}
+.login-card::before{content:'';position:absolute;top:-1px;left:40px;right:40px;height:1px;
+  background:linear-gradient(90deg,transparent,var(--purple),transparent);opacity:.8}
+.card-head{margin-bottom:40px;text-align:center;}
+.card-head .mini-tag{display:inline-block;font-size:10px;font-weight:800;color:var(--white);
+  background:rgba(138,79,255,0.15);border:1px solid rgba(138,79,255,0.3);padding:6px 14px;
+  border-radius:6px;letter-spacing:.2em;margin-bottom:20px;text-transform:uppercase}
+.card-head h2{font-family:'Archivo Black',sans-serif;font-size:34px;letter-spacing:-0.03em;
+  color:var(--white);margin-bottom:12px;text-transform:uppercase;line-height:1.1}
+.card-head p{font-size:14px;color:var(--gray-hi);line-height:1.65}
 .btn-discord{display:flex;align-items:center;justify-content:space-between;gap:14px;
-  width:100%;padding:18px 22px;background:linear-gradient(135deg, var(--purple) 0%, #6B2EE0 100%);
-  color:var(--white);font-weight:700;font-size:14px;text-decoration:none;transition:all .25s var(--ease);
-  letter-spacing:-.005em;position:relative;overflow:hidden;border:1px solid rgba(255,255,255,0.15);border-radius:8px;
-  box-shadow:0 8px 24px -8px rgba(138,79,255,0.4);}
+  width:100%;padding:18px 24px;background:linear-gradient(135deg, var(--purple) 0%, #6B2EE0 100%);
+  color:var(--white);font-weight:700;font-size:15px;text-decoration:none;transition:all .25s var(--ease);
+  letter-spacing:-.005em;position:relative;overflow:hidden;border:1px solid rgba(255,255,255,0.15);border-radius:10px;
+  box-shadow:0 12px 30px -8px rgba(138,79,255,0.5);}
 .btn-discord::before{content:'';position:absolute;inset:0;
   background:linear-gradient(120deg,transparent,rgba(255,255,255,.2),transparent);
   transform:translateX(-100%);transition:transform .5s var(--ease)}
 .btn-discord:hover{background:linear-gradient(135deg, #A370FF 0%, #8A4FFF 100%);
-  box-shadow:0 12px 32px -8px rgba(138,79,255,0.6);transform:translateY(-2px);color:var(--white)}
+  box-shadow:0 16px 40px -8px rgba(138,79,255,0.7);transform:translateY(-2px);color:var(--white)}
 .btn-discord:hover::before{transform:translateX(100%)}
 .btn-discord .left{display:flex;align-items:center;gap:12px;position:relative;z-index:1}
 .btn-discord .arrow{position:relative;z-index:1;transition:transform .2s var(--ease)}
 .btn-discord:hover .arrow{transform:translateX(4px)}
-.login-foot{margin-top:28px;padding-top:24px;border-top:1px solid var(--border);
+.login-foot{margin-top:32px;padding-top:24px;border-top:1px solid rgba(255,255,255,0.05);
   display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;color:var(--gray-mid)}
 .login-foot .status{display:flex;align-items:center;gap:8px}
 .login-foot .status .dot{width:6px;height:6px;background:var(--ok);box-shadow:0 0 8px var(--ok)}
 .login-foot .secure{display:flex;align-items:center;gap:6px}
-.page-mini-footer{position:absolute;bottom:20px;left:0;right:0;
-  font-size:11px;color:var(--gray-lo);display:flex;justify-content:center;gap:18px;z-index:10;letter-spacing:.04em;}
-.page-mini-footer a{color:var(--gray-lo);}
-.page-mini-footer a:hover{color:var(--purple-hi);}
+.page-mini-footer{position:fixed;bottom:24px;left:0;right:0;
+  font-size:12px;color:var(--gray-lo);display:flex;justify-content:center;gap:24px;z-index:50;letter-spacing:.04em;
+  pointer-events:none;}
+.page-mini-footer a,.page-mini-footer span{pointer-events:auto;}
+.page-mini-footer a{color:var(--gray-lo);transition:color .2s var(--ease)}
+.page-mini-footer a:hover{color:var(--purple-hi)}
 @media(max-width:960px){
   .login-page{grid-template-columns:1fr}
   .hero{padding:36px 28px 44px;min-height:auto;border-right:0;border-bottom:1px solid var(--border)}
@@ -537,14 +541,16 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
   .hero-mid p{font-size:15px}
   .hero-bottom{font-size:11px;gap:12px;flex-wrap:wrap}
   .login-panel{padding:36px 20px 80px}
-  .login-card{max-width:440px;padding:36px 28px}
-  .page-mini-footer{position:static;margin-top:24px;justify-content:center}
+  .login-card{max-width:440px;padding:40px 28px}
+  .page-mini-footer{position:static;margin-top:32px;justify-content:center;flex-wrap:wrap}
 }
 @media(max-width:480px){
   .hero{padding:28px 20px 36px}
-  .hero-brand .mark{width:40px;height:40px;}
+  .hero-brand{font-size:24px;}
+  .hero-brand .mark{width:56px;height:56px;}
   .login-panel{padding:28px 16px 60px}
   .login-card{padding:32px 22px}
+  .card-head h2{font-size:28px;}
 }
 </style></head>
 <body>
@@ -553,7 +559,7 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
     <div class="hero-top">
       <div class="hero-brand">
         <span class="mark"><img src="/static/logo.gif" alt="Logo"></span>
-        <span class="name">PXKK<small>Management</small></span>
+        <span class="name">PXKK</span>
       </div>
     </div>
     <div class="hero-mid">
@@ -577,24 +583,24 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
       </div>
       <a href="/auth" class="btn-discord">
         <span class="left">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M20.3 4.4A19.7 19.7 0 0 0 15.4 3l-.3.5a14.7 14.7 0 0 1 4.3 2.2 15 15 0 0 0-12.8 0A14.6 14.6 0 0 1 10.9 3.5L10.6 3a19.7 19.7 0 0 0-4.9 1.4C2.6 8.6 1.9 12.7 2.3 16.7a19.8 19.8 0 0 0 6 3l.8-1.3a13 13 0 0 1-2-1l.5-.4a14 14 0 0 0 12.8 0l.5.4a13 13 0 0 1-2 1l.8 1.3a19.8 19.8 0 0 0 6-3c.5-4.6-.7-8.6-3.4-12.3ZM9 14.6c-1.2 0-2.2-1.1-2.2-2.4S7.8 9.8 9 9.8s2.2 1.1 2.2 2.4S10.2 14.6 9 14.6Zm6 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Z"/></svg>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20.3 4.4A19.7 19.7 0 0 0 15.4 3l-.3.5a14.7 14.7 0 0 1 4.3 2.2 15 15 0 0 0-12.8 0A14.6 14.6 0 0 1 10.9 3.5L10.6 3a19.7 19.7 0 0 0-4.9 1.4C2.6 8.6 1.9 12.7 2.3 16.7a19.8 19.8 0 0 0 6 3l.8-1.3a13 13 0 0 1-2-1l.5-.4a14 14 0 0 0 12.8 0l.5.4a13 13 0 0 1-2 1l.8 1.3a19.8 19.8 0 0 0 6-3c.5-4.6-.7-8.6-3.4-12.3ZM9 14.6c-1.2 0-2.2-1.1-2.2-2.4S7.8 9.8 9 9.8s2.2 1.1 2.2 2.4S10.2 14.6 9 14.6Zm6 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Z"/></svg>
           Entrar com Discord
         </span>
-        <svg class="arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <svg class="arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </a>
       <div class="login-foot">
         <div class="status"><span class="dot"></span> Online</div>
-        <div class="secure"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Seguro</div>
+        <div class="secure"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Seguro</div>
       </div>
     </div>
   </section>
-  <footer class="page-mini-footer">
-    <span>© 2026 PXKK</span>
-    <a href="#">Suporte</a>
-    <a href="#">Termos</a>
-    <a href="#">Privacidade</a>
-  </footer>
 </main>
+<footer class="page-mini-footer">
+  <span>© 2026 PXKK</span>
+  <a href="#">Suporte</a>
+  <a href="#">Termos</a>
+  <a href="#">Privacidade</a>
+</footer>
 </body></html>"""
 
 NOT_OWNER_HTML = """<!doctype html><html lang="pt-br"><head>
@@ -666,7 +672,7 @@ DASHBOARD_HTML = """<!doctype html><html lang="pt-br"><head>
 .hamburger.open span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
 .brand{display:flex;align-items:center;gap:12px;color:var(--white);text-decoration:none;flex-shrink:0}
 .brand-icon{width:38px;height:38px;border:1px solid var(--purple);display:grid;place-items:center;font-size:16px;
-  background:radial-gradient(circle at 30% 30%,rgba(138,79,255,.12),transparent 70%);box-shadow:0 0 20px -6px var(--purple-glow);overflow:hidden}
+  background:radial-gradient(circle at 30% 30%,rgba(138,79,255,.12),transparent 70%);box-shadow:0 0 20px -6px var(--purple-glow);overflow:hidden;border-radius:6px;}
 .brand-icon img{width:100%;height:100%;object-fit:cover;display:block;}
 .brand-text{display:flex;flex-direction:column;line-height:1}
 .brand-text .name{font-family:'Archivo Black',sans-serif;font-weight:400;font-size:16px;letter-spacing:-.03em;color:var(--white)}
@@ -786,7 +792,7 @@ input[type=color]::-webkit-color-swatch{border:0}
 .footer-inner{max-width:920px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;
   gap:16px;flex-wrap:wrap;font-size:12px;color:var(--gray-mid);letter-spacing:.02em}
 .footer-brand{display:flex;align-items:center;gap:10px;font-weight:600;color:var(--gray-hi)}
-.footer-brand .mini-icon{width:26px;height:26px;border:1px solid var(--border-hi);display:grid;place-items:center;font-size:12px;overflow:hidden}
+.footer-brand .mini-icon{width:26px;height:26px;border:1px solid var(--border-hi);display:grid;place-items:center;font-size:12px;overflow:hidden;border-radius:4px;}
 .footer-brand .mini-icon img{width:100%;height:100%;object-fit:cover;display:block;}
 .footer-links{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .footer-links a{color:var(--gray-mid);padding:5px 9px;transition:all .16s var(--ease);font-size:12px}
