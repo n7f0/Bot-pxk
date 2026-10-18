@@ -422,9 +422,9 @@ STYLE = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 :root{
-  --ink-900:#1c202c;--ink-800:#232736;--ink-700:#2a2e3e;--ink-600:#31323e;
-  --ink-500:#3a3d4d;--ink-400:#4a4d5e;--purple:#60519b;--purple-hi:#7869b3;
-  --purple-lo:#4d4080;--mist:#bfc0d1;--mist-hi:#d5d6e1;--mist-lo:#8e8fa3;
+  --ink-900:#000000;--ink-800:#0a0a0a;--ink-700:#141414;--ink-600:#1f1f1f;
+  --ink-500:#292929;--ink-400:#333333;--purple:#8A2BE2;--purple-hi:#9B30FF;
+  --purple-lo:#4B0082;--mist:#e0e0e0;--mist-hi:#ffffff;--mist-lo:#aaaaaa;
   --ok:#5fa87d;--warn:#c9a15a;--err:#c96363;
   --radius-sm:8px;--radius:12px;--radius-lg:18px;--radius-xl:24px;
   --shadow-sm:0 1px 2px rgba(0,0,0,.28);
@@ -454,15 +454,15 @@ img{display:block;max-width:100%}
 LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#1c202c">
+<meta name="theme-color" content="#000000">
 <meta name="description" content="PXKK Dashboard — gerencie seu bot Discord de forma simples e profissional.">
 <title>PXKK — Plataforma de Gerenciamento</title>
 """ + STYLE + """
 <style>
 .login-page{min-height:100vh;display:grid;grid-template-columns:1.15fr 1fr;position:relative;overflow:hidden;background:var(--ink-900)}
 .hero{position:relative;padding:56px 72px;display:flex;flex-direction:column;justify-content:space-between;
-  background:radial-gradient(1200px 700px at -20% 100%,rgba(96,81,155,.28),transparent 60%),
-             radial-gradient(900px 600px at 110% 0%,rgba(96,81,155,.14),transparent 55%),var(--ink-900);
+  background:radial-gradient(1200px 700px at -20% 100%,rgba(138,43,226,.28),transparent 60%),
+             radial-gradient(900px 600px at 110% 0%,rgba(138,43,226,.14),transparent 55%),var(--ink-900);
   overflow:hidden;border-right:1px solid var(--ink-700)}
 .hero::before{content:'';position:absolute;inset:0;
   background-image:linear-gradient(rgba(191,192,209,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(191,192,209,.035) 1px,transparent 1px);
@@ -472,14 +472,14 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
 .hero-top,.hero-mid,.hero-bottom{position:relative;z-index:1}
 .hero-brand{display:flex;align-items:center;gap:14px;font-weight:800;font-size:18px;letter-spacing:-0.03em;color:var(--mist-hi)}
 .hero-brand .mark{width:44px;height:44px;border-radius:12px;background:var(--purple);display:grid;place-items:center;font-size:20px;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 8px 24px -8px rgba(96,81,155,.7);position:relative}
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 8px 24px -8px rgba(138,43,226,.7);position:relative}
 .hero-brand .name{display:flex;flex-direction:column;line-height:1.05}
 .hero-brand .name small{font-size:10px;font-weight:600;color:var(--mist-lo);letter-spacing:.16em;text-transform:uppercase;margin-top:2px}
 .hero-mid{max-width:540px}
 .hero-mid .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:11.5px;font-weight:600;color:var(--mist);
   letter-spacing:.16em;text-transform:uppercase;padding:6px 12px;border-radius:99px;
   border:1px solid var(--ink-600);background:rgba(49,50,62,.5);margin-bottom:28px}
-.hero-mid .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--purple-hi);box-shadow:0 0 0 3px rgba(120,105,179,.25)}
+.hero-mid .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--purple-hi);box-shadow:0 0 0 3px rgba(155,48,255,.25)}
 .hero-mid h1{font-size:clamp(38px,4.4vw,58px);font-weight:800;line-height:1.04;letter-spacing:-0.035em;color:var(--mist-hi);margin-bottom:22px}
 .hero-mid h1 .accent{color:var(--purple-hi)}
 .hero-mid p{font-size:17px;color:var(--mist);line-height:1.65;max-width:480px}
@@ -487,21 +487,21 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
 .hero-mid .feature{display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border-radius:10px;
   background:rgba(49,50,62,.55);border:1px solid var(--ink-600);font-size:13px;color:var(--mist);font-weight:500;
   transition:all .18s var(--ease)}
-.hero-mid .feature:hover{border-color:var(--purple);background:rgba(96,81,155,.12);transform:translateY(-1px)}
+.hero-mid .feature:hover{border-color:var(--purple);background:rgba(138,43,226,.12);transform:translateY(-1px)}
 .hero-mid .feature svg{color:var(--purple-hi);flex-shrink:0}
 .hero-bottom{display:flex;align-items:center;gap:20px;flex-wrap:wrap;font-size:12.5px;color:var(--mist-lo)}
 .hero-bottom .stat{display:flex;align-items:center;gap:8px}
 .hero-bottom .stat b{color:var(--mist-hi);font-weight:700}
 .hero-bottom .divider{width:1px;height:14px;background:var(--ink-500)}
 .login-panel{display:flex;align-items:center;justify-content:center;padding:48px 32px;background:var(--ink-800);position:relative}
-.login-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(96,81,155,.5),transparent)}
+.login-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(138,43,226,.5),transparent)}
 .login-card{width:100%;max-width:400px;position:relative}
 .login-card .card-head{margin-bottom:32px}
 .login-card .card-head h2{font-size:26px;font-weight:800;letter-spacing:-0.03em;color:var(--mist-hi);margin-bottom:8px}
 .login-card .card-head p{font-size:14.5px;color:var(--mist);line-height:1.6}
 .btn-discord{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;padding:16px 20px;
   border-radius:var(--radius);background:var(--purple);color:#fff;font-weight:700;font-size:15px;text-decoration:none;
-  transition:all .2s var(--ease);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 12px 32px -12px rgba(96,81,155,.85);position:relative;overflow:hidden}
+  transition:all .2s var(--ease);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 12px 32px -12px rgba(138,43,226,.85);position:relative;overflow:hidden}
 .btn-discord:hover{background:var(--purple-hi);transform:translateY(-2px);color:#fff}
 .btn-discord .left{display:flex;align-items:center;gap:12px}
 .btn-discord .arrow{opacity:.7;transition:transform .2s var(--ease)}
@@ -572,6 +572,7 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
 NOT_OWNER_HTML = """<!doctype html><html lang="pt-br"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Acesso negado — PXKK</title><meta name="robots" content="noindex">
+<meta name="theme-color" content="#000000">
 """ + STYLE + """
 <style>
 .denied{min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(900px 600px at 50% -10%,rgba(201,99,99,.10),transparent 60%),var(--ink-900)}
@@ -599,7 +600,7 @@ Sair da conta
 
 DASHBOARD_HTML = """<!doctype html><html lang="pt-br"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#1c202c"><meta name="robots" content="noindex">
+<meta name="theme-color" content="#000000"><meta name="robots" content="noindex">
 <title>Dashboard — PXKK</title>
 """ + STYLE + """
 <style>
@@ -612,7 +613,7 @@ DASHBOARD_HTML = """<!doctype html><html lang="pt-br"><head>
 .hamburger.open span:nth-child(2){opacity:0}
 .hamburger.open span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
 .brand{display:flex;align-items:center;gap:12px;color:var(--mist-hi);text-decoration:none;flex-shrink:0}
-.brand-icon{width:36px;height:36px;border-radius:10px;background:var(--purple);display:grid;place-items:center;font-size:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 6px 18px -8px rgba(96,81,155,.7)}
+.brand-icon{width:36px;height:36px;border-radius:10px;background:var(--purple);display:grid;place-items:center;font-size:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 6px 18px -8px rgba(138,43,226,.7)}
 .brand-text{display:flex;flex-direction:column;line-height:1.1}
 .brand-text .name{font-weight:800;font-size:15.5px;letter-spacing:-0.02em}
 .brand-text .sub{font-size:10px;color:var(--mist-lo);font-weight:600;letter-spacing:.14em;text-transform:uppercase}
@@ -641,10 +642,10 @@ DASHBOARD_HTML = """<!doctype html><html lang="pt-br"><head>
 .sidebar-title{font-size:10px;font-weight:700;color:var(--mist-lo);text-transform:uppercase;letter-spacing:.16em;padding:8px 14px;margin-bottom:8px}
 .nav-btn{display:flex;align-items:center;gap:12px;width:100%;padding:11px 14px;border-radius:10px;color:var(--mist);font-size:14px;font-weight:500;text-align:left;transition:all .16s var(--ease);margin-bottom:2px;position:relative;letter-spacing:-0.005em}
 .nav-btn:hover{background:var(--ink-700);color:var(--mist-hi)}
-.nav-btn.active{background:rgba(96,81,155,.14);color:var(--mist-hi);font-weight:600}
+.nav-btn.active{background:rgba(138,43,226,.14);color:var(--mist-hi);font-weight:600}
 .nav-btn.active::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:var(--purple-hi)}
 .nav-icon{width:26px;height:26px;border-radius:7px;flex-shrink:0;display:grid;place-items:center;font-size:13px;background:var(--ink-700);transition:background .16s var(--ease)}
-.nav-btn.active .nav-icon{background:rgba(96,81,155,.28)}
+.nav-btn.active .nav-icon{background:rgba(138,43,226,.28)}
 .nav-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;letter-spacing:-0.005em}
 .content{flex:1;min-width:0;padding:40px 48px 56px;display:flex;flex-direction:column}
 .content-inner{max-width:920px;width:100%;margin:0 auto;flex:1}
@@ -661,7 +662,7 @@ DASHBOARD_HTML = """<!doctype html><html lang="pt-br"><head>
 .f label{display:block;font-size:13px;color:var(--mist);font-weight:600;margin-bottom:9px;letter-spacing:-0.005em}
 .f .hint{font-size:12px;color:var(--mist-lo);margin-top:7px;line-height:1.5}
 input[type=text],input[type=number],textarea,select{width:100%;padding:12px 14px;border-radius:var(--radius-sm);border:1px solid var(--ink-600);background:var(--ink-900);color:var(--mist-hi);font:inherit;font-size:14px;transition:border-color .16s var(--ease),box-shadow .16s var(--ease),background .16s var(--ease)}
-input[type=text]:focus,input[type=number]:focus,textarea:focus,select:focus{outline:none;border-color:var(--purple);background:var(--ink-800);box-shadow:0 0 0 3px rgba(96,81,155,.20)}
+input[type=text]:focus,input[type=number]:focus,textarea:focus,select:focus{outline:none;border-color:var(--purple);background:var(--ink-800);box-shadow:0 0 0 3px rgba(138,43,226,.20)}
 input::placeholder,textarea::placeholder{color:var(--ink-400)}
 textarea{min-height:110px;resize:vertical;font-family:inherit;line-height:1.6}
 select[multiple]{min-height:160px;padding:8px}
@@ -678,7 +679,7 @@ input[type=color]::-webkit-color-swatch{border:0;border-radius:6px}
 .sw label{margin:0;color:var(--mist-hi);font-size:14px;font-weight:500;cursor:pointer;flex:1;letter-spacing:-0.005em}
 .save-bar{position:fixed;bottom:0;left:270px;right:0;z-index:50;padding:16px 32px;background:rgba(28,32,44,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--ink-700);display:flex;justify-content:flex-end;align-items:center;gap:16px}
 .save-hint{color:var(--mist-lo);font-size:12.5px;flex:1;letter-spacing:-0.005em}
-.save-btn{padding:13px 30px;border-radius:var(--radius-sm);background:var(--purple);color:#fff;font-weight:700;font-size:14px;letter-spacing:-0.005em;transition:all .2s var(--ease);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 8px 22px -10px rgba(96,81,155,.85);display:inline-flex;align-items:center;gap:8px}
+.save-btn{padding:13px 30px;border-radius:var(--radius-sm);background:var(--purple);color:#fff;font-weight:700;font-size:14px;letter-spacing:-0.005em;transition:all .2s var(--ease);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 8px 22px -10px rgba(138,43,226,.85);display:inline-flex;align-items:center;gap:8px}
 .save-btn:hover{background:var(--purple-hi);transform:translateY(-1px)}
 .save-btn:disabled{opacity:.5;cursor:not-allowed}
 .empty{text-align:center;padding:80px 24px;background:var(--ink-800);border:1px dashed var(--ink-600);border-radius:var(--radius-lg)}
@@ -904,7 +905,4 @@ document.addEventListener('keydown', (e) => {
   }
 });
 </script>
-</body></html>"""
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+</body></html>
