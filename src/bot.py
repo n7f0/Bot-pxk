@@ -41,14 +41,15 @@ def E(key): return _parse_emoji(EMOJI.get(key,""))
 # ===================== CONFIG =====================
 DEFAULT_CONFIG = {
     "brand_name":"𝚙𝚡𝚔","brand_emoji":"🖤","brand_footer":"🖤 𝚙𝚡𝚔 • Sistema Oficial",
-    "brand_color_primary":0x8A2BE2,"brand_color_secondary":0x9B30FF,
+    "brand_color_primary":0x3D1A5C,"brand_color_secondary":0x5B2A8E,
     "brand_color_success":0x00FF88,"brand_color_danger":0xFF3366,
     "avatar_url":"","_last_avatar_url":"",
     "banner_painel_url":"","banner_ticket_url":"","banner_welcome_url":"",
     "guild_id":None,
-    "panel_color_main":0x8A2BE2,"panel_color_ticket":0x8A2BE2,
-    "panel_color_verification":0x9B30FF,"panel_color_feedback":0x8A2BE2,
-    "panel_color_suggestions":0x8A2BE2,"panel_color_levels":0xFFD700,
+    # Cores individuais por painel
+    "panel_color_main":0x3D1A5C,"panel_color_ticket":0x3D1A5C,
+    "panel_color_verification":0x5B2A8E,"panel_color_feedback":0x3D1A5C,
+    "panel_color_suggestions":0x3D1A5C,"panel_color_levels":0xFFD700,
     "panel_color_staff":0xFF3366,"panel_color_vip":0xFFD700,
     "auto_emoji_channels":True,
     "verification_enabled":True,"verification_method":"math","verification_difficulty":1,
@@ -71,6 +72,7 @@ DEFAULT_CONFIG = {
     "admin_role_ids":[],"addcargo_allowed_role_ids":[],
     "addcargo_panel_channel_id":None,"addcargo_panel_message_id":None,
     "painel_channel_id":None,"painel_message_id":None,
+    # Tickets 5 tipos
     "ticket_category_movcall_id":None,"ticket_category_movchat_id":None,
     "ticket_category_recrute_id":None,"ticket_category_support_id":None,
     "ticket_category_others_id":None,
@@ -84,28 +86,35 @@ DEFAULT_CONFIG = {
     "ticket_label_recrute":"RECRUTE-S","ticket_emoji_recrute":"📢",
     "ticket_label_support":"SUPORTE","ticket_emoji_support":"🛠️",
     "ticket_label_others":"OUTROS","ticket_emoji_others":"❓",
+    # Feedback
     "feedback_channel_id":None,"feedback_panel_channel_id":None,
     "feedback_panel_message_id":None,
     "feedback_panel_title":"⭐ Avaliações & Feedback — {brand}",
     "feedback_panel_description":"### 💜 Sua opinião é muito importante!\nAvalie o servidor de **1 a 5 estrelas**.",
+    # Sugestões
     "suggestions_channel_id":None,"suggestions_panel_channel_id":None,
     "suggestions_panel_message_id":None,
     "moderation_logs_channel_id":None,
+    # AntiBot
     "antibot_channel_id":None,"antibot_panel_message_id":None,
     "antibot_banner_url":"","antibot_title":"• Não envie mensagem nesse canal!",
     "antibot_description":"Sistema criado para prevenir bots de divulgação.",
     "antibot_punish_ban":True,"antibot_delete_messages":True,
     "antibot_log_channel_id":None,
+    # Levels
     "levels_enabled":True,"levels_xp_per_message":15,"levels_xp_cooldown_seconds":60,
     "levels_announce_channel_id":None,
     "levels_message_up":"🎉 {user} subiu para o **level {level}**!",
+    # Filters
     "filters_enabled":True,"filters_punish_after_warnings":3,
     "filters_links_allowed_role_ids":[],"filters_log_channel_id":None,
     "filters_blocked_words":[],"filters_allowed_domains":[],
+    # VIP
     "vip_enabled":True,"vip_role_base_id":None,
     "vip_allow_custom_color":True,"vip_allow_custom_name":True,
     "vip_allow_custom_tag":True,"vip_max_members":5,
     "vip_panel_channel_id":None,
+    # Staff
     "staff_role_ids":[],"staff_movchat_role_ids":[],
     "staff_movchat_goal":1000,"staff_call_goal_hours":30,
     "staff_report_channel_id":None,"staff_punish_channel_id":None,
@@ -150,11 +159,11 @@ async def task_reload_config():
 def bname(): return config.get("brand_name") or "Bot"
 def bemoji(): return config.get("brand_emoji") or "🖤"
 def bfooter(): return config.get("brand_footer") or "Sistema Oficial"
-def c_primary(): return config.get("brand_color_primary",0x8A2BE2)
-def c_secondary(): return config.get("brand_color_secondary",0x9B30FF)
+def c_primary(): return config.get("brand_color_primary",0x3D1A5C)
+def c_secondary(): return config.get("brand_color_secondary",0x5B2A8E)
 def c_success(): return config.get("brand_color_success",0x00FF88)
 def c_danger(): return config.get("brand_color_danger",0xFF3366)
-def c_panel(key, fallback=0x8A2BE2): return config.get(f"panel_color_{key}") or fallback
+def c_panel(key, fallback=0x3D1A5C): return config.get(f"panel_color_{key}") or fallback
 def avatar_url(): return config.get("avatar_url") or None
 def banner_painel(): return config.get("banner_painel_url") or None
 def banner_ticket(): return config.get("banner_ticket_url") or None
@@ -1787,11 +1796,7 @@ class SuggestionModal(ui.Modal, title="💡 Enviar Sugestão"):
 
 def suggestion_card_layout(sid, author, content, up, down, status="open"):
     total = up+down
-    if total == 0:
-        bar = "`[" + "░"*14 + "]` **0%**"
-    else:
-        filled = int(14*up/total); empty = 14 - filled
-        bar = "`[" + "█"*filled + "░"*empty + "]` **" + str(int(up/total*100)) + "%**"
+    bar = "`[{'░'*14}]`" if total == 0 else f"`[{'█'*int(14*up/total)}{'░'*(14-int(14*up/total))}]` **{int(up/total*100)}%**"
     avatar = author.display_avatar.with_size(256).url
     comps = [ui.TextDisplay(f"# 💡 Sugestão #{sid}"),
              ui.Section(ui.TextDisplay(f"### {author.display_name}\n-# Autor • {author.mention}"),
@@ -3037,6 +3042,7 @@ async def on_guild_channel_update(before, after):
         await auto_emoji_channel(after)
     except Exception: pass
 
+# Níveis: contador de mensagens para MOV CHAT
 @bot.event
 async def on_message_staff_count(message):
     if message.author.bot or not message.guild: return
