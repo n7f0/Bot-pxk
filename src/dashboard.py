@@ -524,16 +524,25 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
 .btn-discord .arrow{position:relative;z-index:1;transition:transform .2s var(--ease)}
 .btn-discord:hover .arrow{transform:translateX(4px)}
 .login-foot{margin-top:32px;padding-top:24px;border-top:1px solid rgba(255,255,255,0.05);
-  display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;color:var(--gray-mid)}
-.login-foot .status{display:flex;align-items:center;gap:8px}
-.login-foot .status .dot{width:6px;height:6px;background:var(--ok);box-shadow:0 0 8px var(--ok)}
-.login-foot .secure{display:flex;align-items:center;gap:6px}
+  display:flex;align-items:center;justify-content:space-between;gap:12px;}
+
+/* BADGES ELEGANTES */
+.status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 99px;
+  background: rgba(74, 222, 128, 0.05); border: 1px solid rgba(74, 222, 128, 0.15);
+  color: #86efac; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.status-dot { width: 6px; height: 6px; background: #4ade80; border-radius: 50%; box-shadow: 0 0 10px #4ade80;
+  animation: pulse-dot 2s infinite; }
+@keyframes pulse-dot { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.5); }
+  70% { transform: scale(1); box-shadow: 0 0 0 4px rgba(74, 222, 128, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); } }
+
+.secure-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 99px;
+  background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--gray-hi); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.secure-pill svg { color: var(--purple-hi); }
+
 .page-mini-footer{position:fixed;bottom:24px;left:0;right:0;
-  font-size:12px;color:var(--gray-lo);display:flex;justify-content:center;gap:24px;z-index:50;letter-spacing:.04em;
-  pointer-events:none;}
-.page-mini-footer a,.page-mini-footer span{pointer-events:auto;}
-.page-mini-footer a{color:var(--gray-lo);transition:color .2s var(--ease)}
-.page-mini-footer a:hover{color:var(--purple-hi)}
+  font-size:11px;color:var(--gray-lo);display:flex;justify-content:center;z-index:100;letter-spacing:.1em;text-transform:uppercase;font-weight:600;}
 @media(max-width:960px){
   .login-page{grid-template-columns:1fr}
   .hero{padding:36px 28px 44px;min-height:auto;border-right:0;border-bottom:1px solid var(--border)}
@@ -542,7 +551,7 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
   .hero-bottom{font-size:11px;gap:12px;flex-wrap:wrap}
   .login-panel{padding:36px 20px 80px}
   .login-card{max-width:440px;padding:40px 28px}
-  .page-mini-footer{position:static;margin-top:32px;justify-content:center;flex-wrap:wrap}
+  .page-mini-footer{position:relative;margin-top:32px;bottom:auto;}
 }
 @media(max-width:480px){
   .hero{padding:28px 20px 36px}
@@ -589,17 +598,17 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
         <svg class="arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </a>
       <div class="login-foot">
-        <div class="status"><span class="dot"></span> Online</div>
-        <div class="secure"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Seguro</div>
+        <div class="status-pill"><span class="status-dot"></span> Online</div>
+        <div class="secure-pill">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+          Seguro
+        </div>
       </div>
     </div>
   </section>
 </main>
 <footer class="page-mini-footer">
   <span>© 2026 PXKK</span>
-  <a href="#">Suporte</a>
-  <a href="#">Termos</a>
-  <a href="#">Privacidade</a>
 </footer>
 </body></html>"""
 
