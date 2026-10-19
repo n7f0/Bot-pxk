@@ -1,7 +1,7 @@
 """
 Dashboard público — pxkk.com.br
 Sistema completo: níveis MEE6, VIP, staff, filtros, 5 tipos de ticket.
-Visual: Retro Pixel RPG (Undertale Inspired).
+Visual: High Contrast Premium SaaS + Gradients + Layout Otimizado.
 """
 import os, json, secrets, hmac, hashlib, time
 import requests
@@ -420,111 +420,190 @@ def index():
 # ==================== TEMPLATES ====================
 STYLE = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
-
-:root {
-  --bg: #0f0814;
-  --bg-box: #1a0f24;
-  --bg-box-dark: #13081b;
-  --border: #4a2e6b;
-  --border-hi: #b565ff;
-  --text: #f0e6ff;
-  --text-muted: #9d86b8;
-  --primary: #b565ff;
-  --primary-hover: #c98cff;
-  --accent: #ff4d6d;
-  --shadow: #000000;
+@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap');
+:root{
+  --black:#050505;--black-soft:#0a0a0a;--black-card:rgba(15,15,15,0.6);--black-elevated:#141414;
+  --purple:#8A4FFF;--purple-hi:#A370FF;--purple-lo:#6B2EE0;--purple-glow:rgba(138,79,255,0.4);
+  --white:#FFFFFF;--white-soft:#F5F5F5;
+  --gray-hi:#B8B8C2;--gray-mid:#7A7A88;--gray-lo:#4A4A55;
+  --border:rgba(255,255,255,0.08);--border-hi:rgba(138,79,255,0.35);
+  --ok:#4ade80;--warn:#fbbf24;--err:#f87171;
+  --radius-sm:6px;--radius:10px;--radius-lg:16px;
+  --ease:cubic-bezier(0.4, 0, 0.2, 1);
 }
-
-* { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
-
-body {
-  background-color: var(--bg);
-  /* Fundo estilo grade de pixel */
-  background-image: 
-    linear-gradient(rgba(181, 101, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(181, 101, 255, 0.03) 1px, transparent 1px);
-  background-size: 20px 20px;
-  color: var(--text);
-  font-family: 'VT323', monospace;
-  font-size: 20px;
-  line-height: 1.4;
-  min-height: 100vh;
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--black);color:var(--white-soft);
+  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  font-size:15px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;letter-spacing:-0.005em;min-height:100vh;
 }
-
-h1, h2, h3, .pixel-font {
-  font-family: 'Press Start 2P', cursive;
-  font-weight: normal;
-  line-height: 1.3;
-  text-transform: uppercase;
-}
-
-a { color: var(--primary); text-decoration: none; transition: color 0.2s; }
-a:hover { color: var(--primary-hover); text-shadow: 0 0 8px var(--primary); }
-
-button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; font-size: inherit; }
-img { display: block; max-width: 100%; }
-::selection { background: var(--primary); color: var(--bg); }
-
-/* Scrollbar customizada */
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: var(--bg-box-dark); border-left: 1px solid var(--border); }
-::-webkit-scrollbar-thumb { background: var(--border); border: 2px solid var(--bg-box-dark); }
-::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+h1,h2,h3,.display{font-family:'Archivo Black','Inter',sans-serif;letter-spacing:-0.035em;line-height:1.02}
+a{color:var(--purple-hi);text-decoration:none;transition:color .18s var(--ease)}
+a:hover{color:var(--white)}
+button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit;font-size:inherit}
+img{display:block;max-width:100%}
+::selection{background:var(--purple);color:var(--white)}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:8px}
+::-webkit-scrollbar-thumb:hover{background:var(--purple)}
 </style>"""
 
 LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0f0814">
-<title>PXKK — Login</title>
+<meta name="theme-color" content="#000000">
+<meta name="description" content="PXKK Dashboard — gerencie seu bot Discord.">
+<title>PXKK — Dashboard</title>
 """ + STYLE + """
 <style>
-.login-page { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; position: relative; }
-.hero-bg { position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, rgba(181, 101, 255, 0.1) 0%, transparent 60%); pointer-events: none; }
-.login-box { 
-  position: relative; z-index: 10; width: 100%; max-width: 500px; 
-  background: var(--bg-box); padding: 40px; 
-  border: 4px solid var(--border); 
-  box-shadow: 8px 8px 0 var(--shadow), 0 0 20px rgba(181, 101, 255, 0.2);
+.login-page{min-height:100vh;display:grid;grid-template-columns:1.2fr 1fr;background:var(--black);overflow:hidden;position:relative}
+.hero{position:relative;padding:56px 72px;display:flex;flex-direction:column;justify-content:space-between;
+  background:
+    radial-gradient(ellipse 900px 600px at 20% 30%,rgba(138,79,255,0.18),transparent 60%),
+    radial-gradient(ellipse 700px 500px at 80% 80%,rgba(138,79,255,0.08),transparent 60%),
+    var(--black);
+  overflow:hidden;border-right:1px solid var(--border);min-height:100vh}
+.hero::before{content:'';position:absolute;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
+  background-size:64px 64px;
+  mask-image:radial-gradient(ellipse 70% 60% at 30% 40%,#000 30%,transparent 90%);
+  -webkit-mask-image:radial-gradient(ellipse 70% 60% at 30% 40%,#000 30%,transparent 90%);pointer-events:none}
+.hero::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--purple),transparent);opacity:.5}
+.hero-top,.hero-mid,.hero-bottom{position:relative;z-index:1}
+.hero-brand{display:flex;align-items:center;gap:16px;font-family:'Archivo Black',sans-serif;
+  font-size:28px;letter-spacing:-0.04em;color:var(--white)}
+.hero-brand .mark{width:68px;height:68px;border:1px solid var(--purple);display:grid;place-items:center;
+  background:radial-gradient(circle at 30% 30%,rgba(138,79,255,.15),transparent 70%);
+  box-shadow:0 0 24px -8px var(--purple-glow);overflow:hidden;border-radius:8px;}
+.hero-brand .mark img{width:100%;height:100%;object-fit:cover;display:block;}
+.hero-brand .name{display:flex;flex-direction:column;line-height:1}
+.hero-mid{max-width:560px}
+.hero-mid h1{font-family:'Archivo Black',sans-serif;font-size:clamp(42px,5.2vw,76px);line-height:.95;
+  color:var(--white);margin-bottom:28px;letter-spacing:-0.045em;text-transform:uppercase}
+.hero-mid h1 .accent{color:var(--purple);text-shadow:0 0 40px var(--purple-glow)}
+.hero-mid p{font-size:16px;color:var(--gray-hi);line-height:1.7;max-width:460px}
+.hero-bottom{display:flex;align-items:center;gap:24px;flex-wrap:wrap;font-size:12px;color:var(--gray-mid);letter-spacing:.02em}
+.stat{display:flex;align-items:center;gap:8px}
+.stat b{color:var(--white);font-weight:700}
+.divider{width:1px;height:12px;background:var(--border)}
+.login-panel{display:flex;align-items:center;justify-content:center;padding:48px 32px;background:var(--black);position:relative}
+.login-panel::before{content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at 50% 50%,rgba(138,79,255,.08),transparent 60%);pointer-events:none}
+.login-card{position:relative;width:100%;max-width:440px;padding:56px 48px;
+  border:1px solid rgba(255,255,255,0.06);border-top:1px solid rgba(138,79,255,0.4);
+  background:linear-gradient(180deg, rgba(16,16,20,0.95) 0%, rgba(8,8,10,0.98) 100%);
+  border-radius:16px;backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  box-shadow:0 32px 80px -20px rgba(0,0,0,0.9), 0 0 40px -10px rgba(138,79,255,0.15);}
+.login-card::before{content:'';position:absolute;top:-1px;left:40px;right:40px;height:1px;
+  background:linear-gradient(90deg,transparent,var(--purple),transparent);opacity:.8}
+.card-head{margin-bottom:40px;text-align:center;}
+.card-head .mini-tag{display:inline-block;font-size:10px;font-weight:800;color:var(--white);
+  background:rgba(138,79,255,0.15);border:1px solid rgba(138,79,255,0.3);padding:6px 14px;
+  border-radius:6px;letter-spacing:.2em;margin-bottom:20px;text-transform:uppercase}
+.card-head h2{font-family:'Archivo Black',sans-serif;font-size:34px;letter-spacing:-0.03em;
+  color:var(--white);margin-bottom:12px;text-transform:uppercase;line-height:1.1}
+.card-head p{font-size:14px;color:var(--gray-hi);line-height:1.65}
+.btn-discord{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  width:100%;padding:18px 24px;background:linear-gradient(135deg, var(--purple) 0%, #6B2EE0 100%);
+  color:var(--white);font-weight:700;font-size:15px;text-decoration:none;transition:all .25s var(--ease);
+  letter-spacing:-.005em;position:relative;overflow:hidden;border:1px solid rgba(255,255,255,0.15);border-radius:10px;
+  box-shadow:0 12px 30px -8px rgba(138,79,255,0.5);}
+.btn-discord::before{content:'';position:absolute;inset:0;
+  background:linear-gradient(120deg,transparent,rgba(255,255,255,.2),transparent);
+  transform:translateX(-100%);transition:transform .5s var(--ease)}
+.btn-discord:hover{background:linear-gradient(135deg, #A370FF 0%, #8A4FFF 100%);
+  box-shadow:0 16px 40px -8px rgba(138,79,255,0.7);transform:translateY(-2px);color:var(--white)}
+.btn-discord:hover::before{transform:translateX(100%)}
+.btn-discord .left{display:flex;align-items:center;gap:12px;position:relative;z-index:1}
+.btn-discord .arrow{position:relative;z-index:1;transition:transform .2s var(--ease)}
+.btn-discord:hover .arrow{transform:translateX(4px)}
+.login-foot{margin-top:32px;padding-top:24px;border-top:1px solid rgba(255,255,255,0.05);
+  display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 99px;
+  background: rgba(74, 222, 128, 0.05); border: 1px solid rgba(74, 222, 128, 0.15);
+  color: #86efac; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.status-dot { width: 6px; height: 6px; background: #4ade80; border-radius: 50%; box-shadow: 0 0 10px #4ade80;
+  animation: pulse-dot 2s infinite; }
+@keyframes pulse-dot { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.5); }
+  70% { transform: scale(1); box-shadow: 0 0 0 4px rgba(74, 222, 128, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); } }
+.secure-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 99px;
+  background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--gray-hi); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.secure-pill svg { color: var(--purple-hi); }
+.page-mini-footer{position:fixed;bottom:24px;left:0;right:0;
+  font-size:11px;color:var(--gray-lo);display:flex;justify-content:center;z-index:100;letter-spacing:.1em;text-transform:uppercase;font-weight:600;}
+@media(max-width:960px){
+  .login-page{grid-template-columns:1fr}
+  .hero{padding:36px 28px 44px;min-height:auto;border-right:0;border-bottom:1px solid var(--border)}
+  .hero-mid h1{font-size:clamp(36px,9vw,52px)}
+  .hero-mid p{font-size:15px}
+  .hero-bottom{font-size:11px;gap:12px;flex-wrap:wrap}
+  .login-panel{padding:36px 20px 80px}
+  .login-card{max-width:440px;padding:40px 28px}
+  .page-mini-footer{position:relative;margin-top:32px;bottom:auto;}
 }
-.login-box::before { content: ''; position: absolute; top: -4px; left: 20px; right: 20px; height: 4px; background: var(--primary); }
-.logo-area { text-align: center; margin-bottom: 32px; }
-.logo-icon { font-size: 48px; margin-bottom: 16px; text-shadow: 0 0 15px var(--primary); }
-.logo-title { font-size: 32px; color: var(--text); text-shadow: 4px 4px 0 var(--border); letter-spacing: 2px; }
-.logo-subtitle { font-size: 16px; color: var(--text-muted); margin-top: 8px; letter-spacing: 1px; }
-.btn-discord { 
-  display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; 
-  background: var(--primary); color: var(--bg); font-family: 'Press Start 2P', cursive; font-size: 14px;
-  padding: 20px; border: 4px solid var(--text); text-decoration: none;
-  box-shadow: 6px 6px 0 var(--shadow); transition: all 0.1s; margin-top: 24px;
+@media(max-width:480px){
+  .hero{padding:28px 20px 36px}
+  .hero-brand{font-size:24px;}
+  .hero-brand .mark{width:56px;height:56px;}
+  .login-panel{padding:28px 16px 60px}
+  .login-card{padding:32px 22px}
+  .card-head h2{font-size:28px;}
 }
-.btn-discord:hover { background: var(--primary-hover); transform: translate(2px, 2px); box-shadow: 4px 4px 0 var(--shadow); color: var(--bg); }
-.btn-discord:active { transform: translate(6px, 6px); box-shadow: 0 0 0 var(--shadow); }
-.footer-text { margin-top: 32px; font-size: 16px; color: var(--text-muted); text-align: center; }
-.footer-text span { color: var(--accent); }
 </style></head>
 <body>
 <main class="login-page">
-  <div class="hero-bg"></div>
-  <div class="login-box">
-    <div class="logo-area">
-      <div class="logo-icon">💜</div>
-      <h1 class="logo-title">PXKK</h1>
-      <p class="logo-subtitle">MANAGEMENT SYSTEM</p>
+  <section class="hero" aria-label="Apresentação">
+    <div class="hero-top">
+      <div class="hero-brand">
+        <span class="mark"><img src="/static/logo.gif" alt="Logo"></span>
+        <span class="name">PXKK</span>
+      </div>
     </div>
-    
-    <p style="text-align: center; color: var(--text-muted); margin-bottom: 8px;">Autentique-se para acessar o painel.</p>
-    
-    <a href="/auth" class="btn-discord">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20.3 4.4A19.7 19.7 0 0 0 15.4 3l-.3.5a14.7 14.7 0 0 1 4.3 2.2 15 15 0 0 0-12.8 0A14.6 14.6 0 0 1 10.9 3.5L10.6 3a19.7 19.7 0 0 0-4.9 1.4C2.6 8.6 1.9 12.7 2.3 16.7a19.8 19.8 0 0 0 6 3l.8-1.3a13 13 0 0 1-2-1l.5-.4a14 14 0 0 0 12.8 0l.5.4a13 13 0 0 1-2 1l.8 1.3a19.8 19.8 0 0 0 6-3c.5-4.6-.7-8.6-3.4-12.3ZM9 14.6c-1.2 0-2.2-1.1-2.2-2.4S7.8 9.8 9 9.8s2.2 1.1 2.2 2.4S10.2 14.6 9 14.6Zm6 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Z"/></svg>
-      ENTRAR COM DISCORD
-    </a>
-  </div>
-  
-  <p class="footer-text">© 2026 PXKK <span>❤</span></p>
+    <div class="hero-mid">
+      <h1>Gerencie seu<br>servidor com<br><span class="accent">precisão total.</span></h1>
+      <p>Toda a configuração do seu bot em um painel único, seguro e intuitivo. Controle tickets, verificação, níveis e muito mais.</p>
+    </div>
+    <div class="hero-bottom">
+      <div class="stat"><b>OAuth2</b> Discord</div>
+      <span class="divider"></span>
+      <div class="stat"><b>Cloudflare</b></div>
+      <span class="divider"></span>
+      <div class="stat"><b>100%</b> real-time</div>
+    </div>
+  </section>
+  <section class="login-panel" aria-label="Entrar">
+    <div class="login-card">
+      <div class="card-head">
+        <span class="mini-tag">Autenticação</span>
+        <h2>Bem-vindo<br>de volta</h2>
+        <p>Autentique-se com sua conta do Discord para acessar o painel administrativo.</p>
+      </div>
+      <a href="/auth" class="btn-discord">
+        <span class="left">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20.3 4.4A19.7 19.7 0 0 0 15.4 3l-.3.5a14.7 14.7 0 0 1 4.3 2.2 15 15 0 0 0-12.8 0A14.6 14.6 0 0 1 10.9 3.5L10.6 3a19.7 19.7 0 0 0-4.9 1.4C2.6 8.6 1.9 12.7 2.3 16.7a19.8 19.8 0 0 0 6 3l.8-1.3a13 13 0 0 1-2-1l.5-.4a14 14 0 0 0 12.8 0l.5.4a13 13 0 0 1-2 1l.8 1.3a19.8 19.8 0 0 0 6-3c.5-4.6-.7-8.6-3.4-12.3ZM9 14.6c-1.2 0-2.2-1.1-2.2-2.4S7.8 9.8 9 9.8s2.2 1.1 2.2 2.4S10.2 14.6 9 14.6Zm6 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Z"/></svg>
+          Entrar com Discord
+        </span>
+        <svg class="arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      <div class="login-foot">
+        <div class="status-pill"><span class="status-dot"></span> Online</div>
+        <div class="secure-pill">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+          Seguro
+        </div>
+      </div>
+    </div>
+  </section>
 </main>
+<footer class="page-mini-footer">
+  <span>© 2026 PXKK</span>
+</footer>
 </body></html>"""
 
 NOT_OWNER_HTML = """<!doctype html><html lang="pt-br"><head>
@@ -532,194 +611,288 @@ NOT_OWNER_HTML = """<!doctype html><html lang="pt-br"><head>
 <title>Acesso negado — PXKK</title><meta name="robots" content="noindex">
 """ + STYLE + """
 <style>
-body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
-.denied-box { 
-  background: var(--bg-box); padding: 40px; max-width: 500px; width: 100%; text-align: center;
-  border: 4px solid var(--accent); box-shadow: 8px 8px 0 var(--shadow), 0 0 20px rgba(255, 77, 109, 0.2);
-}
-.denied-icon { font-size: 48px; margin-bottom: 24px; }
-.denied-title { color: var(--accent); font-size: 24px; margin-bottom: 16px; }
-.denied-text { color: var(--text-muted); font-size: 20px; margin-bottom: 32px; }
-.btn-back { 
-  display: inline-block; background: var(--border); color: var(--text); padding: 16px 32px;
-  border: 2px solid var(--text); box-shadow: 4px 4px 0 var(--shadow); transition: all 0.1s;
-}
-.btn-back:hover { background: var(--accent); color: var(--bg); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--shadow); }
+body{background:var(--black)}
+.denied{min-height:100vh;display:grid;place-items:center;padding:24px;
+  background:radial-gradient(ellipse 800px 500px at 50% -10%,rgba(248,113,113,.08),transparent 60%),
+             radial-gradient(ellipse 600px 400px at 50% 110%,rgba(138,79,255,.06),transparent 60%),var(--black);
+  position:relative}
+.denied::before{content:'';position:absolute;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);
+  background-size:56px 56px;
+  mask-image:radial-gradient(ellipse 60% 60% at 50% 50%,#000 20%,transparent 90%);
+  -webkit-mask-image:radial-gradient(ellipse 60% 60% at 50% 50%,#000 20%,transparent 90%);pointer-events:none}
+.denied-card{position:relative;max-width:440px;width:100%;background:rgba(10,10,10,.8);backdrop-filter:blur(12px);
+  border:1px solid var(--border);padding:56px 40px;text-align:center;z-index:1}
+.denied-card::before{content:'';position:absolute;top:-1px;left:32px;right:32px;height:1px;
+  background:linear-gradient(90deg,transparent,var(--err),transparent)}
+.denied-icon{width:76px;height:76px;margin:0 auto 24px;border:1px solid rgba(248,113,113,.4);
+  display:grid;place-items:center;font-size:34px;background:radial-gradient(circle,rgba(248,113,113,.08),transparent 70%)}
+.denied-card h1{font-family:'Archivo Black',sans-serif;font-size:26px;letter-spacing:-.03em;
+  margin-bottom:12px;color:var(--white);text-transform:uppercase;line-height:1.05}
+.denied-card p{color:var(--gray-hi);font-size:14px;line-height:1.65;margin-bottom:8px}
+.user-chip{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border:1px solid var(--border);
+  margin:24px 0 28px;font-size:12.5px;color:var(--gray-hi);background:rgba(255,255,255,.02);font-weight:500}
+.user-chip b{color:var(--white);font-weight:600}
+.user-chip svg{color:var(--purple-hi)}
+.btn-back{display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:14px 28px;
+  border:1px solid var(--purple);background:transparent;color:var(--white);font-weight:600;font-size:13px;
+  letter-spacing:.02em;transition:all .2s var(--ease);text-transform:uppercase}
+.btn-back:hover{background:var(--purple);box-shadow:0 0 30px -6px var(--purple-glow);color:var(--white);transform:translateY(-1px)}
 </style></head>
 <body>
-<div class="denied-box">
-  <div class="denied-icon">🚫</div>
-  <h1 class="denied-title">ACESSO NEGADO</h1>
-  <p class="denied-text">Este painel é privado.</p>
-  <a href="/logout" class="btn-back">SAIR DA CONTA</a>
+<div class="denied"><div class="denied-card">
+<div class="denied-icon">🚫</div>
+<h1>Acesso<br>Negado</h1>
+<p>Este painel é privado e restrito à equipe autorizada.</p>
+<div class="user-chip">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2"/></svg>
+  <b>{{user.username}}</b>
 </div>
-</body></html>"""
+<br>
+<a href="/logout" class="btn-back">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+  Sair da conta
+</a>
+</div></div></body></html>"""
 
 DASHBOARD_HTML = """<!doctype html><html lang="pt-br"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#0f0814"><meta name="robots" content="noindex">
+<meta name="theme-color" content="#000000"><meta name="robots" content="noindex">
 <title>Dashboard — PXKK</title>
 """ + STYLE + """
 <style>
+/* FUNDO GLOBAL */
+body { 
+  background: 
+    radial-gradient(circle at 15% 0%, rgba(138,79,255,0.1) 0%, transparent 40%),
+    radial-gradient(circle at 85% 100%, rgba(138,79,255,0.06) 0%, transparent 40%),
+    #040404;
+  background-attachment: fixed;
+}
+
 /* TOPBAR */
-.topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 100; display: flex; align-items: center; height: 80px; padding: 0 32px; background: var(--bg-box); border-bottom: 4px solid var(--border); }
-.hamburger { display: none; width: 48px; height: 48px; background: var(--bg-box-dark); border: 2px solid var(--border); align-items: center; justify-content: center; flex-direction: column; gap: 5px; cursor: pointer; box-shadow: 4px 4px 0 var(--shadow); }
-.hamburger span { display: block; width: 24px; height: 2px; background: var(--text); transition: 0.2s; }
-.hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-.hamburger.open span:nth-child(2) { opacity: 0; }
-.hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+.topbar{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;gap:20px;height:72px;padding:0 32px;
+  background:rgba(4,4,4,.6);backdrop-filter:blur(24px) saturate(1.5);-webkit-backdrop-filter:blur(24px) saturate(1.5);
+  border-bottom:1px solid var(--border);box-shadow:0 4px 30px rgba(0,0,0,0.3);}
+.topbar::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--purple),transparent);opacity:.3;pointer-events:none}
 
-.brand { display: flex; align-items: center; gap: 16px; text-decoration: none; }
-.brand-icon { width: 44px; height: 44px; background: var(--bg-box-dark); border: 2px solid var(--border); display: grid; place-items: center; font-size: 24px; box-shadow: 4px 4px 0 var(--shadow); }
-.brand-text { color: var(--text); font-size: 20px; letter-spacing: 1px; text-shadow: 2px 2px 0 var(--shadow); }
-.spacer { flex: 1; }
+/* HAMBURGER (MOBILE) */
+.hamburger{display:none; width:44px;height:44px;align-items:center;justify-content:center;flex-direction:column;gap:5px;
+  transition:all .2s var(--ease);border:1px solid transparent;border-radius:10px;cursor:pointer;flex-shrink:0;}
+.hamburger:hover{background:rgba(255,255,255,0.05);border-color:var(--border)}
+.hamburger span{display:block;width:20px;height:2px;background:var(--white);transition:transform .3s var(--ease),opacity .2s;border-radius:2px;}
+.hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.hamburger.open span:nth-child(2){opacity:0}
+.hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
 
-/* USER PROFILE */
-.user-wrap { position: relative; }
-.user-trigger { display: flex; align-items: center; gap: 12px; background: var(--bg-box-dark); border: 2px solid var(--border); padding: 6px 16px 6px 6px; cursor: pointer; box-shadow: 4px 4px 0 var(--shadow); transition: all 0.1s; }
-.user-trigger:hover { transform: translate(1px, 1px); box-shadow: 3px 3px 0 var(--shadow); border-color: var(--border-hi); }
-.user-trigger .avatar { width: 40px; height: 40px; border: 2px solid var(--border); object-fit: cover; }
-.user-trigger .name { font-size: 18px; color: var(--text); }
-.role-badge { font-family: 'Press Start 2P', cursive; font-size: 8px; padding: 4px 8px; color: var(--bg); background: var(--primary); }
-.role-owner { background: var(--primary); }
-.role-dev { background: #3b82f6; }
-.role-staff { background: var(--text-muted); }
+.brand{display:flex;align-items:center;gap:14px;color:var(--white);text-decoration:none;flex-shrink:0}
+.brand-icon{width:44px;height:44px;border:1px solid rgba(138,79,255,0.3);display:grid;place-items:center;font-size:16px;
+  background:radial-gradient(circle at 30% 30%,rgba(138,79,255,.2),transparent 70%);box-shadow:0 0 24px -6px var(--purple-glow);overflow:hidden;border-radius:12px;}
+.brand-icon img{width:100%;height:100%;object-fit:cover;display:block;}
+.brand-text{display:flex;flex-direction:column;line-height:1}
+.brand-text .name{font-family:'Archivo Black',sans-serif;font-weight:400;font-size:20px;letter-spacing:-.03em;color:var(--white)}
+.brand-text .sub{font-size:10px;color:var(--gray-mid);font-weight:800;letter-spacing:.25em;text-transform:uppercase;margin-top:4px}
+.spacer{flex:1}
 
-.dropdown { position: absolute; top: calc(100% + 12px); right: 0; min-width: 260px; background: var(--bg-box); border: 4px solid var(--border); box-shadow: 8px 8px 0 var(--shadow); padding: 12px; opacity: 0; visibility: hidden; transform: translateY(-10px); transition: 0.2s; }
-.dropdown.open { opacity: 1; visibility: visible; transform: none; }
-.dd-head { display: flex; gap: 12px; align-items: center; padding-bottom: 12px; border-bottom: 2px dashed var(--border); margin-bottom: 12px; }
-.dd-head img { width: 48px; height: 48px; border: 2px solid var(--border); }
-.dd-head .dd-name { font-family: 'Press Start 2P', cursive; font-size: 12px; color: var(--text); }
-.dd-head .dd-id { font-size: 16px; color: var(--text-muted); margin-top: 6px; }
-.dd-item { display: flex; align-items: center; gap: 10px; padding: 12px; color: var(--accent); font-size: 20px; transition: 0.1s; }
-.dd-item:hover { background: var(--bg-box-dark); transform: translateX(4px); }
+/* MENU USUÁRIO */
+.user-wrap{position:relative}
+.user-trigger{display:flex;align-items:center;gap:12px;padding:6px 14px 6px 6px;background:rgba(255,255,255,0.03);
+  border:1px solid var(--border);transition:all .2s var(--ease);border-radius:99px;cursor:pointer;backdrop-filter:blur(10px);}
+.user-trigger:hover{background:rgba(255,255,255,0.06);border-color:var(--border-hi);box-shadow:0 0 20px -8px var(--purple-glow)}
+.user-trigger .avatar{width:38px;height:38px;border:1px solid var(--border-hi);border-radius:50%;object-fit:cover;}
+.user-trigger .name{font-size:14px;font-weight:600;color:var(--white);letter-spacing:-.01em;}
+.role-badge{font-size:10px;padding:4px 10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--white);white-space:nowrap;border-radius:99px;box-shadow:0 2px 10px rgba(0,0,0,0.5);}
+.role-owner{background:linear-gradient(135deg, var(--purple), #6B2EE0);}
+.role-dev{background:linear-gradient(135deg, #3b82f6, #2563eb);}
+.role-staff{background:var(--gray-lo);}
+.user-trigger .chev{transition:transform .22s var(--ease);color:var(--gray-mid);margin-left:4px;}
+.user-trigger.open .chev{transform:rotate(180deg)}
+.dropdown{position:absolute;top:calc(100% + 12px);right:0;min-width:280px;background:rgba(10,10,10,.95);
+  backdrop-filter:blur(24px);border:1px solid var(--border-hi);padding:10px;border-radius:14px;
+  box-shadow:0 24px 60px -20px rgba(0,0,0,.9),0 0 40px -8px var(--purple-glow);
+  opacity:0;visibility:hidden;transform:translateY(-6px);transition:opacity .2s var(--ease),transform .2s var(--ease),visibility .2s}
+.dropdown.open{opacity:1;visibility:visible;transform:none}
+.dd-head{display:flex;gap:14px;align-items:center;padding:14px 12px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.dd-head img{width:44px;height:44px;border:1px solid var(--border-hi);border-radius:50%;object-fit:cover;}
+.dd-head .dd-name{font-weight:700;font-size:14.5px;color:var(--white)}
+.dd-head .dd-id{font-size:11px;color:var(--gray-mid);font-family:ui-monospace,'SF Mono',monospace;margin-top:4px;letter-spacing:.02em}
+.dd-item{display:flex;align-items:center;gap:12px;padding:12px 14px;color:var(--gray-hi);font-size:13.5px;
+  transition:all .15s var(--ease);font-weight:600;text-decoration:none;border-radius:8px;}
+.dd-item:hover{background:rgba(138,79,255,.12);color:var(--white)}
+.dd-item svg{color:var(--gray-mid);transition:color .15s;}
+.dd-item:hover svg{color:var(--white);}
 
-/* SIDEBAR & LAYOUT */
-.layout { display: flex; min-height: 100vh; padding-top: 80px; }
-.overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 90; }
-.overlay.show { display: block; }
+/* SIDEBAR E LAYOUT */
+.layout{display:flex;min-height:100vh;padding-top:72px;position:relative;}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:90;backdrop-filter:blur(4px)}
+.overlay.show{display:block}
 
-.sidebar { width: 300px; flex-shrink: 0; background: var(--bg-box); border-right: 4px solid var(--border); padding: 24px 16px; position: fixed; top: 80px; bottom: 0; left: 0; z-index: 99; overflow-y: auto; transition: transform 0.3s; }
-.sidebar-group { margin-bottom: 32px; }
-.sidebar-group-title { font-family: 'Press Start 2P', cursive; font-size: 10px; color: var(--accent); margin-bottom: 12px; padding-left: 8px; text-shadow: 2px 2px 0 var(--shadow); }
+/* SIDEBAR PREMIUM */
+.sidebar{width:280px;flex-shrink:0;background:rgba(6,6,6,0.4);backdrop-filter:blur(30px);border-right:1px solid var(--border);padding:28px 16px;
+  overflow-y:auto;position:fixed;top:72px;bottom:0;left:0;z-index:99;
+  transition:transform .35s cubic-bezier(0.4, 0, 0.2, 1);}
+  
+.sidebar-group { margin-bottom: 28px; }
+.sidebar-group-title { font-size: 9.5px; font-weight: 800; color: var(--gray-mid); text-transform: uppercase;
+  letter-spacing: .15em; padding: 0 16px; margin-bottom: 10px; display:flex; align-items:center; gap:8px; opacity:0.8;}
+.sidebar-group-title svg { width: 12px; height: 12px; color: var(--purple); }
 
-.nav-btn { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 16px; color: var(--text-muted); font-size: 20px; text-align: left; margin-bottom: 6px; border: 2px solid transparent; transition: 0.1s; }
-.nav-btn:hover { color: var(--text); border-color: var(--border); background: var(--bg-box-dark); }
-.nav-btn.active { background: var(--bg-box-dark); color: var(--text); border-color: var(--primary); box-shadow: 4px 4px 0 var(--shadow); }
-.nav-btn.active .nav-icon { color: var(--primary); }
-.nav-icon { font-size: 16px; }
-.nav-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-btn{display:flex;align-items:center;gap:12px;width:100%;padding:10px 14px;color:var(--gray-hi);font-size:13.5px;
+  font-weight:500;text-align:left;transition:all .2s var(--ease);margin-bottom:2px;position:relative;
+  letter-spacing:-.01em;border-radius:8px;border:1px solid transparent;}
+.nav-btn:hover{background:rgba(255,255,255,.04);color:var(--white); transform: translateX(2px);}
+.nav-btn.active{background:linear-gradient(90deg,rgba(138,79,255,.12),rgba(138,79,255,.01));color:var(--white);
+  font-weight:600;border-color:rgba(138,79,255,0.15);}
+.nav-btn.active::before{content:'';position:absolute;left:-16px;top:10px;bottom:10px;width:3px;background:var(--purple);border-radius:0 4px 4px 0;box-shadow:0 0 12px var(--purple);}
+.nav-icon{width:28px;height:28px;flex-shrink:0;display:grid;place-items:center;font-size:14px;
+  background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,0.05);transition:all .2s var(--ease);border-radius:6px;}
+.nav-btn.active .nav-icon{background:rgba(138,79,255,.2);border-color:rgba(138,79,255,0.4);color:var(--white);box-shadow:0 0 10px -2px var(--purple-glow);}
+.nav-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
 
-/* CONTENT */
-.content { flex: 1; min-width: 0; padding: 48px; margin-left: 300px; display: flex; flex-direction: column; align-items: center; }
-.content-inner { max-width: 900px; width: 100%; }
+/* CONTEÚDO PRINCIPAL */
+.content{flex:1;min-width:0;padding:48px 56px 120px;display:flex;flex-direction:column;align-items:center;
+  transition:margin-left .35s cubic-bezier(0.4, 0, 0.2, 1); margin-left:280px;}
+.content-inner{max-width:960px;width:100%;flex:1}
 
-/* ALERTS */
-.alert { display: flex; align-items: center; gap: 12px; padding: 16px; margin-bottom: 32px; background: var(--bg-box); border: 2px solid var(--success); color: var(--success); box-shadow: 4px 4px 0 var(--shadow); font-size: 18px; }
-.alert.warn { border-color: #f1c40f; color: #f1c40f; }
+/* ALERTAS */
+.alert{display:flex;align-items:center;gap:14px;padding:16px 20px;margin-bottom:32px;font-size:14px;
+  font-weight:600;border:1px solid;animation:slideDown .32s var(--ease);border-radius:10px;
+  background:rgba(74,222,128,.08);border-color:rgba(74,222,128,.3);color:#86efac;backdrop-filter:blur(10px);}
+.alert.warn{background:rgba(251,191,36,.08);border-color:rgba(251,191,36,.3);color:#fde68a}
+@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 
-/* DIALOG BOX (SECTIONS) */
-.section { display: none; background: var(--bg-box); border: 4px solid var(--border); padding: 40px; position: relative; box-shadow: 8px 8px 0 var(--shadow); }
-.section::before { content: '❤'; position: absolute; top: -12px; left: 24px; background: var(--bg-box); padding: 0 8px; color: var(--accent); font-size: 20px; }
-.section.active { display: block; animation: fadeIn 0.3s ease-out; }
-@keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+/* CARDS DE SEÇÃO */
+.section{display:none;background:linear-gradient(145deg, rgba(20,20,25,0.6) 0%, rgba(8,8,10,0.8) 100%);
+  backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border:1px solid rgba(255,255,255,0.06);padding:44px;position:relative;border-radius:16px;
+  box-shadow:0 24px 60px -20px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.08);}
+.section::before{content:'';position:absolute;top:-1px;left:44px;right:44px;height:1px;
+  background:linear-gradient(90deg,transparent,var(--purple),transparent);opacity:.6;pointer-events:none}
+.section.active{display:block;animation:fadeUp .35s var(--ease)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.section-head{margin-bottom:36px;padding-bottom:28px;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;flex-direction:column;gap:8px;}
+.section-head h2{font-family:'Archivo Black',sans-serif;font-size:26px;font-weight:400;letter-spacing:-.03em;
+  color:var(--white);display:flex;align-items:center;gap:14px;text-transform:uppercase;line-height:1.1}
+.section-head p{color:var(--gray-mid);font-size:13.5px;line-height:1.6;letter-spacing:-.005em}
 
-.section-head { margin-bottom: 32px; border-bottom: 4px dashed var(--border); padding-bottom: 20px; }
-.section-head h2 { font-size: 20px; color: var(--text); display: flex; align-items: center; gap: 12px; text-shadow: 3px 3px 0 var(--shadow); }
-.section-head p { color: var(--text-muted); font-size: 18px; margin-top: 12px; }
-
-/* FORM GRID */
+/* FORMULÁRIO GRID */
 .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 28px; }
-.f { display: flex; flex-direction: column; gap: 8px; }
+.f { display: flex; flex-direction: column; gap: 10px; }
 .f.full-width { grid-column: 1 / -1; }
-.f label { font-family: 'Press Start 2P', cursive; font-size: 10px; color: var(--text); line-height: 1.5; }
-.f .hint { font-size: 16px; color: var(--text-muted); }
+.f label{font-size:11px;color:var(--gray-hi);font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.f .hint{font-size:11.5px;color:var(--gray-lo);line-height:1.5;letter-spacing:.01em;margin-top:2px;}
 
-/* INPUTS */
-input[type=text], input[type=number], textarea, select {
-  width: 100%; padding: 12px 16px; background: var(--bg-box-dark); border: 2px solid var(--border);
-  color: var(--text); font-family: 'VT323', monospace; font-size: 22px;
-  box-shadow: inset 3px 3px 0 var(--shadow); transition: all 0.2s;
-}
-input[type=text]:focus, input[type=number]:focus, textarea:focus, select:focus {
-  outline: none; border-color: var(--primary); box-shadow: inset 3px 3px 0 var(--shadow), 0 0 10px rgba(181, 101, 255, 0.4);
-}
-textarea { min-height: 120px; resize: vertical; }
-select[multiple] { min-height: 160px; padding: 8px; }
-select[multiple] option { padding: 8px; margin: 4px 0; background: var(--bg-box); color: var(--text); }
-select[multiple] option:checked { background: var(--primary); color: var(--bg); }
+/* INPUTS TÁTEIS */
+input[type=text],input[type=number],textarea,select{
+  width:100%;padding:14px 16px;border:1px solid rgba(255,255,255,0.08);
+  background:rgba(0,0,0,0.4);color:var(--white);font:inherit;font-size:14px;letter-spacing:-.005em;
+  border-radius:10px;transition:all .2s var(--ease);box-shadow:inset 0 2px 4px rgba(0,0,0,0.3);}
+input[type=text]:hover,input[type=number]:hover,textarea:hover,select:hover { border-color: rgba(255,255,255,0.2); background: rgba(0,0,0,0.6);}
+input[type=text]:focus,input[type=number]:focus,textarea:focus,select:focus{
+  outline:none;border-color:var(--purple);background:rgba(0,0,0,0.8);
+  box-shadow:0 0 0 3px rgba(138,79,255,0.25), inset 0 2px 4px rgba(0,0,0,0.3);}
+input::placeholder,textarea::placeholder{color:var(--gray-lo)}
+textarea{min-height:110px;resize:vertical;font-family:inherit;line-height:1.6}
+select[multiple]{min-height:150px;padding:8px}
+select[multiple] option{padding:12px;margin:2px 0;background:#0a0a0a;color:var(--white);border-radius:6px;font-weight:500;}
+select[multiple] option:checked{background:var(--purple);color:var(--white)}
 
-/* COLOR PICKER */
-.color-wrapper { display: flex; align-items: center; gap: 16px; background: var(--bg-box-dark); padding: 8px 16px; border: 2px solid var(--border); box-shadow: inset 3px 3px 0 var(--shadow); }
-input[type=color] { appearance: none; width: 48px; height: 48px; border: none; padding: 0; background: transparent; cursor: pointer; }
-input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
-input[type=color]::-webkit-color-swatch { border: 2px solid var(--text); }
-.color-hex { font-family: 'Press Start 2P', cursive; font-size: 12px; color: var(--text); }
+/* COLOR PICKER APPLE STYLE */
+.color-wrapper { display: flex; align-items: center; gap: 16px; background: rgba(0,0,0,0.4); padding: 8px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); transition: all .2s; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);}
+.color-wrapper:hover { border-color: rgba(255,255,255,0.2); background: rgba(0,0,0,0.6);}
+input[type=color]{appearance:none; -webkit-appearance:none; width: 38px; height: 38px; border: none; padding: 0; background: transparent; cursor: pointer; border-radius: 8px; overflow: hidden;}
+input[type=color]::-webkit-color-swatch-wrapper{padding:0;}
+input[type=color]::-webkit-color-swatch{border: 2px solid rgba(255,255,255,0.2); border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.5);}
+.color-hex { font-family: ui-monospace, 'SF Mono', monospace; font-size: 15px; color: var(--white); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
 
-/* TOGGLE */
-.sw { display: flex; align-items: center; gap: 16px; padding: 16px; background: var(--bg-box-dark); border: 2px solid var(--border); cursor: pointer; box-shadow: inset 3px 3px 0 var(--shadow); transition: 0.1s; }
-.sw:hover { border-color: var(--primary); }
-.sw input[type=checkbox] { appearance: none; width: 52px; height: 28px; background: var(--border); position: relative; cursor: pointer; border: 2px solid var(--text); }
-.sw input[type=checkbox]::after { content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: var(--text); transition: 0.2s; }
-.sw input[type=checkbox]:checked { background: var(--primary); }
-.sw input[type=checkbox]:checked::after { transform: translateX(24px); }
-.sw span { color: var(--text); font-size: 20px; flex: 1; }
+/* TOGGLE PREMIUM */
+.sw{display:flex;align-items:center;gap:16px;padding:14px 16px;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.08);
+  transition:all .2s var(--ease);cursor:pointer;border-radius:10px;box-shadow:inset 0 2px 4px rgba(0,0,0,0.3);}
+.sw:hover{border-color:rgba(255,255,255,0.2); background:rgba(0,0,0,0.6);}
+.sw input[type=checkbox]{appearance:none;-webkit-appearance:none;width:46px;height:24px;background:var(--gray-lo);
+  position:relative;cursor:pointer;flex-shrink:0;transition:background .25s var(--ease);border-radius:99px;box-shadow:inset 0 2px 4px rgba(0,0,0,0.5);}
+.sw input[type=checkbox]::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;
+  background:#fff;transition:transform .25s var(--ease);box-shadow:0 2px 5px rgba(0,0,0,.5)}
+.sw input[type=checkbox]:checked{background:var(--purple);box-shadow:0 0 15px -2px var(--purple-glow), inset 0 2px 4px rgba(0,0,0,0.2)}
+.sw input[type=checkbox]:checked::after{transform:translateX(22px)}
+.sw span{color:var(--white);font-size:13.5px;font-weight:500;cursor:pointer;flex:1;letter-spacing:-.01em}
 
-/* SAVE BAR */
-.save-bar { position: fixed; bottom: 0; left: 300px; right: 0; z-index: 50; padding: 20px 48px; background: var(--bg-box); border-top: 4px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-.save-hint { color: var(--text-muted); font-size: 18px; display: flex; align-items: center; gap: 10px; }
-.save-btn { background: var(--accent); color: var(--text); font-family: 'Press Start 2P', cursive; font-size: 14px; padding: 20px 40px; border: 4px solid var(--text); box-shadow: 6px 6px 0 var(--shadow); transition: 0.1s; display: flex; align-items: center; gap: 12px; }
-.save-btn:hover { background: #ff6b85; transform: translate(2px, 2px); box-shadow: 4px 4px 0 var(--shadow); }
-.save-btn:active { transform: translate(6px, 6px); box-shadow: 0 0 0 var(--shadow); }
+/* BARRA SALVAR */
+.save-bar{position:fixed;bottom:0;left:280px;right:0;z-index:50;padding:20px 56px;background:rgba(8,8,8,.85);
+  backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border-top:1px solid rgba(255,255,255,0.06);
+  display:flex;justify-content:space-between;align-items:center;gap:16px;
+  transition:left .35s cubic-bezier(0.4, 0, 0.2, 1);}
+.save-bar::before{content:'';position:absolute;top:-1px;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--purple),transparent);opacity:.4;pointer-events:none}
+.save-hint{color:var(--gray-mid);font-size:13.5px;letter-spacing:.01em; display:flex; align-items: center; gap:10px; font-weight:500;}
+.save-hint svg { color: var(--purple); }
+.save-btn{padding:14px 36px;background:linear-gradient(135deg, var(--purple), #6B2EE0);color:var(--white);font-weight:800;font-size:13.5px;
+  letter-spacing:.05em;text-transform:uppercase;transition:all .2s var(--ease);border:1px solid rgba(255,255,255,0.15);border-radius:8px;
+  display:inline-flex;align-items:center;gap:10px;position:relative;overflow:hidden;box-shadow: 0 8px 24px -8px rgba(138,79,255,0.6);}
+.save-btn::before{content:'';position:absolute;inset:0;
+  background:linear-gradient(120deg,transparent,rgba(255,255,255,.2),transparent);
+  transform:translateX(-100%);transition:transform .5s var(--ease)}
+.save-btn:hover{background:linear-gradient(135deg, #A370FF, #8A4FFF); box-shadow:0 12px 32px -8px rgba(138,79,255,0.8);transform:translateY(-2px)}
+.save-btn:hover::before{transform:translateX(100%)}
+.save-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
 
-/* RESPONSIVE */
-@media(max-width:1024px) {
+/* RESPONSIVO */
+@media(max-width:1024px){
   .form-grid { grid-template-columns: 1fr; }
-  .content { padding: 32px; }
+  .content { padding: 32px 32px 120px; }
 }
-@media(max-width:960px) {
-  .hamburger { display: flex; }
-  .brand-text { display: none; }
-  .user-trigger .name, .role-badge { display: none; }
-  .user-trigger { padding: 4px; }
-  .sidebar { transform: translateX(-100%); box-shadow: 10px 0 0 rgba(0,0,0,0.5); }
+@media(max-width:960px){
+  .hamburger{display:flex;} 
+  .brand-text .sub{display:none}
+  .user-trigger .name{display:none}
+  .user-trigger{padding:6px}
+  .user-trigger .chev{display:none}
+  
+  .sidebar { transform: translateX(-100%); box-shadow: 24px 0 60px -10px rgba(0,0,0,.9); border-right-color: var(--border-hi); background:#0a0a0a;}
   .sidebar.open { transform: none; }
-  .content { margin-left: 0; padding: 24px 16px 120px; }
-  .save-bar { left: 0; padding: 16px 24px; }
-  .save-hint { display: none; }
-  .save-btn { width: 100%; justify-content: center; }
-  .section { padding: 24px 16px; }
+  
+  .content { margin-left: 0; padding: 24px 20px 120px; }
+  .save-bar { left: 0; padding: 16px 20px; }
+  .save-hint{display:none}
+  .save-btn{width:100%;justify-content:center}
+  .section{padding:28px 20px;}
+  .section-head h2{font-size:22px}
 }
 </style></head>
 <body>
-
 <header class="topbar">
   <button class="hamburger" id="hamburger" aria-label="Abrir menu" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
-  <a href="/" class="brand">
-    <div class="brand-icon" style="color:var(--primary);">💜</div>
-    <div class="brand-text pixel-font">PXKK</div>
+  <a href="/" class="brand" aria-label="PXKK Dashboard">
+    <span class="brand-icon" aria-hidden="true"><img src="/static/logo.gif" alt="Logo"></span>
+    <span class="brand-text">
+      <span class="name">PXKK</span>
+      <span class="sub">Dashboard</span>
+    </span>
   </a>
   <div class="spacer"></div>
   <div class="user-wrap">
-    <button class="user-trigger" id="userTrigger">
+    <button class="user-trigger" id="userTrigger" aria-haspopup="true" aria-expanded="false">
       <img class="avatar" src="https://cdn.discordapp.com/avatars/{{user.id}}/{{user.avatar}}.png?size=64" alt="">
       <span class="name">{{user.global_name}}</span>
       <span class="role-badge role-{{user.role}}">
-        {% if user.role=='owner' %}LV MAX{% elif user.role=='dev' %}DEV{% else %}STAFF{% endif %}
+        {% if user.role=='owner' %}Dono{% elif user.role=='dev' %}Dev{% else %}Staff{% endif %}
       </span>
+      <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
     </button>
-    <div class="dropdown" id="userDropdown">
+    <div class="dropdown" id="userDropdown" role="menu">
       <div class="dd-head">
         <img src="https://cdn.discordapp.com/avatars/{{user.id}}/{{user.avatar}}.png?size=64" alt="">
         <div>
           <div class="dd-name">{{user.global_name}}</div>
-          <div class="dd-id">ID: {{user.id}}</div>
+          <div class="dd-id">ID · {{user.id}}</div>
         </div>
       </div>
-      <a href="/logout" class="dd-item">
-        <span style="font-size:16px;">❌</span> Sair da conta
+      <a href="/logout" class="dd-item" role="menuitem">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+        Sair da conta
       </a>
     </div>
   </div>
@@ -727,47 +900,59 @@ input[type=color]::-webkit-color-swatch { border: 2px solid var(--text); }
 
 <div class="layout">
   <div class="overlay" id="overlay"></div>
-  <aside class="sidebar" id="sidebar">
+  <aside class="sidebar" id="sidebar" aria-label="Navegação">
     
     <div class="sidebar-group">
-      <div class="sidebar-group-title">⚔️ GERAL</div>
+      <div class="sidebar-group-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Geral
+      </div>
       {% for title, _ in sections[:4] %}
         {% set parts = title.split(' ', 1) %}
         <button class="nav-btn {{'active' if loop.first}}" data-t="{{loop.index0}}">
-          <span class="nav-icon">{{parts[0]}}</span>
+          <span class="nav-icon" aria-hidden="true">{{parts[0]}}</span>
           <span class="nav-label">{{parts[1] if parts|length > 1 else title}}</span>
         </button>
       {% endfor %}
     </div>
 
     <div class="sidebar-group">
-      <div class="sidebar-group-title">🛡️ SEGURANÇA</div>
+      <div class="sidebar-group-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+        Segurança
+      </div>
       {% for title, _ in sections[4:7] %}
         {% set parts = title.split(' ', 1) %}
         <button class="nav-btn" data-t="{{loop.index0 + 4}}">
-          <span class="nav-icon">{{parts[0]}}</span>
+          <span class="nav-icon" aria-hidden="true">{{parts[0]}}</span>
           <span class="nav-label">{{parts[1] if parts|length > 1 else title}}</span>
         </button>
       {% endfor %}
     </div>
 
     <div class="sidebar-group">
-      <div class="sidebar-group-title">💬 ATENDIMENTO</div>
+      <div class="sidebar-group-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        Atendimento
+      </div>
       {% for title, _ in sections[7:9] %}
         {% set parts = title.split(' ', 1) %}
         <button class="nav-btn" data-t="{{loop.index0 + 7}}">
-          <span class="nav-icon">{{parts[0]}}</span>
+          <span class="nav-icon" aria-hidden="true">{{parts[0]}}</span>
           <span class="nav-label">{{parts[1] if parts|length > 1 else title}}</span>
         </button>
       {% endfor %}
     </div>
 
     <div class="sidebar-group">
-      <div class="sidebar-group-title">👥 COMUNIDADE</div>
+      <div class="sidebar-group-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        Comunidade
+      </div>
       {% for title, _ in sections[9:] %}
         {% set parts = title.split(' ', 1) %}
         <button class="nav-btn" data-t="{{loop.index0 + 9}}">
-          <span class="nav-icon">{{parts[0]}}</span>
+          <span class="nav-icon" aria-hidden="true">{{parts[0]}}</span>
           <span class="nav-label">{{parts[1] if parts|length > 1 else title}}</span>
         </button>
       {% endfor %}
@@ -778,28 +963,31 @@ input[type=color]::-webkit-color-swatch { border: 2px solid var(--text); }
   <main class="content">
     <div class="content-inner">
       {% for m in get_flashed_messages() %}
-        <div class="alert">
-          <span>💾</span> {{m}}
+        <div class="alert" role="status">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+          {{m}}
         </div>
       {% endfor %}
       {% if not cfg.get('guild_id') %}
-        <div class="alert warn">
-          <span>⚠️</span> O bot ainda não registrou um servidor. Inicie o bot primeiro.
+        <div class="alert warn" role="alert">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>
+          O bot ainda não registrou um servidor. Inicie o bot primeiro.
         </div>
       {% endif %}
       
       {% if not sections %}
-        <div class="section active" style="text-align: center;">
-          <h2 style="justify-content: center;">🔒 ACESSO RESTRITO</h2>
-          <p>Você não tem permissão para editar nenhuma seção.</p>
+        <div class="empty">
+          <div class="ic" aria-hidden="true">🔒</div>
+          <h2>Nenhuma seção liberada</h2>
+          <p>Você ainda não tem permissão para editar nenhuma seção. Fale com o administrador do sistema.</p>
         </div>
       {% else %}
       <form method="post" id="cfgForm" novalidate>
         <input type="hidden" name="_csrf" value="{{csrf()}}">
         {% for title, fields in sections %}
-        <section id="s{{loop.index0}}" class="section {{'active' if loop.first}}">
+        <section id="s{{loop.index0}}" class="section {{'active' if loop.first}}" aria-labelledby="h{{loop.index0}}">
           <div class="section-head">
-            <h2>{{title}}</h2>
+            <h2 id="h{{loop.index0}}">{{title}}</h2>
             <p>As alterações são aplicadas automaticamente no bot em até 5 segundos.</p>
           </div>
           
@@ -853,6 +1041,7 @@ input[type=color]::-webkit-color-swatch { border: 2px solid var(--text); }
             </div>
           {% endfor %}
           </div>
+          
         </section>
         {% endfor %}
       </form>
@@ -862,12 +1051,14 @@ input[type=color]::-webkit-color-swatch { border: 2px solid var(--text); }
 </div>
 
 {% if sections %}
-<div class="save-bar">
+<div class="save-bar" role="region" aria-label="Salvar alterações">
   <div class="save-hint">
-    <span>⚡</span> Salve para aplicar as mudanças.
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    As alterações são aplicadas automaticamente.
   </div>
   <button class="save-btn" form="cfgForm" type="submit">
-    <span>💾</span> SALVAR
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+    Salvar Alterações
   </button>
 </div>
 {% endif %}
@@ -878,11 +1069,13 @@ const sidebar   = document.getElementById('sidebar');
 const overlay   = document.getElementById('overlay');
 
 function toggleSidebar(open){
-  if (window.innerWidth > 960) return;
+  if (window.innerWidth > 960) return; // Ignora no desktop
+  
   const isOpen = open ?? !sidebar.classList.contains('open');
   sidebar.classList.toggle('open', isOpen);
   overlay.classList.toggle('show', isOpen);
   hamburger.classList.toggle('open', isOpen);
+  hamburger.setAttribute('aria-expanded', String(isOpen));
   document.body.style.overflow = isOpen ? 'hidden' : '';
 }
 
@@ -896,6 +1089,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.classList.add('active');
     const target = document.getElementById('s' + btn.dataset.t);
     if (target) target.classList.add('active');
+    
     if (window.innerWidth <= 960) toggleSidebar(false);
     window.scrollTo({top:0, behavior:'smooth'});
   });
@@ -905,16 +1099,27 @@ const trigger = document.getElementById('userTrigger');
 const dropdown = document.getElementById('userDropdown');
 trigger?.addEventListener('click', (e) => {
   e.stopPropagation();
-  dropdown.classList.toggle('open');
+  const isOpen = dropdown.classList.toggle('open');
+  trigger.classList.toggle('open', isOpen);
+  trigger.setAttribute('aria-expanded', String(isOpen));
 });
 document.addEventListener('click', (e) => {
   if (!dropdown?.contains(e.target) && e.target !== trigger) {
     dropdown?.classList.remove('open');
+    trigger?.classList.remove('open');
+    trigger?.setAttribute('aria-expanded', 'false');
   }
 });
 document.getElementById('cfgForm')?.addEventListener('submit', () => {
   const btn = document.querySelector('.save-btn');
-  if (btn) { btn.innerHTML = '<span>⏳</span> SALVANDO...'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Salvando...'; }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    dropdown?.classList.remove('open');
+    trigger?.classList.remove('open');
+    if (sidebar?.classList.contains('open')) toggleSidebar(false);
+  }
 });
 document.querySelectorAll('input[type="color"]').forEach(input => {
     input.addEventListener('input', (e) => {
