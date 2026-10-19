@@ -1,6 +1,6 @@
 """
 Dashboard público — pxkk.com.br
-Sistema completo: níveis MEE6, VIP, staff, filtros, 5 tipos de ticket.
+Sistema completo: níveis MEE6, VIP, staff, filtros, 5 tipos de ticket, Statbot.
 Visual: High Contrast Premium SaaS + Gradients + Layout Otimizado.
 """
 import os, json, secrets, hmac, hashlib, time
@@ -51,7 +51,7 @@ app.config.update(
 # ==================== SEÇÕES ====================
 SECTION_SLUGS = [
     "identity", "colors", "autoemoji", "activity", "verification", "antibot", "filters", 
-    "tickets", "feedback", "welcome", "levels", "vip", "staff", "addcargo", "voice"
+    "tickets", "feedback", "welcome", "levels", "vip", "staff", "addcargo", "voice", "statbot"
 ]
 
 SECTIONS = [
@@ -198,6 +198,12 @@ SECTIONS = [
         ("moderation_logs_channel_id", "Log de moderação", "ch"),
         ("painel_channel_id", "Canal do painel admin fixo", "ch"),
         ("admin_role_ids", "Cargos administradores do bot", "role"),
+    ]),
+    ("📊 Statbot (Contadores & Cargos)", [
+        ("counter_total_channel_id", "Canal de voz: Contador de Membros", "vc"),
+        ("counter_online_channel_id", "Canal de voz: Contador de Online", "vc"),
+        ("counter_call_channel_id", "Canal de voz: Contador em Call", "vc"),
+        ("statroles", "Cargos por meta (JSON). Ex:\n[\n  {\"tipo\":\"voice\", \"meta\":36000, \"role_id\":12345678, \"dias\":30}\n]", "area"),
     ]),
 ]
 
@@ -383,7 +389,15 @@ def index():
                 raw = request.form.get(key, "").replace("\r\n", "\n")
                 cfg[key] = [ln.strip() for ln in raw.split("\n") if ln.strip()]
             elif typ == "area":
-                cfg[key] = request.form.get(key, "").replace("\r\n", "\n")
+                # Tratamento especial para o JSON dos Statroles
+                if key == "statroles":
+                    try:
+                        raw_json = request.form.get(key, "[]")
+                        cfg[key] = json.loads(raw_json)
+                    except Exception:
+                        pass
+                else:
+                    cfg[key] = request.form.get(key, "").replace("\r\n", "\n")
             elif typ.startswith("choice"):
                 cfg[key] = request.form.get(key, "").strip()
             elif typ == "text":
@@ -406,6 +420,12 @@ def index():
         write_config(cfg)
         flash("Configurações salvas com sucesso. Aplicando no bot…")
         return redirect(url_for("index"))
+
+    # Prepara o campo statroles como string JSON para o textarea
+    if "statroles" in cfg:
+        cfg["statroles"] = json.dumps(cfg["statroles"], indent=2, ensure_ascii=False)
+    else:
+        cfg["statroles"] = "[]"
 
     visible_sections = _visible_sections_for(user_data)
     dd = discord_guild_data(cfg.get("guild_id"))
