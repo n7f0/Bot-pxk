@@ -1,0 +1,21 @@
+{
+  "name": "pxkk-bot",
+  "version": "1.0.0",
+  "description": "Bot e Dashboard PXKK",
+  "main": "bot.js",
+  "scripts": {
+    "start:bot": "node bot.js",
+    "start:dash": "node dashboard.js",
+    "start": "node bot.js & node dashboard.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.8",
+    "better-sqlite3": "^9.4.3",
+    "connect-flash": "^0.1.1",
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.9",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0"
+  }
+}
