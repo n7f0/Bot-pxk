@@ -1,29 +1,10 @@
 version: '3.8'
-
 services:
-  discord-bot:
+  pxk-sistema:
     build: .
-    container_name: pxk-bot
+    container_name: pxk-sistema
     restart: unless-stopped
-    environment:
-      - DISCORD_TOKEN=${DISCORD_TOKEN}
-    volumes:
-      - ./data:/app/data
-
-  painel:
-    build: .
-    container_name: pxk-painel
-    restart: unless-stopped
-    command: ["python", "-u", "dashboard.py"]
-    environment:
-      - DISCORD_TOKEN=${DISCORD_TOKEN}
-      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
-      - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET}
-      - OWNER_IDS=${OWNER_IDS}
-      - DEV_IDS=${DEV_IDS}
-      - STAFF_PERMS=${STAFF_PERMS}
-      - BASE_URL=${BASE_URL}
-      - PANEL_SECRET=${PANEL_SECRET}
+    env_file: .env
     ports:
       - "8080:8080"
     volumes:
