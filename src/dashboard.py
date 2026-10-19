@@ -389,7 +389,6 @@ def index():
                 raw = request.form.get(key, "").replace("\r\n", "\n")
                 cfg[key] = [ln.strip() for ln in raw.split("\n") if ln.strip()]
             elif typ == "area":
-                # Tratamento especial para o JSON dos Statroles
                 if key == "statroles":
                     try:
                         raw_json = request.form.get(key, "[]")
@@ -421,7 +420,6 @@ def index():
         flash("Configurações salvas com sucesso. Aplicando no bot…")
         return redirect(url_for("index"))
 
-    # Prepara o campo statroles como string JSON para o textarea
     if "statroles" in cfg:
         cfg["statroles"] = json.dumps(cfg["statroles"], indent=2, ensure_ascii=False)
     else:
@@ -463,6 +461,7 @@ body{
   font-family:'Inter',system-ui,-apple-system,sans-serif;
   font-size:15px;line-height:1.6;
   -webkit-font-smoothing:antialiased;letter-spacing:-0.005em;min-height:100vh;
+  overflow-x: hidden; /* Evita rolagem lateral */
 }
 h1,h2,h3,.display{font-family:'Archivo Black','Inter',sans-serif;letter-spacing:-0.035em;line-height:1.02}
 a{color:var(--purple-hi);text-decoration:none;transition:color .18s var(--ease)}
@@ -761,20 +760,33 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
     pointer-events: none;
 }
 
+/* AJUSTES MOBILE LOGIN */
 @media(max-width: 960px) {
-    .login-page { grid-template-columns: 1fr; padding-bottom: 60px; }
-    .hero { padding: 40px 24px 20px; min-height: auto; }
-    .login-panel { padding: 20px 24px 40px; }
-    .hero-mid h1 { font-size: clamp(32px, 8vw, 48px); }
+    .login-page { 
+        grid-template-columns: 1fr; 
+        padding-bottom: 0; 
+    }
+    .hero { 
+        padding: 40px 24px 16px; 
+        min-height: auto; 
+    }
+    .hero-mid { margin: 24px 0; }
+    .hero-mid h1 { font-size: clamp(28px, 7vw, 42px); margin-bottom: 16px; }
+    .hero-mid p { font-size: 14px; }
     .hero-bottom { display: none; }
-    .login-card { padding: 40px 28px; }
-    .page-mini-footer { position: relative; margin-top: 20px; bottom: auto; }
-}
-@media(max-width: 480px) {
-    .hero-brand { font-size: 24px; }
-    .hero-brand .mark { width: 56px; height: 56px; }
-    .login-card { padding: 32px 22px; }
+    .login-panel { 
+        padding: 16px 24px 40px; 
+    }
+    .login-card { 
+        padding: 32px 24px; 
+    }
+    .card-head { margin-bottom: 24px; }
     .card-head h2 { font-size: 28px; }
+    .page-mini-footer { 
+        position: relative; 
+        margin-top: 20px; 
+        bottom: auto; 
+    }
 }
 </style></head>
 <body>
@@ -1116,7 +1128,7 @@ input[type=color]::-webkit-color-swatch{border: 2px solid rgba(255,255,255,0.2);
 }
 @media(max-width:960px){
   body { padding: 0; }
-  .topbar { top: 0; left: 0; right: 0; border-radius: 0; border-top: 0; border-left: 0; border-right: 0; padding: 0 16px; height: 64px; }
+  .topbar { top: 0; left: 0; right: 0; border-radius: 0; border-top: 0; border-left: 0; border-right: 0; padding: 0 16px; height: 64px; z-index: 1000;}
   .hamburger{display:flex;} 
   .brand-text .sub{display:none}
   .user-trigger .name{display:none}
@@ -1124,16 +1136,48 @@ input[type=color]::-webkit-color-swatch{border: 2px solid rgba(255,255,255,0.2);
   .user-trigger .chev{display:none}
   
   .layout { padding-top: 80px; gap: 0; }
-  .sidebar { transform: translateX(-120%); top: 80px; bottom: 16px; left: 16px; box-shadow: 24px 0 60px -10px rgba(0,0,0,.9); background:rgba(10, 10, 10, 0.95); width: calc(100% - 32px); }
+  
+  /* Sidebar mobile precisa rolar até o fim sem sobrepor a Save Bar */
+  .sidebar { 
+      transform: translateX(-120%); 
+      top: 80px; 
+      bottom: 16px; 
+      left: 16px; 
+      padding-bottom: 120px; /* Espaço extra para o botão de salvar */
+      box-shadow: 24px 0 60px -10px rgba(0,0,0,.9); 
+      background:rgba(10, 10, 10, 0.95); 
+      width: calc(100% - 32px); 
+      z-index: 1002;
+  }
   .sidebar.open { transform: none; }
   
+  .overlay { z-index: 1001; }
+  
   .content { margin-left: 0; padding: 0 16px 100px; }
-  .save-bar { bottom: 16px; padding: 12px; flex-direction: column; border-radius: var(--radius);}
+  
+  /* Save Bar mais compacta no mobile */
+  .save-bar { 
+      bottom: 16px; 
+      padding: 10px 16px; 
+      flex-direction: row; 
+      justify-content: center;
+      border-radius: var(--radius-pill);
+      z-index: 999;
+  }
   .save-hint{display:none}
-  .save-btn{width:100%;justify-content:center}
-  .section{padding:32px 20px; border-radius: var(--radius);}
+  .save-btn{width:100%;justify-content:center; padding: 14px 24px;}
+  
+  .section{padding:24px 20px; border-radius: var(--radius);}
   .section-head h2{font-size:22px}
-  .dash-hero { flex-direction: column; text-align: center; padding: 32px 20px; gap: 24px; }
+  
+  /* Hero Banner mobile */
+  .dash-hero { 
+      flex-direction: column; 
+      text-align: center; 
+      padding: 32px 20px; 
+      gap: 16px; 
+  }
+  .dash-hero-text h2 { font-size: 26px; }
   .dash-hero-emoji { font-size: 64px; }
 }
 </style></head>
