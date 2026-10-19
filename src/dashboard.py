@@ -494,7 +494,6 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
     z-index: 0;
 }
 
-/* HERO SECTION - SEM CORTES E SEM BORDAS */
 .hero {
     position: relative;
     padding: 80px 10%;
@@ -502,17 +501,13 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
     flex-direction: column;
     justify-content: space-between;
     z-index: 1;
-    /* Removemos bordas, fundos e limitadores de altura */
     background: transparent;
     border: none;
     border-radius: 0;
     min-height: 100vh;
 }
 
-.hero-top, .hero-mid, .hero-bottom {
-    position: relative;
-    z-index: 1;
-}
+.hero-top, .hero-mid, .hero-bottom { position: relative; z-index: 1; }
 
 .hero-brand {
     display: flex;
@@ -534,25 +529,11 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
     border-radius: var(--radius);
 }
 
-.hero-brand .mark img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-}
+.hero-brand .mark img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hero-brand .name { display: flex; flex-direction: column; line-height: 1; }
 
-.hero-brand .name {
-    display: flex;
-    flex-direction: column;
-    line-height: 1;
-}
+.hero-mid { max-width: 700px; margin: 40px 0; }
 
-.hero-mid {
-    max-width: 700px;
-    margin: 40px 0;
-}
-
-/* FONTE ADAPTÁVEL PARA NÃO CORTAR */
 .hero-mid h1 {
     font-family: 'Archivo Black', sans-serif;
     font-size: clamp(36px, 5vw, 72px);
@@ -564,17 +545,8 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
     word-wrap: break-word;
 }
 
-.hero-mid h1 .accent {
-    color: var(--purple);
-    text-shadow: 0 0 40px var(--purple-glow);
-}
-
-.hero-mid p {
-    font-size: 16px;
-    color: var(--gray-hi);
-    line-height: 1.7;
-    max-width: 500px;
-}
+.hero-mid h1 .accent { color: var(--purple); text-shadow: 0 0 40px var(--purple-glow); }
+.hero-mid p { font-size: 16px; color: var(--gray-hi); line-height: 1.7; max-width: 500px; }
 
 .hero-bottom {
     display: flex;
@@ -590,7 +562,6 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
 .stat b { color: var(--white); font-weight: 700; }
 .divider { width: 1px; height: 12px; background: var(--border); }
 
-/* LOGIN PANEL - SEM BORDAS E SEM FUNDO */
 .login-panel {
     display: flex;
     align-items: center;
@@ -601,7 +572,6 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
     z-index: 1;
 }
 
-/* CARD DE LOGIN MANTIDO COM EFEITO PREMIUM */
 .login-card {
     position: relative;
     width: 100%;
@@ -654,11 +624,7 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
     line-height: 1.1;
 }
 
-.card-head p {
-    font-size: 14px;
-    color: var(--gray-hi);
-    line-height: 1.65;
-}
+.card-head p { font-size: 14px; color: var(--gray-hi); line-height: 1.65; }
 
 .btn-discord {
     display: flex;
@@ -698,7 +664,6 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
 }
 
 .btn-discord:hover::before { transform: translateX(100%); }
-
 .btn-discord .left { display: flex; align-items: center; gap: 12px; position: relative; z-index: 1; }
 .btn-discord .arrow { position: relative; z-index: 1; transition: transform .2s var(--ease); }
 .btn-discord:hover .arrow { transform: translateX(4px); }
@@ -777,17 +742,9 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
 }
 
 @media(max-width: 960px) {
-    .login-page {
-        grid-template-columns: 1fr;
-        padding-bottom: 60px;
-    }
-    .hero {
-        padding: 40px 24px 20px;
-        min-height: auto;
-    }
-    .login-panel {
-        padding: 20px 24px 40px;
-    }
+    .login-page { grid-template-columns: 1fr; padding-bottom: 60px; }
+    .hero { padding: 40px 24px 20px; min-height: auto; }
+    .login-panel { padding: 20px 24px 40px; }
     .hero-mid h1 { font-size: clamp(32px, 8vw, 48px); }
     .hero-bottom { display: none; }
     .login-card { padding: 40px 28px; }
@@ -905,14 +862,32 @@ DASHBOARD_HTML = """<!doctype html><html lang="pt-br"><head>
 <title>Dashboard — PXKK</title>
 """ + STYLE + """
 <style>
-/* FUNDO GLOBAL */
+/* FUNDO GLOBAL COM DEGRADE */
 body { 
   background: 
-    radial-gradient(circle at 15% 0%, rgba(138,79,255,0.1) 0%, transparent 40%),
-    radial-gradient(circle at 85% 100%, rgba(138,79,255,0.06) 0%, transparent 40%),
+    radial-gradient(circle at 15% 10%, rgba(138,79,255,0.15) 0%, transparent 45%),
+    radial-gradient(circle at 85% 90%, rgba(138,79,255,0.1) 0%, transparent 45%),
     #040404;
   background-attachment: fixed;
   padding: 16px;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* GRID PATTERN NO FUNDO */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: 
+      linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, #000 20%, transparent 90%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, #000 20%, transparent 90%);
+  pointer-events: none;
+  z-index: 0;
 }
 
 /* TOPBAR - Estilo Flutuante Pílula */
@@ -969,12 +944,12 @@ body {
 .dd-item:hover svg{color:var(--white);}
 
 /* SIDEBAR E LAYOUT */
-.layout{display:flex;min-height:calc(100vh - 104px);padding-top:96px;position:relative; gap: 16px;}
+.layout{display:flex;min-height:calc(100vh - 104px);padding-top:96px;position:relative; gap: 16px; z-index: 10;}
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:90;backdrop-filter:blur(4px)}
 .overlay.show{display:block}
 
 /* SIDEBAR PREMIUM - Estilo Cartão Flutuante */
-.sidebar{width:280px;flex-shrink:0;background:var(--black-soft);border:1px solid var(--border);padding:24px 16px;
+.sidebar{width:280px;flex-shrink:0;background:rgba(10, 10, 10, 0.6);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--border);padding:24px 16px;
   overflow-y:auto;position:fixed;top:96px;bottom:16px;left:16px;z-index:99;
   border-radius:var(--radius-lg); box-shadow: var(--shadow-soft);
   transition:transform .35s cubic-bezier(0.4, 0, 0.2, 1);}
@@ -1043,7 +1018,7 @@ body {
 @keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 
 /* CARDS DE SEÇÃO - Estilo Cartão Soft UI */
-.section{display:none;background:var(--black-soft);
+.section{display:none;background:rgba(10, 10, 10, 0.6);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
   border:1px solid var(--border);padding:48px;position:relative;border-radius:var(--radius-lg);
   box-shadow:var(--shadow-soft);}
 .section::before{content:'';position:absolute;top:-1px;left:48px;right:48px;height:1px;
@@ -1129,7 +1104,7 @@ input[type=color]::-webkit-color-swatch{border: 2px solid rgba(255,255,255,0.2);
   .user-trigger .chev{display:none}
   
   .layout { padding-top: 80px; gap: 0; }
-  .sidebar { transform: translateX(-120%); top: 80px; bottom: 16px; left: 16px; box-shadow: 24px 0 60px -10px rgba(0,0,0,.9); background:var(--black-soft); width: calc(100% - 32px); }
+  .sidebar { transform: translateX(-120%); top: 80px; bottom: 16px; left: 16px; box-shadow: 24px 0 60px -10px rgba(0,0,0,.9); background:rgba(10, 10, 10, 0.95); width: calc(100% - 32px); }
   .sidebar.open { transform: none; }
   
   .content { margin-left: 0; padding: 0 16px 100px; }
