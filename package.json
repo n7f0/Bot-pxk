@@ -1,12 +1,9 @@
 {
-  "name": "pxkk-bot",
-  "version": "1.0.0",
-  "description": "Bot e Dashboard PXKK",
-  "main": "bot.js",
+  "name": "pxk-bot",
+  "version": "2.0.0",
+  "main": "src/index.js",
   "scripts": {
-    "start:bot": "node bot.js",
-    "start:dash": "node dashboard.js",
-    "start": "node bot.js & node dashboard.js"
+    "start": "node src/index.js"
   },
   "dependencies": {
     "axios": "^1.6.8",
