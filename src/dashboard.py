@@ -1,7 +1,7 @@
 """
 Dashboard público — pxkk.com.br
 Sistema completo: níveis MEE6, VIP, staff, filtros, 5 tipos de ticket.
-Visual: Clean SaaS Premium (Paleta #1c202c / #60519b).
+Visual: Retro Pixel RPG (Undertale Inspired).
 """
 import os, json, secrets, hmac, hashlib, time
 import requests
@@ -420,147 +420,111 @@ def index():
 # ==================== TEMPLATES ====================
 STYLE = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-:root{
-  /* Paleta extraída da imagem */
-  --bg: #1c202c;
-  --bg-darker: #151822;
-  --bg-card: #232736;
-  --border: #31323e;
-  --border-hi: #60519b;
-  --primary: #60519b;
-  --primary-hover: #7363b5;
-  --primary-glow: rgba(96, 81, 155, 0.4);
-  --text: #bfc0d1;
-  --text-hi: #ffffff;
-  --text-muted: #8e8fa3;
-  --danger: #e74c3c;
-  --success: #2ecc71;
-  --radius: 12px;
-  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+
+:root {
+  --bg: #0f0814;
+  --bg-box: #1a0f24;
+  --bg-box-dark: #13081b;
+  --border: #4a2e6b;
+  --border-hi: #b565ff;
+  --text: #f0e6ff;
+  --text-muted: #9d86b8;
+  --primary: #b565ff;
+  --primary-hover: #c98cff;
+  --accent: #ff4d6d;
+  --shadow: #000000;
 }
-*{box-sizing:border-box;margin:0;padding:0}
-body{
-  background:var(--bg);color:var(--text);
-  font-family:'Inter',system-ui,-apple-system,sans-serif;
-  font-size:15px;line-height:1.6;
-  -webkit-font-smoothing:antialiased;letter-spacing:-0.01em;min-height:100vh;
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background-color: var(--bg);
+  /* Fundo estilo grade de pixel */
+  background-image: 
+    linear-gradient(rgba(181, 101, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(181, 101, 255, 0.03) 1px, transparent 1px);
+  background-size: 20px 20px;
+  color: var(--text);
+  font-family: 'VT323', monospace;
+  font-size: 20px;
+  line-height: 1.4;
+  min-height: 100vh;
 }
-h1,h2,h3{font-weight:700;letter-spacing:-0.02em;color:var(--text-hi)}
-a{color:var(--primary);text-decoration:none;transition:color .2s var(--ease)}
-a:hover{color:var(--text-hi)}
-button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit;font-size:inherit}
-img{display:block;max-width:100%}
-::selection{background:var(--primary);color:var(--text-hi)}
-::-webkit-scrollbar{width:6px;height:6px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border);border-radius:8px}
-::-webkit-scrollbar-thumb:hover{background:var(--primary)}
+
+h1, h2, h3, .pixel-font {
+  font-family: 'Press Start 2P', cursive;
+  font-weight: normal;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+a { color: var(--primary); text-decoration: none; transition: color 0.2s; }
+a:hover { color: var(--primary-hover); text-shadow: 0 0 8px var(--primary); }
+
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; font-size: inherit; }
+img { display: block; max-width: 100%; }
+::selection { background: var(--primary); color: var(--bg); }
+
+/* Scrollbar customizada */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--bg-box-dark); border-left: 1px solid var(--border); }
+::-webkit-scrollbar-thumb { background: var(--border); border: 2px solid var(--bg-box-dark); }
+::-webkit-scrollbar-thumb:hover { background: var(--primary); }
 </style>"""
 
 LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#1c202c">
-<meta name="description" content="PXKK Dashboard — gerencie seu bot Discord.">
-<title>PXKK — Dashboard</title>
+<meta name="theme-color" content="#0f0814">
+<title>PXKK — Login</title>
 """ + STYLE + """
 <style>
-.login-page{min-height:100vh;display:grid;grid-template-columns:1.2fr 1fr;background:var(--bg);overflow:hidden;position:relative}
-.hero{position:relative;padding:56px 72px;display:flex;flex-direction:column;justify-content:space-between;
-  background: radial-gradient(ellipse 900px 600px at 20% 30%,rgba(96,81,155,0.15),transparent 60%),
-              radial-gradient(ellipse 700px 500px at 80% 80%,rgba(96,81,155,0.05),transparent 60%),
-              var(--bg);
-  overflow:hidden;border-right:1px solid var(--border);min-height:100vh}
-.hero::before{content:'';position:absolute;inset:0;
-  background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);
-  background-size:64px 64px;
-  mask-image:radial-gradient(ellipse 70% 60% at 30% 40%,#000 30%,transparent 90%);
-  -webkit-mask-image:radial-gradient(ellipse 70% 60% at 30% 40%,#000 30%,transparent 90%);pointer-events:none}
-.hero-top,.hero-mid,.hero-bottom{position:relative;z-index:1}
-.hero-brand{display:flex;align-items:center;gap:16px;font-size:24px;font-weight:700;color:var(--text-hi)}
-.hero-brand .mark{width:64px;height:64px;border:1px solid var(--border);border-radius:12px;display:grid;place-items:center;
-  background:var(--bg-card);box-shadow:0 0 24px -8px var(--primary-glow);overflow:hidden;}
-.hero-brand .mark img{width:100%;height:100%;object-fit:cover;display:block;}
-.hero-mid{max-width:560px}
-.hero-mid h1{font-size:clamp(36px,4vw,56px);line-height:1.1;color:var(--text-hi);margin-bottom:24px;letter-spacing:-0.03em}
-.hero-mid h1 .accent{color:var(--primary)}
-.hero-mid p{font-size:16px;color:var(--text-muted);line-height:1.7;max-width:460px}
-.hero-bottom{display:flex;align-items:center;gap:24px;flex-wrap:wrap;font-size:13px;color:var(--text-muted);font-weight:500}
-.stat{display:flex;align-items:center;gap:8px}
-.stat b{color:var(--text-hi);font-weight:600}
-.divider{width:1px;height:12px;background:var(--border)}
-.login-panel{display:flex;align-items:center;justify-content:center;padding:48px 32px;background:var(--bg-darker);position:relative}
-.login-card{position:relative;width:100%;max-width:440px;padding:48px;
-  border:1px solid var(--border);background:var(--bg-card);
-  border-radius:20px;box-shadow:0 24px 60px -20px rgba(0,0,0,0.5);}
-.card-head{margin-bottom:32px;text-align:center;}
-.card-head .mini-tag{display:inline-block;font-size:11px;font-weight:600;color:var(--primary);
-  background:rgba(96,81,155,0.1);padding:6px 14px;border-radius:6px;letter-spacing:.05em;margin-bottom:16px;text-transform:uppercase}
-.card-head h2{font-size:28px;margin-bottom:8px}
-.card-head p{font-size:14px;color:var(--text-muted);line-height:1.6}
-.btn-discord{display:flex;align-items:center;justify-content:center;gap:12px;
-  width:100%;padding:16px 24px;background:var(--primary);
-  color:var(--text-hi);font-weight:600;font-size:15px;text-decoration:none;transition:all .2s var(--ease);
-  border-radius:8px;box-shadow:0 4px 12px rgba(96,81,155,0.3);}
-.btn-discord:hover{background:var(--primary-hover);transform:translateY(-1px);box-shadow:0 6px 16px rgba(96,81,155,0.4);color:var(--text-hi)}
-.login-foot{margin-top:32px;padding-top:24px;border-top:1px solid var(--border);
-  display:flex;align-items:center;justify-content:space-between;gap:12px;}
-.status-pill { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); font-weight:500;}
-.status-dot { width: 8px; height: 8px; background: var(--success); border-radius: 50%; box-shadow: 0 0 8px var(--success); }
-.page-mini-footer{position:fixed;bottom:24px;left:0;right:0;
-  font-size:12px;color:var(--text-muted);display:flex;justify-content:center;z-index:100;font-weight:500;}
-@media(max-width:960px){
-  .login-page{grid-template-columns:1fr}
-  .hero{padding:36px 28px 44px;min-height:auto;border-right:0;border-bottom:1px solid var(--border)}
-  .hero-mid h1{font-size:clamp(32px,8vw,48px)}
-  .login-panel{padding:36px 20px 80px}
-  .login-card{max-width:440px;padding:32px 24px}
-  .page-mini-footer{position:relative;margin-top:32px;bottom:auto;}
+.login-page { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; position: relative; }
+.hero-bg { position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, rgba(181, 101, 255, 0.1) 0%, transparent 60%); pointer-events: none; }
+.login-box { 
+  position: relative; z-index: 10; width: 100%; max-width: 500px; 
+  background: var(--bg-box); padding: 40px; 
+  border: 4px solid var(--border); 
+  box-shadow: 8px 8px 0 var(--shadow), 0 0 20px rgba(181, 101, 255, 0.2);
 }
+.login-box::before { content: ''; position: absolute; top: -4px; left: 20px; right: 20px; height: 4px; background: var(--primary); }
+.logo-area { text-align: center; margin-bottom: 32px; }
+.logo-icon { font-size: 48px; margin-bottom: 16px; text-shadow: 0 0 15px var(--primary); }
+.logo-title { font-size: 32px; color: var(--text); text-shadow: 4px 4px 0 var(--border); letter-spacing: 2px; }
+.logo-subtitle { font-size: 16px; color: var(--text-muted); margin-top: 8px; letter-spacing: 1px; }
+.btn-discord { 
+  display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; 
+  background: var(--primary); color: var(--bg); font-family: 'Press Start 2P', cursive; font-size: 14px;
+  padding: 20px; border: 4px solid var(--text); text-decoration: none;
+  box-shadow: 6px 6px 0 var(--shadow); transition: all 0.1s; margin-top: 24px;
+}
+.btn-discord:hover { background: var(--primary-hover); transform: translate(2px, 2px); box-shadow: 4px 4px 0 var(--shadow); color: var(--bg); }
+.btn-discord:active { transform: translate(6px, 6px); box-shadow: 0 0 0 var(--shadow); }
+.footer-text { margin-top: 32px; font-size: 16px; color: var(--text-muted); text-align: center; }
+.footer-text span { color: var(--accent); }
 </style></head>
 <body>
 <main class="login-page">
-  <section class="hero" aria-label="Apresentação">
-    <div class="hero-top">
-      <div class="hero-brand">
-        <span class="mark"><img src="/static/logo.gif" alt="Logo"></span>
-        <span class="name">PXKK</span>
-      </div>
+  <div class="hero-bg"></div>
+  <div class="login-box">
+    <div class="logo-area">
+      <div class="logo-icon">💜</div>
+      <h1 class="logo-title">PXKK</h1>
+      <p class="logo-subtitle">MANAGEMENT SYSTEM</p>
     </div>
-    <div class="hero-mid">
-      <h1>Gerencie seu servidor com <span class="accent">precisão total.</span></h1>
-      <p>Toda a configuração do seu bot em um painel único, seguro e intuitivo. Controle tickets, verificação, níveis e muito mais.</p>
-    </div>
-    <div class="hero-bottom">
-      <div class="stat"><b>OAuth2</b> Discord</div>
-      <span class="divider"></span>
-      <div class="stat"><b>Cloudflare</b></div>
-      <span class="divider"></span>
-      <div class="stat"><b>100%</b> real-time</div>
-    </div>
-  </section>
-  <section class="login-panel" aria-label="Entrar">
-    <div class="login-card">
-      <div class="card-head">
-        <span class="mini-tag">Autenticação</span>
-        <h2>Bem-vindo de volta</h2>
-        <p>Autentique-se com sua conta do Discord para acessar o painel administrativo.</p>
-      </div>
-      <a href="/auth" class="btn-discord">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M20.3 4.4A19.7 19.7 0 0 0 15.4 3l-.3.5a14.7 14.7 0 0 1 4.3 2.2 15 15 0 0 0-12.8 0A14.6 14.6 0 0 1 10.9 3.5L10.6 3a19.7 19.7 0 0 0-4.9 1.4C2.6 8.6 1.9 12.7 2.3 16.7a19.8 19.8 0 0 0 6 3l.8-1.3a13 13 0 0 1-2-1l.5-.4a14 14 0 0 0 12.8 0l.5.4a13 13 0 0 1-2 1l.8 1.3a19.8 19.8 0 0 0 6-3c.5-4.6-.7-8.6-3.4-12.3ZM9 14.6c-1.2 0-2.2-1.1-2.2-2.4S7.8 9.8 9 9.8s2.2 1.1 2.2 2.4S10.2 14.6 9 14.6Zm6 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Z"/></svg>
-        Entrar com Discord
-      </a>
-      <div class="login-foot">
-        <div class="status-pill"><span class="status-dot"></span> Sistemas Online</div>
-        <div class="status-pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--primary)"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg> Conexão Segura</div>
-      </div>
-    </div>
-  </section>
+    
+    <p style="text-align: center; color: var(--text-muted); margin-bottom: 8px;">Autentique-se para acessar o painel.</p>
+    
+    <a href="/auth" class="btn-discord">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20.3 4.4A19.7 19.7 0 0 0 15.4 3l-.3.5a14.7 14.7 0 0 1 4.3 2.2 15 15 0 0 0-12.8 0A14.6 14.6 0 0 1 10.9 3.5L10.6 3a19.7 19.7 0 0 0-4.9 1.4C2.6 8.6 1.9 12.7 2.3 16.7a19.8 19.8 0 0 0 6 3l.8-1.3a13 13 0 0 1-2-1l.5-.4a14 14 0 0 0 12.8 0l.5.4a13 13 0 0 1-2 1l.8 1.3a19.8 19.8 0 0 0 6-3c.5-4.6-.7-8.6-3.4-12.3ZM9 14.6c-1.2 0-2.2-1.1-2.2-2.4S7.8 9.8 9 9.8s2.2 1.1 2.2 2.4S10.2 14.6 9 14.6Zm6 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Z"/></svg>
+      ENTRAR COM DISCORD
+    </a>
+  </div>
+  
+  <p class="footer-text">© 2026 PXKK <span>❤</span></p>
 </main>
-<footer class="page-mini-footer">
-  <span>© 2026 PXKK. Todos os direitos reservados.</span>
-</footer>
 </body></html>"""
 
 NOT_OWNER_HTML = """<!doctype html><html lang="pt-br"><head>
@@ -568,233 +532,194 @@ NOT_OWNER_HTML = """<!doctype html><html lang="pt-br"><head>
 <title>Acesso negado — PXKK</title><meta name="robots" content="noindex">
 """ + STYLE + """
 <style>
-body{background:var(--bg);display:grid;place-items:center;min-height:100vh;padding:24px;}
-.denied-card{position:relative;max-width:440px;width:100%;background:var(--bg-card);border:1px solid var(--border);
-  border-radius:16px;padding:48px 40px;text-align:center;box-shadow:0 24px 60px -20px rgba(0,0,0,0.5);}
-.denied-icon{width:64px;height:64px;margin:0 auto 24px;border-radius:16px;background:rgba(231,76,60,0.1);
-  display:grid;place-items:center;font-size:28px;color:var(--danger);}
-.denied-card h1{font-size:24px;margin-bottom:12px}
-.denied-card p{color:var(--text-muted);font-size:14px;margin-bottom:24px}
-.user-chip{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border:1px solid var(--border);
-  border-radius:99px;margin-bottom:28px;font-size:13px;color:var(--text);background:var(--bg);}
-.btn-back{display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:12px 24px;
-  background:var(--primary);color:var(--text-hi);font-weight:600;font-size:14px;border-radius:8px;transition:all .2s;}
-.btn-back:hover{background:var(--primary-hover);}
+body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+.denied-box { 
+  background: var(--bg-box); padding: 40px; max-width: 500px; width: 100%; text-align: center;
+  border: 4px solid var(--accent); box-shadow: 8px 8px 0 var(--shadow), 0 0 20px rgba(255, 77, 109, 0.2);
+}
+.denied-icon { font-size: 48px; margin-bottom: 24px; }
+.denied-title { color: var(--accent); font-size: 24px; margin-bottom: 16px; }
+.denied-text { color: var(--text-muted); font-size: 20px; margin-bottom: 32px; }
+.btn-back { 
+  display: inline-block; background: var(--border); color: var(--text); padding: 16px 32px;
+  border: 2px solid var(--text); box-shadow: 4px 4px 0 var(--shadow); transition: all 0.1s;
+}
+.btn-back:hover { background: var(--accent); color: var(--bg); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--shadow); }
 </style></head>
 <body>
-<div class="denied-card">
+<div class="denied-box">
   <div class="denied-icon">🚫</div>
-  <h1>Acesso Negado</h1>
-  <p>Este painel é privado e restrito à equipe autorizada.</p>
-  <div class="user-chip"><b>{{user.username}}</b></div>
-  <br>
-  <a href="/logout" class="btn-back">Sair da conta</a>
-</div></body></html>"""
+  <h1 class="denied-title">ACESSO NEGADO</h1>
+  <p class="denied-text">Este painel é privado.</p>
+  <a href="/logout" class="btn-back">SAIR DA CONTA</a>
+</div>
+</body></html>"""
 
 DASHBOARD_HTML = """<!doctype html><html lang="pt-br"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#1c202c"><meta name="robots" content="noindex">
+<meta name="theme-color" content="#0f0814"><meta name="robots" content="noindex">
 <title>Dashboard — PXKK</title>
 """ + STYLE + """
 <style>
-/* FUNDO GLOBAL (Gradient da imagem) */
-body { 
-  background: radial-gradient(circle at 10% 0%, rgba(96,81,155,0.1) 0%, transparent 40%),
-              radial-gradient(circle at 90% 100%, rgba(96,81,155,0.05) 0%, transparent 40%),
-              var(--bg);
-  background-attachment: fixed;
-}
-
 /* TOPBAR */
-.topbar{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;gap:20px;height:72px;padding:0 32px;
-  background:rgba(28,32,44,0.8);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-  border-bottom:1px solid var(--border);}
-.hamburger{display:none;width:40px;height:40px;align-items:center;justify-content:center;flex-direction:column;gap:5px;
-  border:1px solid transparent;border-radius:8px;cursor:pointer;transition:all .2s;}
-.hamburger:hover{background:var(--bg-card);border-color:var(--border)}
-.hamburger span{display:block;width:20px;height:2px;background:var(--text);transition:all .3s;}
-.hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
-.hamburger.open span:nth-child(2){opacity:0}
-.hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+.topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 100; display: flex; align-items: center; height: 80px; padding: 0 32px; background: var(--bg-box); border-bottom: 4px solid var(--border); }
+.hamburger { display: none; width: 48px; height: 48px; background: var(--bg-box-dark); border: 2px solid var(--border); align-items: center; justify-content: center; flex-direction: column; gap: 5px; cursor: pointer; box-shadow: 4px 4px 0 var(--shadow); }
+.hamburger span { display: block; width: 24px; height: 2px; background: var(--text); transition: 0.2s; }
+.hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.hamburger.open span:nth-child(2) { opacity: 0; }
+.hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
-.brand{display:flex;align-items:center;gap:12px;color:var(--text-hi);text-decoration:none;flex-shrink:0}
-.brand-icon{width:40px;height:40px;border-radius:10px;overflow:hidden;border:1px solid var(--border);}
-.brand-icon img{width:100%;height:100%;object-fit:cover;}
-.brand-text{display:flex;flex-direction:column;line-height:1}
-.brand-text .name{font-weight:700;font-size:18px;letter-spacing:-.02em;}
-.brand-text .sub{font-size:10px;color:var(--text-muted);font-weight:600;letter-spacing:.1em;text-transform:uppercase;margin-top:2px}
-.spacer{flex:1}
+.brand { display: flex; align-items: center; gap: 16px; text-decoration: none; }
+.brand-icon { width: 44px; height: 44px; background: var(--bg-box-dark); border: 2px solid var(--border); display: grid; place-items: center; font-size: 24px; box-shadow: 4px 4px 0 var(--shadow); }
+.brand-text { color: var(--text); font-size: 20px; letter-spacing: 1px; text-shadow: 2px 2px 0 var(--shadow); }
+.spacer { flex: 1; }
 
-/* MENU USUÁRIO */
-.user-wrap{position:relative}
-.user-trigger{display:flex;align-items:center;gap:12px;padding:6px 14px 6px 6px;background:var(--bg-card);
-  border:1px solid var(--border);transition:all .2s;border-radius:99px;cursor:pointer;}
-.user-trigger:hover{border-color:var(--border-hi);box-shadow:0 0 15px -5px var(--primary-glow)}
-.user-trigger .avatar{width:34px;height:34px;border-radius:50%;object-fit:cover;}
-.user-trigger .name{font-size:14px;font-weight:600;color:var(--text-hi);}
-.role-badge{font-size:10px;padding:4px 10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-hi);border-radius:99px;}
-.role-owner{background:var(--primary);}
-.role-dev{background:#3b82f6;}
-.role-staff{background:var(--border);}
-.user-trigger .chev{transition:transform .2s;color:var(--text-muted);}
-.user-trigger.open .chev{transform:rotate(180deg)}
-.dropdown{position:absolute;top:calc(100% + 10px);right:0;min-width:260px;background:var(--bg-card);
-  border:1px solid var(--border);padding:8px;border-radius:12px;box-shadow:0 20px 40px -10px rgba(0,0,0,0.5);
-  opacity:0;visibility:hidden;transform:translateY(-5px);transition:all .2s;}
-.dropdown.open{opacity:1;visibility:visible;transform:none}
-.dd-head{display:flex;gap:12px;align-items:center;padding:12px;border-bottom:1px solid var(--border);margin-bottom:8px}
-.dd-head img{width:40px;height:40px;border-radius:50%;}
-.dd-head .dd-name{font-weight:600;font-size:14px;color:var(--text-hi);}
-.dd-head .dd-id{font-size:11px;color:var(--text-muted);margin-top:2px}
-.dd-item{display:flex;align-items:center;gap:10px;padding:10px 12px;color:var(--text);font-size:13.5px;
-  font-weight:500;text-decoration:none;border-radius:6px;transition:all .2s;}
-.dd-item:hover{background:var(--bg);color:var(--text-hi)}
-.dd-item svg{color:var(--text-muted);}
+/* USER PROFILE */
+.user-wrap { position: relative; }
+.user-trigger { display: flex; align-items: center; gap: 12px; background: var(--bg-box-dark); border: 2px solid var(--border); padding: 6px 16px 6px 6px; cursor: pointer; box-shadow: 4px 4px 0 var(--shadow); transition: all 0.1s; }
+.user-trigger:hover { transform: translate(1px, 1px); box-shadow: 3px 3px 0 var(--shadow); border-color: var(--border-hi); }
+.user-trigger .avatar { width: 40px; height: 40px; border: 2px solid var(--border); object-fit: cover; }
+.user-trigger .name { font-size: 18px; color: var(--text); }
+.role-badge { font-family: 'Press Start 2P', cursive; font-size: 8px; padding: 4px 8px; color: var(--bg); background: var(--primary); }
+.role-owner { background: var(--primary); }
+.role-dev { background: #3b82f6; }
+.role-staff { background: var(--text-muted); }
 
-/* SIDEBAR E LAYOUT */
-.layout{display:flex;min-height:100vh;padding-top:72px;position:relative;}
-.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:90;backdrop-filter:blur(4px)}
-.overlay.show{display:block}
+.dropdown { position: absolute; top: calc(100% + 12px); right: 0; min-width: 260px; background: var(--bg-box); border: 4px solid var(--border); box-shadow: 8px 8px 0 var(--shadow); padding: 12px; opacity: 0; visibility: hidden; transform: translateY(-10px); transition: 0.2s; }
+.dropdown.open { opacity: 1; visibility: visible; transform: none; }
+.dd-head { display: flex; gap: 12px; align-items: center; padding-bottom: 12px; border-bottom: 2px dashed var(--border); margin-bottom: 12px; }
+.dd-head img { width: 48px; height: 48px; border: 2px solid var(--border); }
+.dd-head .dd-name { font-family: 'Press Start 2P', cursive; font-size: 12px; color: var(--text); }
+.dd-head .dd-id { font-size: 16px; color: var(--text-muted); margin-top: 6px; }
+.dd-item { display: flex; align-items: center; gap: 10px; padding: 12px; color: var(--accent); font-size: 20px; transition: 0.1s; }
+.dd-item:hover { background: var(--bg-box-dark); transform: translateX(4px); }
 
-/* SIDEBAR */
-.sidebar{width:270px;flex-shrink:0;background:rgba(28,32,44,0.95);backdrop-filter:blur(20px);border-right:1px solid var(--border);padding:24px 16px;
-  overflow-y:auto;position:fixed;top:72px;bottom:0;left:0;z-index:99;transition:transform .3s var(--ease);}
-  
-.sidebar-group { margin-bottom: 28px; }
-.sidebar-group-title { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;
-  letter-spacing: .1em; padding: 0 12px; margin-bottom: 8px;}
+/* SIDEBAR & LAYOUT */
+.layout { display: flex; min-height: 100vh; padding-top: 80px; }
+.overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 90; }
+.overlay.show { display: block; }
 
-.nav-btn{display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;color:var(--text);font-size:14px;
-  font-weight:500;text-align:left;transition:all .2s;margin-bottom:2px;
-  border-radius:8px;border:1px solid transparent;}
-.nav-btn:hover{background:var(--bg-card);color:var(--text-hi)}
-.nav-btn.active{background:rgba(96,81,155,0.15);color:var(--text-hi);font-weight:600;border-color:rgba(96,81,155,0.2)}
-.nav-icon{width:24px;height:24px;flex-shrink:0;display:grid;place-items:center;font-size:14px;}
-.nav-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
+.sidebar { width: 300px; flex-shrink: 0; background: var(--bg-box); border-right: 4px solid var(--border); padding: 24px 16px; position: fixed; top: 80px; bottom: 0; left: 0; z-index: 99; overflow-y: auto; transition: transform 0.3s; }
+.sidebar-group { margin-bottom: 32px; }
+.sidebar-group-title { font-family: 'Press Start 2P', cursive; font-size: 10px; color: var(--accent); margin-bottom: 12px; padding-left: 8px; text-shadow: 2px 2px 0 var(--shadow); }
 
-/* CONTEÚDO PRINCIPAL */
-.content{flex:1;min-width:0;padding:40px 48px 100px;display:flex;flex-direction:column;align-items:center;
-  transition:margin-left .3s var(--ease); margin-left:270px;}
-.content-inner{max-width:960px;width:100%;flex:1}
+.nav-btn { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 16px; color: var(--text-muted); font-size: 20px; text-align: left; margin-bottom: 6px; border: 2px solid transparent; transition: 0.1s; }
+.nav-btn:hover { color: var(--text); border-color: var(--border); background: var(--bg-box-dark); }
+.nav-btn.active { background: var(--bg-box-dark); color: var(--text); border-color: var(--primary); box-shadow: 4px 4px 0 var(--shadow); }
+.nav-btn.active .nav-icon { color: var(--primary); }
+.nav-icon { font-size: 16px; }
+.nav-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ALERTAS */
-.alert{display:flex;align-items:center;gap:12px;padding:16px 20px;margin-bottom:32px;font-size:14px;
-  font-weight:500;border:1px solid;border-radius:10px;background:rgba(46,204,113,0.1);border-color:rgba(46,204,113,0.2);color:var(--success);}
-.alert.warn{background:rgba(241,196,15,0.1);border-color:rgba(241,196,15,0.2);color:#f1c40f}
+/* CONTENT */
+.content { flex: 1; min-width: 0; padding: 48px; margin-left: 300px; display: flex; flex-direction: column; align-items: center; }
+.content-inner { max-width: 900px; width: 100%; }
 
-/* CARDS DE SEÇÃO */
-.section{display:none;background:var(--bg-card);
-  border:1px solid var(--border);padding:40px;position:relative;border-radius:16px;
-  box-shadow:0 10px 30px -10px rgba(0,0,0,0.3);}
-.section.active{display:block;animation:fadeUp .3s var(--ease)}
-@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-.section-head{margin-bottom:36px;padding-bottom:24px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px;}
-.section-head h2{font-size:22px;color:var(--text-hi);display:flex;align-items:center;gap:12px;}
-.section-head p{color:var(--text-muted);font-size:14px;}
+/* ALERTS */
+.alert { display: flex; align-items: center; gap: 12px; padding: 16px; margin-bottom: 32px; background: var(--bg-box); border: 2px solid var(--success); color: var(--success); box-shadow: 4px 4px 0 var(--shadow); font-size: 18px; }
+.alert.warn { border-color: #f1c40f; color: #f1c40f; }
 
-/* FORMULÁRIO GRID */
-.form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+/* DIALOG BOX (SECTIONS) */
+.section { display: none; background: var(--bg-box); border: 4px solid var(--border); padding: 40px; position: relative; box-shadow: 8px 8px 0 var(--shadow); }
+.section::before { content: '❤'; position: absolute; top: -12px; left: 24px; background: var(--bg-box); padding: 0 8px; color: var(--accent); font-size: 20px; }
+.section.active { display: block; animation: fadeIn 0.3s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+
+.section-head { margin-bottom: 32px; border-bottom: 4px dashed var(--border); padding-bottom: 20px; }
+.section-head h2 { font-size: 20px; color: var(--text); display: flex; align-items: center; gap: 12px; text-shadow: 3px 3px 0 var(--shadow); }
+.section-head p { color: var(--text-muted); font-size: 18px; margin-top: 12px; }
+
+/* FORM GRID */
+.form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 28px; }
 .f { display: flex; flex-direction: column; gap: 8px; }
 .f.full-width { grid-column: 1 / -1; }
-.f label{font-size:12px;color:var(--text);font-weight:600;letter-spacing:.02em;}
-.f .hint{font-size:12px;color:var(--text-muted);line-height:1.4;}
+.f label { font-family: 'Press Start 2P', cursive; font-size: 10px; color: var(--text); line-height: 1.5; }
+.f .hint { font-size: 16px; color: var(--text-muted); }
 
 /* INPUTS */
-input[type=text],input[type=number],textarea,select{
-  width:100%;padding:12px 16px;border:1px solid var(--border);
-  background:var(--bg);color:var(--text-hi);font:inherit;font-size:14px;
-  border-radius:8px;transition:all .2s;}
-input[type=text]:hover,input[type=number]:hover,textarea:hover,select:hover { border-color:var(--text-muted);}
-input[type=text]:focus,input[type=number]:focus,textarea:focus,select:focus{
-  outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(96,81,155,0.2);}
-input::placeholder,textarea::placeholder{color:var(--text-muted);opacity:0.6}
-textarea{min-height:100px;resize:vertical;font-family:inherit;line-height:1.5}
-select[multiple]{min-height:140px;padding:8px}
-select[multiple] option{padding:10px;margin:2px 0;background:var(--bg-card);color:var(--text);border-radius:4px;}
-select[multiple] option:checked{background:var(--primary);color:var(--text-hi)}
+input[type=text], input[type=number], textarea, select {
+  width: 100%; padding: 12px 16px; background: var(--bg-box-dark); border: 2px solid var(--border);
+  color: var(--text); font-family: 'VT323', monospace; font-size: 22px;
+  box-shadow: inset 3px 3px 0 var(--shadow); transition: all 0.2s;
+}
+input[type=text]:focus, input[type=number]:focus, textarea:focus, select:focus {
+  outline: none; border-color: var(--primary); box-shadow: inset 3px 3px 0 var(--shadow), 0 0 10px rgba(181, 101, 255, 0.4);
+}
+textarea { min-height: 120px; resize: vertical; }
+select[multiple] { min-height: 160px; padding: 8px; }
+select[multiple] option { padding: 8px; margin: 4px 0; background: var(--bg-box); color: var(--text); }
+select[multiple] option:checked { background: var(--primary); color: var(--bg); }
 
 /* COLOR PICKER */
-.color-wrapper { display: flex; align-items: center; gap: 12px; background: var(--bg); padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); transition: all .2s;}
-.color-wrapper:hover { border-color: var(--text-muted); }
-input[type=color]{appearance:none; -webkit-appearance:none; width: 32px; height: 32px; border: none; padding: 0; background: transparent; cursor: pointer; border-radius: 6px; overflow: hidden;}
-input[type=color]::-webkit-color-swatch-wrapper{padding:0;}
-input[type=color]::-webkit-color-swatch{border: none; border-radius: 6px;}
-.color-hex { font-family: monospace; font-size: 14px; color: var(--text-hi); font-weight: 600; text-transform: uppercase;}
+.color-wrapper { display: flex; align-items: center; gap: 16px; background: var(--bg-box-dark); padding: 8px 16px; border: 2px solid var(--border); box-shadow: inset 3px 3px 0 var(--shadow); }
+input[type=color] { appearance: none; width: 48px; height: 48px; border: none; padding: 0; background: transparent; cursor: pointer; }
+input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+input[type=color]::-webkit-color-swatch { border: 2px solid var(--text); }
+.color-hex { font-family: 'Press Start 2P', cursive; font-size: 12px; color: var(--text); }
 
 /* TOGGLE */
-.sw{display:flex;align-items:center;gap:16px;padding:12px 16px;background:var(--bg);border:1px solid var(--border);
-  transition:all .2s;cursor:pointer;border-radius:8px;}
-.sw:hover{border-color:var(--text-muted);}
-.sw input[type=checkbox]{appearance:none;-webkit-appearance:none;width:44px;height:24px;background:var(--border);
-  position:relative;cursor:pointer;flex-shrink:0;transition:background .2s;border-radius:99px;}
-.sw input[type=checkbox]::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;
-  background:#fff;transition:transform .2s;box-shadow:0 2px 4px rgba(0,0,0,.2)}
-.sw input[type=checkbox]:checked{background:var(--primary)}
-.sw input[type=checkbox]:checked::after{transform:translateX(20px)}
-.sw span{color:var(--text);font-size:14px;font-weight:500;cursor:pointer;flex:1;}
+.sw { display: flex; align-items: center; gap: 16px; padding: 16px; background: var(--bg-box-dark); border: 2px solid var(--border); cursor: pointer; box-shadow: inset 3px 3px 0 var(--shadow); transition: 0.1s; }
+.sw:hover { border-color: var(--primary); }
+.sw input[type=checkbox] { appearance: none; width: 52px; height: 28px; background: var(--border); position: relative; cursor: pointer; border: 2px solid var(--text); }
+.sw input[type=checkbox]::after { content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: var(--text); transition: 0.2s; }
+.sw input[type=checkbox]:checked { background: var(--primary); }
+.sw input[type=checkbox]:checked::after { transform: translateX(24px); }
+.sw span { color: var(--text); font-size: 20px; flex: 1; }
 
-/* BARRA SALVAR */
-.save-bar{position:fixed;bottom:0;left:270px;right:0;z-index:50;padding:16px 48px;background:rgba(28,32,44,0.9);
-  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border);
-  display:flex;justify-content:space-between;align-items:center;gap:16px;transition:left .3s var(--ease);}
-.save-hint{color:var(--text-muted);font-size:13px;display:flex;align-items:center;gap:8px;}
-.save-btn{padding:12px 32px;background:var(--primary);color:var(--text-hi);font-weight:600;font-size:14px;
-  border-radius:8px;transition:all .2s;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(96,81,155,0.3);}
-.save-btn:hover{background:var(--primary-hover);transform:translateY(-1px);box-shadow:0 6px 16px rgba(96,81,155,0.4);}
-.save-btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
+/* SAVE BAR */
+.save-bar { position: fixed; bottom: 0; left: 300px; right: 0; z-index: 50; padding: 20px 48px; background: var(--bg-box); border-top: 4px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.save-hint { color: var(--text-muted); font-size: 18px; display: flex; align-items: center; gap: 10px; }
+.save-btn { background: var(--accent); color: var(--text); font-family: 'Press Start 2P', cursive; font-size: 14px; padding: 20px 40px; border: 4px solid var(--text); box-shadow: 6px 6px 0 var(--shadow); transition: 0.1s; display: flex; align-items: center; gap: 12px; }
+.save-btn:hover { background: #ff6b85; transform: translate(2px, 2px); box-shadow: 4px 4px 0 var(--shadow); }
+.save-btn:active { transform: translate(6px, 6px); box-shadow: 0 0 0 var(--shadow); }
 
-/* RESPONSIVO */
-@media(max-width:1024px){
+/* RESPONSIVE */
+@media(max-width:1024px) {
   .form-grid { grid-template-columns: 1fr; }
+  .content { padding: 32px; }
 }
-@media(max-width:960px){
-  .hamburger{display:flex;} 
-  .brand-text .sub{display:none}
-  .user-trigger .name{display:none}
-  .user-trigger{padding:6px}
-  .user-trigger .chev{display:none}
-  .sidebar { transform: translateX(-100%); box-shadow: 24px 0 40px -10px rgba(0,0,0,.5); background:var(--bg);}
+@media(max-width:960px) {
+  .hamburger { display: flex; }
+  .brand-text { display: none; }
+  .user-trigger .name, .role-badge { display: none; }
+  .user-trigger { padding: 4px; }
+  .sidebar { transform: translateX(-100%); box-shadow: 10px 0 0 rgba(0,0,0,0.5); }
   .sidebar.open { transform: none; }
-  .content { margin-left: 0; padding: 24px 20px 100px; }
-  .save-bar { left: 0; padding: 16px 20px; }
-  .save-hint{display:none}
-  .save-btn{width:100%;justify-content:center}
-  .section{padding:24px 20px;}
+  .content { margin-left: 0; padding: 24px 16px 120px; }
+  .save-bar { left: 0; padding: 16px 24px; }
+  .save-hint { display: none; }
+  .save-btn { width: 100%; justify-content: center; }
+  .section { padding: 24px 16px; }
 }
 </style></head>
 <body>
+
 <header class="topbar">
   <button class="hamburger" id="hamburger" aria-label="Abrir menu" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
-  <a href="/" class="brand" aria-label="PXKK Dashboard">
-    <span class="brand-icon" aria-hidden="true"><img src="/static/logo.gif" alt="Logo"></span>
-    <span class="brand-text">
-      <span class="name">PXKK</span>
-      <span class="sub">Dashboard</span>
-    </span>
+  <a href="/" class="brand">
+    <div class="brand-icon" style="color:var(--primary);">💜</div>
+    <div class="brand-text pixel-font">PXKK</div>
   </a>
   <div class="spacer"></div>
   <div class="user-wrap">
-    <button class="user-trigger" id="userTrigger" aria-haspopup="true" aria-expanded="false">
+    <button class="user-trigger" id="userTrigger">
       <img class="avatar" src="https://cdn.discordapp.com/avatars/{{user.id}}/{{user.avatar}}.png?size=64" alt="">
       <span class="name">{{user.global_name}}</span>
       <span class="role-badge role-{{user.role}}">
-        {% if user.role=='owner' %}Dono{% elif user.role=='dev' %}Dev{% else %}Staff{% endif %}
+        {% if user.role=='owner' %}LV MAX{% elif user.role=='dev' %}DEV{% else %}STAFF{% endif %}
       </span>
-      <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
     </button>
-    <div class="dropdown" id="userDropdown" role="menu">
+    <div class="dropdown" id="userDropdown">
       <div class="dd-head">
         <img src="https://cdn.discordapp.com/avatars/{{user.id}}/{{user.avatar}}.png?size=64" alt="">
         <div>
           <div class="dd-name">{{user.global_name}}</div>
-          <div class="dd-id">ID · {{user.id}}</div>
+          <div class="dd-id">ID: {{user.id}}</div>
         </div>
       </div>
-      <a href="/logout" class="dd-item" role="menuitem">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
-        Sair da conta
+      <a href="/logout" class="dd-item">
+        <span style="font-size:16px;">❌</span> Sair da conta
       </a>
     </div>
   </div>
@@ -802,47 +727,47 @@ input[type=color]::-webkit-color-swatch{border: none; border-radius: 6px;}
 
 <div class="layout">
   <div class="overlay" id="overlay"></div>
-  <aside class="sidebar" id="sidebar" aria-label="Navegação">
+  <aside class="sidebar" id="sidebar">
     
     <div class="sidebar-group">
-      <div class="sidebar-group-title">Geral</div>
+      <div class="sidebar-group-title">⚔️ GERAL</div>
       {% for title, _ in sections[:4] %}
         {% set parts = title.split(' ', 1) %}
         <button class="nav-btn {{'active' if loop.first}}" data-t="{{loop.index0}}">
-          <span class="nav-icon" aria-hidden="true">{{parts[0]}}</span>
+          <span class="nav-icon">{{parts[0]}}</span>
           <span class="nav-label">{{parts[1] if parts|length > 1 else title}}</span>
         </button>
       {% endfor %}
     </div>
 
     <div class="sidebar-group">
-      <div class="sidebar-group-title">Segurança</div>
+      <div class="sidebar-group-title">🛡️ SEGURANÇA</div>
       {% for title, _ in sections[4:7] %}
         {% set parts = title.split(' ', 1) %}
         <button class="nav-btn" data-t="{{loop.index0 + 4}}">
-          <span class="nav-icon" aria-hidden="true">{{parts[0]}}</span>
+          <span class="nav-icon">{{parts[0]}}</span>
           <span class="nav-label">{{parts[1] if parts|length > 1 else title}}</span>
         </button>
       {% endfor %}
     </div>
 
     <div class="sidebar-group">
-      <div class="sidebar-group-title">Atendimento</div>
+      <div class="sidebar-group-title">💬 ATENDIMENTO</div>
       {% for title, _ in sections[7:9] %}
         {% set parts = title.split(' ', 1) %}
         <button class="nav-btn" data-t="{{loop.index0 + 7}}">
-          <span class="nav-icon" aria-hidden="true">{{parts[0]}}</span>
+          <span class="nav-icon">{{parts[0]}}</span>
           <span class="nav-label">{{parts[1] if parts|length > 1 else title}}</span>
         </button>
       {% endfor %}
     </div>
 
     <div class="sidebar-group">
-      <div class="sidebar-group-title">Comunidade</div>
+      <div class="sidebar-group-title">👥 COMUNIDADE</div>
       {% for title, _ in sections[9:] %}
         {% set parts = title.split(' ', 1) %}
         <button class="nav-btn" data-t="{{loop.index0 + 9}}">
-          <span class="nav-icon" aria-hidden="true">{{parts[0]}}</span>
+          <span class="nav-icon">{{parts[0]}}</span>
           <span class="nav-label">{{parts[1] if parts|length > 1 else title}}</span>
         </button>
       {% endfor %}
@@ -853,31 +778,28 @@ input[type=color]::-webkit-color-swatch{border: none; border-radius: 6px;}
   <main class="content">
     <div class="content-inner">
       {% for m in get_flashed_messages() %}
-        <div class="alert" role="status">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
-          {{m}}
+        <div class="alert">
+          <span>💾</span> {{m}}
         </div>
       {% endfor %}
       {% if not cfg.get('guild_id') %}
-        <div class="alert warn" role="alert">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>
-          O bot ainda não registrou um servidor. Inicie o bot primeiro.
+        <div class="alert warn">
+          <span>⚠️</span> O bot ainda não registrou um servidor. Inicie o bot primeiro.
         </div>
       {% endif %}
       
       {% if not sections %}
-        <div class="empty">
-          <div class="ic" aria-hidden="true">🔒</div>
-          <h2>Nenhuma seção liberada</h2>
-          <p>Você ainda não tem permissão para editar nenhuma seção. Fale com o administrador do sistema.</p>
+        <div class="section active" style="text-align: center;">
+          <h2 style="justify-content: center;">🔒 ACESSO RESTRITO</h2>
+          <p>Você não tem permissão para editar nenhuma seção.</p>
         </div>
       {% else %}
       <form method="post" id="cfgForm" novalidate>
         <input type="hidden" name="_csrf" value="{{csrf()}}">
         {% for title, fields in sections %}
-        <section id="s{{loop.index0}}" class="section {{'active' if loop.first}}" aria-labelledby="h{{loop.index0}}">
+        <section id="s{{loop.index0}}" class="section {{'active' if loop.first}}">
           <div class="section-head">
-            <h2 id="h{{loop.index0}}">{{title}}</h2>
+            <h2>{{title}}</h2>
             <p>As alterações são aplicadas automaticamente no bot em até 5 segundos.</p>
           </div>
           
@@ -931,7 +853,6 @@ input[type=color]::-webkit-color-swatch{border: none; border-radius: 6px;}
             </div>
           {% endfor %}
           </div>
-          
         </section>
         {% endfor %}
       </form>
@@ -941,14 +862,12 @@ input[type=color]::-webkit-color-swatch{border: none; border-radius: 6px;}
 </div>
 
 {% if sections %}
-<div class="save-bar" role="region" aria-label="Salvar alterações">
+<div class="save-bar">
   <div class="save-hint">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-    As alterações são aplicadas automaticamente.
+    <span>⚡</span> Salve para aplicar as mudanças.
   </div>
   <button class="save-btn" form="cfgForm" type="submit">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
-    Salvar Alterações
+    <span>💾</span> SALVAR
   </button>
 </div>
 {% endif %}
@@ -964,7 +883,6 @@ function toggleSidebar(open){
   sidebar.classList.toggle('open', isOpen);
   overlay.classList.toggle('show', isOpen);
   hamburger.classList.toggle('open', isOpen);
-  hamburger.setAttribute('aria-expanded', String(isOpen));
   document.body.style.overflow = isOpen ? 'hidden' : '';
 }
 
@@ -987,27 +905,16 @@ const trigger = document.getElementById('userTrigger');
 const dropdown = document.getElementById('userDropdown');
 trigger?.addEventListener('click', (e) => {
   e.stopPropagation();
-  const isOpen = dropdown.classList.toggle('open');
-  trigger.classList.toggle('open', isOpen);
-  trigger.setAttribute('aria-expanded', String(isOpen));
+  dropdown.classList.toggle('open');
 });
 document.addEventListener('click', (e) => {
   if (!dropdown?.contains(e.target) && e.target !== trigger) {
     dropdown?.classList.remove('open');
-    trigger?.classList.remove('open');
-    trigger?.setAttribute('aria-expanded', 'false');
   }
 });
 document.getElementById('cfgForm')?.addEventListener('submit', () => {
   const btn = document.querySelector('.save-btn');
-  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Salvando...'; }
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    dropdown?.classList.remove('open');
-    trigger?.classList.remove('open');
-    if (sidebar?.classList.contains('open')) toggleSidebar(false);
-  }
+  if (btn) { btn.innerHTML = '<span>⏳</span> SALVANDO...'; }
 });
 document.querySelectorAll('input[type="color"]').forEach(input => {
     input.addEventListener('input', (e) => {
