@@ -428,7 +428,6 @@ STYLE = """
   --gray-hi:#B8B8C2;--gray-mid:#7A7A88;--gray-lo:#4A4A55;
   --border:rgba(255,255,255,0.08);--border-hi:rgba(138,79,255,0.35);
   --ok:#4ade80;--warn:#fbbf24;--err:#f87171;
-  /* Aumentando o arredondamento para combinar com a referência */
   --radius-sm: 12px;
   --radius: 24px;
   --radius-lg: 32px;
@@ -462,152 +461,362 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#000000">
 <meta name="description" content="PXKK Dashboard — gerencie seu bot Discord.">
-<title>PXKK — Dashboard</title>
+<title>Login — PXKK</title>
 """ + STYLE + """
 <style>
-/* Estilo do Login inspirado no design de referência (Cartões grandes, arredondados, soft) */
-.login-page{min-height:100vh;display:grid;grid-template-columns:1.2fr 1fr;background:var(--black);overflow:hidden;position:relative; padding: 24px; gap: 24px;}
-.hero{position:relative;padding:56px 72px;display:flex;flex-direction:column;justify-content:space-between;
-  background:
-    radial-gradient(ellipse 900px 600px at 20% 30%,rgba(138,79,255,0.15),transparent 60%),
-    var(--black-soft);
-  overflow:hidden;border:1px solid var(--border);border-radius:var(--radius-lg);min-height:calc(100vh - 48px);box-shadow: var(--shadow-soft);}
-.hero::before{content:'';position:absolute;inset:0;
-  background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);
-  background-size:64px 64px;
-  mask-image:radial-gradient(ellipse 70% 60% at 30% 40%,#000 30%,transparent 90%);
-  -webkit-mask-image:radial-gradient(ellipse 70% 60% at 30% 40%,#000 30%,transparent 90%);pointer-events:none; border-radius:var(--radius-lg);}
-.hero-top,.hero-mid,.hero-bottom{position:relative;z-index:1}
-.hero-brand{display:flex;align-items:center;gap:16px;font-family:'Archivo Black',sans-serif;
-  font-size:28px;letter-spacing:-0.04em;color:var(--white)}
-.hero-brand .mark{width:68px;height:68px;border:1px solid var(--purple);display:grid;place-items:center;
-  background:radial-gradient(circle at 30% 30%,rgba(138,79,255,.15),transparent 70%);
-  box-shadow:0 0 24px -8px var(--purple-glow);overflow:hidden;border-radius:var(--radius);}
-.hero-brand .mark img{width:100%;height:100%;object-fit:cover;display:block;}
-.hero-brand .name{display:flex;flex-direction:column;line-height:1}
-.hero-mid{max-width:560px}
-.hero-mid h1{font-family:'Archivo Black',sans-serif;font-size:clamp(42px,5.2vw,76px);line-height:.95;
-  color:var(--white);margin-bottom:28px;letter-spacing:-0.045em;text-transform:uppercase}
-.hero-mid h1 .accent{color:var(--purple);text-shadow:0 0 40px var(--purple-glow)}
-.hero-mid p{font-size:16px;color:var(--gray-hi);line-height:1.7;max-width:460px}
-.hero-bottom{display:flex;align-items:center;gap:24px;flex-wrap:wrap;font-size:12px;color:var(--gray-mid);letter-spacing:.02em}
-.stat{display:flex;align-items:center;gap:8px}
-.stat b{color:var(--white);font-weight:700}
-.divider{width:1px;height:12px;background:var(--border)}
-
-/* Painel de Login */
-.login-panel{display:flex;align-items:center;justify-content:center;padding:48px 32px;background:var(--black);position:relative;border-radius:var(--radius-lg);}
-.login-card{position:relative;width:100%;max-width:440px;padding:56px 48px;
-  border:1px solid var(--border);border-top:1px solid var(--border-hi);
-  background:var(--black-soft);
-  border-radius:var(--radius-lg);
-  box-shadow:var(--shadow-soft);}
-.login-card::before{content:'';position:absolute;top:-1px;left:40px;right:40px;height:1px;
-  background:linear-gradient(90deg,transparent,var(--purple),transparent);opacity:.8; border-radius: var(--radius-lg) var(--radius-lg) 0 0;}
-.card-head{margin-bottom:40px;text-align:center;}
-.card-head .mini-tag{display:inline-block;font-size:10px;font-weight:800;color:var(--white);
-  background:rgba(138,79,255,0.15);border:1px solid rgba(138,79,255,0.3);padding:6px 14px;
-  border-radius:var(--radius-pill);letter-spacing:.2em;margin-bottom:20px;text-transform:uppercase}
-.card-head h2{font-family:'Archivo Black',sans-serif;font-size:34px;letter-spacing:-0.03em;
-  color:var(--white);margin-bottom:12px;text-transform:uppercase;line-height:1.1}
-.card-head p{font-size:14px;color:var(--gray-hi);line-height:1.65}
-.btn-discord{display:flex;align-items:center;justify-content:space-between;gap:14px;
-  width:100%;padding:18px 28px;background:linear-gradient(135deg, var(--purple) 0%, #6B2EE0 100%);
-  color:var(--white);font-weight:700;font-size:15px;text-decoration:none;transition:all .25s var(--ease);
-  letter-spacing:-.005em;position:relative;overflow:hidden;border:1px solid rgba(255,255,255,0.15);border-radius:var(--radius-pill);
-  box-shadow:0 12px 30px -8px rgba(138,79,255,0.5);}
-.btn-discord::before{content:'';position:absolute;inset:0;
-  background:linear-gradient(120deg,transparent,rgba(255,255,255,.2),transparent);
-  transform:translateX(-100%);transition:transform .5s var(--ease)}
-.btn-discord:hover{background:linear-gradient(135deg, #A370FF 0%, #8A4FFF 100%);
-  box-shadow:0 16px 40px -8px rgba(138,79,255,0.7);transform:translateY(-2px);color:var(--white)}
-.btn-discord:hover::before{transform:translateX(100%)}
-.btn-discord .left{display:flex;align-items:center;gap:12px;position:relative;z-index:1}
-.btn-discord .arrow{position:relative;z-index:1;transition:transform .2s var(--ease)}
-.btn-discord:hover .arrow{transform:translateX(4px)}
-.login-foot{margin-top:32px;padding-top:24px;border-top:1px solid rgba(255,255,255,0.05);
-  display:flex;align-items:center;justify-content:space-between;gap:12px;}
-.status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: var(--radius-pill);
-  background: rgba(74, 222, 128, 0.05); border: 1px solid rgba(74, 222, 128, 0.15);
-  color: #86efac; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
-.status-dot { width: 6px; height: 6px; background: #4ade80; border-radius: 50%; box-shadow: 0 0 10px #4ade80;
-  animation: pulse-dot 2s infinite; }
-@keyframes pulse-dot { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.5); }
-  70% { transform: scale(1); box-shadow: 0 0 0 4px rgba(74, 222, 128, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); } }
-.secure-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);
-  color: var(--gray-hi); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
-.secure-pill svg { color: var(--purple-hi); }
-.page-mini-footer{position:fixed;bottom:24px;left:0;right:0;
-  font-size:11px;color:var(--gray-lo);display:flex;justify-content:center;z-index:100;letter-spacing:.1em;text-transform:uppercase;font-weight:600;}
-@media(max-width:960px){
-  .login-page{grid-template-columns:1fr; padding: 16px;}
-  .hero{padding:36px 28px 44px;min-height:auto;border-right:0;border-bottom:1px solid var(--border); border-radius: var(--radius);}
-  .login-panel{border-radius: var(--radius);}
-  .hero-mid h1{font-size:clamp(36px,9vw,52px)}
-  .hero-mid p{font-size:15px}
-  .hero-bottom{font-size:11px;gap:12px;flex-wrap:wrap}
-  .login-card{max-width:440px;padding:40px 28px; border-radius: var(--radius);}
-  .page-mini-footer{position:relative;margin-top:32px;bottom:auto;}
+/* Layout base para a tela de login */
+.login-page {
+    min-height: 100vh;
+    background: 
+        radial-gradient(circle at 20% 30%, rgba(138, 79, 255, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 80% 70%, rgba(138, 79, 255, 0.1) 0%, transparent 50%),
+        #040404;
+    background-attachment: fixed;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
 }
-@media(max-width:480px){
-  .hero{padding:28px 20px 36px}
-  .hero-brand{font-size:24px;}
-  .hero-brand .mark{width:56px;height:56px;}
-  .login-panel{padding:28px 0px}
-  .login-card{padding:32px 22px}
-  .card-head h2{font-size:28px;}
+
+/* Efeito de grade de fundo (Grid Pattern) */
+.login-page::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: 
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: radial-gradient(circle at 50% 50%, black 20%, transparent 80%);
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, black 20%, transparent 80%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Navbar Superior */
+.login-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px 48px;
+    position: relative;
+    z-index: 10;
+}
+.nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 24px;
+    color: var(--white);
+    letter-spacing: -0.03em;
+}
+.nav-logo .logo-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 1px solid var(--border-hi);
+    box-shadow: 0 0 15px var(--purple-glow);
+}
+.nav-logo .logo-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.nav-links {
+    display: flex;
+    gap: 32px;
+    align-items: center;
+}
+.nav-links a {
+    color: var(--gray-hi);
+    font-size: 14px;
+    font-weight: 600;
+    transition: color 0.2s;
+}
+.nav-links a:hover {
+    color: var(--white);
+}
+.nav-btn-login {
+    padding: 10px 24px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--white);
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+.nav-btn-login:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--border-hi);
+}
+
+/* Container Central */
+.login-wrapper {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    position: relative;
+    z-index: 5;
+}
+
+/* CARD GLASSMORPHISM (Imitando a imagem de referência) */
+.glass-card {
+    background: rgba(15, 15, 15, 0.5);
+    backdrop-filter: blur(24px) saturate(1.2);
+    -webkit-backdrop-filter: blur(24px) saturate(1.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-lg);
+    width: 100%;
+    max-width: 420px;
+    padding: 48px 40px;
+    box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.8), 0 0 40px -10px rgba(138, 79, 255, 0.15);
+    position: relative;
+    animation: floatIn 0.6s var(--ease);
+}
+@keyframes floatIn {
+    from { opacity: 0; transform: translateY(20px) scale(0.98); }
+    to { opacity: 1; transform: none; }
+}
+
+/* Botão Fechar (X) */
+.close-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 32px;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gray-hi);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.close-btn:hover {
+    background: var(--err);
+    color: var(--white);
+    border-color: var(--err);
+    transform: rotate(90deg);
+}
+
+/* Título */
+.glass-card h2 {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 32px;
+    color: var(--white);
+    text-align: center;
+    margin-bottom: 32px;
+    letter-spacing: -0.03em;
+}
+
+/* Inputs Minimalistas (Apenas linha inferior) */
+.input-group {
+    position: relative;
+    margin-bottom: 24px;
+}
+.input-group input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.15);
+    padding: 12px 32px 12px 0;
+    color: var(--white);
+    font-size: 15px;
+    transition: all 0.3s;
+    border-radius: 0;
+    box-shadow: none;
+}
+.input-group input:focus {
+    outline: none;
+    border-bottom-color: var(--purple);
+}
+.input-group input::placeholder {
+    color: var(--gray-mid);
+    font-weight: 500;
+}
+.input-group svg {
+    position: absolute;
+    right: 0;
+    bottom: 14px;
+    width: 18px;
+    height: 18px;
+    color: var(--gray-mid);
+    pointer-events: none;
+    transition: color 0.3s;
+}
+.input-group input:focus + svg {
+    color: var(--purple);
+}
+
+/* Linha de Opções (Lembrar de mim / Esqueceu senha) */
+.options-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+    font-size: 13px;
+}
+.checkbox-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--gray-hi);
+    cursor: pointer;
+}
+.checkbox-wrap input[type="checkbox"] {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--gray-mid);
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+}
+.checkbox-wrap input[type="checkbox"]:checked {
+    background: var(--purple);
+    border-color: var(--purple);
+}
+.checkbox-wrap input[type="checkbox"]:checked::after {
+    content: '✔';
+    position: absolute;
+    top: -2px;
+    left: 2px;
+    color: var(--white);
+    font-size: 11px;
+}
+.options-row a {
+    color: var(--purple-hi);
+    font-weight: 600;
+}
+.options-row a:hover {
+    color: var(--white);
+    text-decoration: underline;
+}
+
+/* Botão Principal (Discord Login) */
+.btn-submit {
+    width: 100%;
+    padding: 16px;
+    background: var(--black-elevated);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-sm);
+    color: var(--white);
+    font-size: 15px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.btn-submit:hover {
+    background: var(--purple);
+    border-color: var(--purple);
+    box-shadow: 0 10px 30px -10px var(--purple-glow);
+    transform: translateY(-2px);
+}
+
+/* Rodapé do Card */
+.card-footer {
+    margin-top: 28px;
+    text-align: center;
+    font-size: 13.5px;
+    color: var(--gray-mid);
+}
+.card-footer a {
+    color: var(--white);
+    font-weight: 600;
+}
+.card-footer a:hover {
+    text-decoration: underline;
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+    .login-nav { padding: 20px; }
+    .nav-links { display: none; }
+    .glass-card { padding: 36px 24px; }
+    .glass-card h2 { font-size: 28px; }
 }
 </style></head>
 <body>
-<main class="login-page">
-  <section class="hero" aria-label="Apresentação">
-    <div class="hero-top">
-      <div class="hero-brand">
-        <span class="mark"><img src="/static/logo.gif" alt="Logo"></span>
-        <span class="name">PXKK</span>
-      </div>
-    </div>
-    <div class="hero-mid">
-      <h1>Gerencie seu<br>servidor com<br><span class="accent">precisão total.</span></h1>
-      <p>Toda a configuração do seu bot em um painel único, seguro e intuitivo. Controle tickets, verificação, níveis e muito mais.</p>
-    </div>
-    <div class="hero-bottom">
-      <div class="stat"><b>OAuth2</b> Discord</div>
-      <span class="divider"></span>
-      <div class="stat"><b>Cloudflare</b></div>
-      <span class="divider"></span>
-      <div class="stat"><b>100%</b> real-time</div>
-    </div>
-  </section>
-  <section class="login-panel" aria-label="Entrar">
-    <div class="login-card">
-      <div class="card-head">
-        <span class="mini-tag">Autenticação</span>
-        <h2>Bem-vindo<br>de volta</h2>
-        <p>Autentique-se com sua conta do Discord para acessar o painel administrativo.</p>
-      </div>
-      <a href="/auth" class="btn-discord">
-        <span class="left">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20.3 4.4A19.7 19.7 0 0 0 15.4 3l-.3.5a14.7 14.7 0 0 1 4.3 2.2 15 15 0 0 0-12.8 0A14.6 14.6 0 0 1 10.9 3.5L10.6 3a19.7 19.7 0 0 0-4.9 1.4C2.6 8.6 1.9 12.7 2.3 16.7a19.8 19.8 0 0 0 6 3l.8-1.3a13 13 0 0 1-2-1l.5-.4a14 14 0 0 0 12.8 0l.5.4a13 13 0 0 1-2 1l.8 1.3a19.8 19.8 0 0 0 6-3c.5-4.6-.7-8.6-3.4-12.3ZM9 14.6c-1.2 0-2.2-1.1-2.2-2.4S7.8 9.8 9 9.8s2.2 1.1 2.2 2.4S10.2 14.6 9 14.6Zm6 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Z"/></svg>
-          Entrar com Discord
-        </span>
-        <svg class="arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-      </a>
-      <div class="login-foot">
-        <div class="status-pill"><span class="status-dot"></span> Online</div>
-        <div class="secure-pill">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
-          Seguro
+
+<div class="login-page">
+    <!-- Menu Superior -->
+    <nav class="login-nav">
+        <div class="nav-logo">
+            <span class="logo-icon"><img src="/static/logo.gif" alt="Logo"></span>
+            PXKK
         </div>
-      </div>
+        <div class="nav-links">
+            <a href="#">Home</a>
+            <a href="#">Sobre</a>
+            <a href="#">Serviços</a>
+            <a href="#">Contato</a>
+        </div>
+        <a href="/auth" class="nav-btn-login">Login</a>
+    </nav>
+
+    <!-- Container do Card Central -->
+    <div class="login-wrapper">
+        <div class="glass-card">
+            <!-- Botão Fechar (Voltar) -->
+            <a href="/" class="close-btn">&times;</a>
+            
+            <h2>Login</h2>
+            
+            <form action="/auth" method="GET">
+                <!-- Campo E-mail (Visual apenas, já que o login é via Discord) -->
+                <div class="input-group">
+                    <input type="text" placeholder="E-mail ou Discord ID" disabled style="opacity: 0.5; cursor: not-allowed;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                </div>
+                
+                <!-- Campo Senha (Visual apenas) -->
+                <div class="input-group">
+                    <input type="password" placeholder="Senha" disabled style="opacity: 0.5; cursor: not-allowed;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                </div>
+
+                <!-- Linha de Opções -->
+                <div class="options-row">
+                    <label class="checkbox-wrap">
+                        <input type="checkbox" checked>
+                        Lembrar de mim
+                    </label>
+                    <a href="#">Esqueceu a senha?</a>
+                </div>
+
+                <!-- Botão de Ação Principal -->
+                <button type="submit" class="btn-submit">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20.3 4.4A19.7 19.7 0 0 0 15.4 3l-.3.5a14.7 14.7 0 0 1 4.3 2.2 15 15 0 0 0-12.8 0A14.6 14.6 0 0 1 10.9 3.5L10.6 3a19.7 19.7 0 0 0-4.9 1.4C2.6 8.6 1.9 12.7 2.3 16.7a19.8 19.8 0 0 0 6 3l.8-1.3a13 13 0 0 1-2-1l.5-.4a14 14 0 0 0 12.8 0l.5.4a13 13 0 0 1-2 1l.8 1.3a19.8 19.8 0 0 0 6-3c.5-4.6-.7-8.6-3.4-12.3ZM9 14.6c-1.2 0-2.2-1.1-2.2-2.4S7.8 9.8 9 9.8s2.2 1.1 2.2 2.4S10.2 14.6 9 14.6Zm6 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Z"/></svg>
+                    Entrar com Discord
+                </button>
+            </form>
+
+            <!-- Rodapé -->
+            <div class="card-footer">
+                Não tem uma conta? <a href="#">Registre-se</a>
+            </div>
+        </div>
     </div>
-  </section>
-</main>
-<footer class="page-mini-footer">
-  <span>© 2026 PXKK</span>
-</footer>
+</div>
+
 </body></html>"""
 
 NOT_OWNER_HTML = """<!doctype html><html lang="pt-br"><head>
