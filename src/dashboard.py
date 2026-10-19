@@ -1,7 +1,7 @@
 """
 Dashboard público — pxkk.com.br
 Sistema completo: níveis MEE6, VIP, staff, filtros, 5 tipos de ticket.
-Visual: High Contrast Premium SaaS + Glassmorphism + Gradients.
+Visual: High Contrast Premium SaaS + Gradients + Layout Otimizado.
 """
 import os, json, secrets, hmac, hashlib, time
 import requests
@@ -50,9 +50,8 @@ app.config.update(
 
 # ==================== SEÇÕES ====================
 SECTION_SLUGS = [
-    "identity", "colors", "autoemoji", "welcome", "verification",
-    "tickets", "feedback", "antibot", "voice", "addcargo", "activity",
-    "levels", "filters", "vip", "staff",
+    "identity", "colors", "autoemoji", "activity", "verification", "antibot", "filters", 
+    "tickets", "feedback", "welcome", "levels", "vip", "staff", "addcargo", "voice"
 ]
 
 SECTIONS = [
@@ -82,16 +81,11 @@ SECTIONS = [
     ("✨ Auto-Emoji", [
         ("auto_emoji_channels", "Adicionar emoji automático nos canais", "bool"),
     ]),
-    ("👋 Boas-vindas", [
-        ("welcome_channel_id", "Canal de boas-vindas (card)", "ch"),
-        ("welcome_message", "Mensagem de boas-vindas", "area"),
-        ("welcome_image_url", "Imagem de boas-vindas (URL)", "text"),
-        ("leave_channel_id", "Canal de saída", "ch"),
-        ("leave_message", "Mensagem de saída", "area"),
-        ("auto_role_id", "Cargo automático ao entrar", "role_single"),
-        ("welcome_mention_channel_id", "Canal da menção de boas-vindas", "ch"),
-        ("welcome_mention_message", "Mensagem de menção (use {user})", "text"),
-        ("welcome_mention_delete_seconds", "Apagar menção após X segundos", "num"),
+    ("🎞️ Atividade do Bot", [
+        ("activity_rotate_enabled", "Ativar rotação de atividade", "bool"),
+        ("activity_type", "Tipo", "choice:watching=Assistindo,playing=Jogando,listening=Ouvindo,competing=Competindo"),
+        ("activity_rotate_seconds", "Trocar a cada X segundos (mín 10)", "num"),
+        ("activity_messages", "Mensagens (uma por linha — use {brand}, {emoji}, {members})", "list"),
     ]),
     ("✅ Verificação", [
         ("verification_enabled", "Verificação ativada", "bool"),
@@ -106,6 +100,23 @@ SECTIONS = [
         ("verification_log_channel_id", "Canal de logs de verificação", "ch"),
         ("verification_temp_category_id", "Categoria do canal temporário", "cat"),
         ("verification_temp_delete_seconds", "Apagar canal temp após X segundos", "num"),
+    ]),
+    ("🚫 AntiBot", [
+        ("antibot_channel_id", "Canal armadilha", "ch"),
+        ("antibot_log_channel_id", "Canal de logs do AntiBot", "ch"),
+        ("antibot_title", "Título do painel", "text"),
+        ("antibot_description", "Descrição do painel", "area"),
+        ("antibot_banner_url", "Banner (URL)", "text"),
+        ("antibot_punish_ban", "Banir quem enviar mensagem", "bool"),
+        ("antibot_delete_messages", "Apagar mensagens do infrator", "bool"),
+    ]),
+    ("🛡️ Filtros de Palavras/Links", [
+        ("filters_enabled", "Filtros ativados", "bool"),
+        ("filters_punish_after_warnings", "Avisos até aplicar castigo (0 = desliga)", "num"),
+        ("filters_links_allowed_role_ids", "Cargos que podem mandar links", "role"),
+        ("filters_log_channel_id", "Canal de logs de filtros", "ch"),
+        ("filters_blocked_words", "Palavras bloqueadas (uma por linha)", "list"),
+        ("filters_allowed_domains", "Domínios de link permitidos (um por linha)", "list"),
     ]),
     ("🎫 Tickets (5 opções)", [
         ("ticket_panel_channel_id", "Canal do painel de tickets", "ch"),
@@ -138,34 +149,16 @@ SECTIONS = [
         ("suggestions_channel_id", "Canal onde as sugestões chegam", "ch"),
         ("suggestions_panel_channel_id", "Canal do painel de sugestões", "ch"),
     ]),
-    ("🚫 AntiBot", [
-        ("antibot_channel_id", "Canal armadilha", "ch"),
-        ("antibot_log_channel_id", "Canal de logs do AntiBot", "ch"),
-        ("antibot_title", "Título do painel", "text"),
-        ("antibot_description", "Descrição do painel", "area"),
-        ("antibot_banner_url", "Banner (URL)", "text"),
-        ("antibot_punish_ban", "Banir quem enviar mensagem", "bool"),
-        ("antibot_delete_messages", "Apagar mensagens do infrator", "bool"),
-    ]),
-    ("🔊 Voz e Status", [
-        ("voice_channel_id", "Call fixa do bot", "vc"),
-        ("voice_mute", "Bot entra mutado", "bool"),
-        ("bot_status", "Status", "choice:online=Online,idle=Ausente,dnd=Não perturbe,invisible=Invisível"),
-        ("voice_join_log_channel_id", "Log: entrada em call", "ch"),
-        ("voice_leave_log_channel_id", "Log: saída de call", "ch"),
-        ("moderation_logs_channel_id", "Log de moderação", "ch"),
-        ("painel_channel_id", "Canal do painel admin fixo", "ch"),
-        ("admin_role_ids", "Cargos administradores do bot", "role"),
-    ]),
-    ("➕ /addcargo", [
-        ("addcargo_allowed_role_ids", "Cargos que podem usar /addcargo", "role"),
-        ("addcargo_panel_channel_id", "Canal do painel público do /addcargo", "ch"),
-    ]),
-    ("🎞️ Atividade do Bot", [
-        ("activity_rotate_enabled", "Ativar rotação de atividade", "bool"),
-        ("activity_type", "Tipo", "choice:watching=Assistindo,playing=Jogando,listening=Ouvindo,competing=Competindo"),
-        ("activity_rotate_seconds", "Trocar a cada X segundos (mín 10)", "num"),
-        ("activity_messages", "Mensagens (uma por linha — use {brand}, {emoji}, {members})", "list"),
+    ("👋 Boas-vindas", [
+        ("welcome_channel_id", "Canal de boas-vindas (card)", "ch"),
+        ("welcome_message", "Mensagem de boas-vindas", "area"),
+        ("welcome_image_url", "Imagem de boas-vindas (URL)", "text"),
+        ("leave_channel_id", "Canal de saída", "ch"),
+        ("leave_message", "Mensagem de saída", "area"),
+        ("auto_role_id", "Cargo automático ao entrar", "role_single"),
+        ("welcome_mention_channel_id", "Canal da menção de boas-vindas", "ch"),
+        ("welcome_mention_message", "Mensagem de menção (use {user})", "text"),
+        ("welcome_mention_delete_seconds", "Apagar menção após X segundos", "num"),
     ]),
     ("🏆 Níveis (MEE6)", [
         ("levels_enabled", "Sistema de níveis ativado", "bool"),
@@ -173,14 +166,6 @@ SECTIONS = [
         ("levels_xp_cooldown_seconds", "Cooldown entre XP (segundos)", "num"),
         ("levels_announce_channel_id", "Canal de anúncio de level up", "ch"),
         ("levels_message_up", "Mensagem de level up (use {user}, {level}, {xp})", "area"),
-    ]),
-    ("🛡️ Filtros de Palavras/Links", [
-        ("filters_enabled", "Filtros ativados", "bool"),
-        ("filters_punish_after_warnings", "Avisos até aplicar castigo (0 = desliga)", "num"),
-        ("filters_links_allowed_role_ids", "Cargos que podem mandar links", "role"),
-        ("filters_log_channel_id", "Canal de logs de filtros", "ch"),
-        ("filters_blocked_words", "Palavras bloqueadas (uma por linha)", "list"),
-        ("filters_allowed_domains", "Domínios de link permitidos (um por linha)", "list"),
     ]),
     ("💎 VIP", [
         ("vip_enabled", "Sistema VIP ativado", "bool"),
@@ -199,6 +184,20 @@ SECTIONS = [
         ("staff_report_channel_id", "Canal de relatórios", "ch"),
         ("staff_punish_channel_id", "Canal de logs de punições", "ch"),
         ("staff_warn_ban_threshold", "Avisos antes de ban automático", "num"),
+    ]),
+    ("➕ /addcargo", [
+        ("addcargo_allowed_role_ids", "Cargos que podem usar /addcargo", "role"),
+        ("addcargo_panel_channel_id", "Canal do painel público do /addcargo", "ch"),
+    ]),
+    ("🔊 Voz e Status", [
+        ("voice_channel_id", "Call fixa do bot", "vc"),
+        ("voice_mute", "Bot entra mutado", "bool"),
+        ("bot_status", "Status", "choice:online=Online,idle=Ausente,dnd=Não perturbe,invisible=Invisível"),
+        ("voice_join_log_channel_id", "Log: entrada em call", "ch"),
+        ("voice_leave_log_channel_id", "Log: saída de call", "ch"),
+        ("moderation_logs_channel_id", "Log de moderação", "ch"),
+        ("painel_channel_id", "Canal do painel admin fixo", "ch"),
+        ("admin_role_ids", "Cargos administradores do bot", "role"),
     ]),
 ]
 
@@ -665,7 +664,7 @@ DASHBOARD_HTML = """<!doctype html><html lang="pt-br"><head>
 /* FUNDO GLOBAL COM GRADIENTE */
 body { 
   background: 
-    radial-gradient(ellipse 1200px 800px at 10% -10%, rgba(138,79,255,0.15), transparent 60%),
+    radial-gradient(ellipse 1200px 800px at 10% -10%, rgba(138,79,255,0.12), transparent 60%),
     radial-gradient(ellipse 1000px 600px at 100% 110%, rgba(138,79,255,0.08), transparent 60%),
     #050505;
   background-attachment: fixed;
@@ -677,13 +676,16 @@ body {
   border-bottom:1px solid var(--border)}
 .topbar::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:1px;
   background:linear-gradient(90deg,transparent,var(--purple),transparent);opacity:.4;pointer-events:none}
-.hamburger{display:flex;width:44px;height:44px;align-items:center;justify-content:center;flex-direction:column;gap:5px;
+
+/* HAMBURGER - APENAS MOBILE */
+.hamburger{display:none; width:44px;height:44px;align-items:center;justify-content:center;flex-direction:column;gap:5px;
   transition:all .2s var(--ease);border:1px solid transparent;border-radius:10px;cursor:pointer;flex-shrink:0;}
 .hamburger:hover{background:rgba(255,255,255,0.05);border-color:var(--border)}
 .hamburger span{display:block;width:20px;height:2px;background:var(--white);transition:transform .3s var(--ease),opacity .2s;border-radius:2px;}
 .hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
 .hamburger.open span:nth-child(2){opacity:0}
 .hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+
 .brand{display:flex;align-items:center;gap:14px;color:var(--white);text-decoration:none;flex-shrink:0}
 .brand-icon{width:44px;height:44px;border:1px solid rgba(138,79,255,0.3);display:grid;place-items:center;font-size:16px;
   background:radial-gradient(circle at 30% 30%,rgba(138,79,255,.2),transparent 70%);box-shadow:0 0 24px -6px var(--purple-glow);overflow:hidden;border-radius:12px;}
@@ -723,32 +725,34 @@ body {
 
 /* SIDEBAR E LAYOUT */
 .layout{display:flex;min-height:100vh;padding-top:72px;position:relative;}
-.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:90;backdrop-filter:blur(4px)}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:90;backdrop-filter:blur(4px)}
 .overlay.show{display:block}
 
-.sidebar{width:280px;flex-shrink:0;background:rgba(10,10,10,.4);backdrop-filter:blur(24px);border-right:1px solid var(--border);padding:28px 16px;
+/* SIDEBAR */
+.sidebar{width:280px;flex-shrink:0;background:rgba(10,10,10,.6);backdrop-filter:blur(24px);border-right:1px solid var(--border);padding:28px 16px;
   overflow-y:auto;position:fixed;top:72px;bottom:0;left:0;z-index:99;
   transition:transform .35s cubic-bezier(0.4, 0, 0.2, 1);}
-.sidebar.hidden{transform:translateX(-100%);}
-.sidebar-title{font-size:10px;font-weight:800;color:var(--gray-mid);text-transform:uppercase;
-  letter-spacing:.25em;padding:0 16px;margin-bottom:20px}
-.nav-btn{display:flex;align-items:center;gap:14px;width:100%;padding:12px 16px;color:var(--gray-hi);font-size:14px;
-  font-weight:600;text-align:left;transition:all .2s var(--ease);margin-bottom:4px;position:relative;
-  letter-spacing:-.01em;border-radius:10px;border:1px solid transparent;}
-.nav-btn:hover{background:rgba(255,255,255,.04);color:var(--white)}
+  
+.sidebar-group { margin-bottom: 24px; }
+.sidebar-group-title { font-size: 9.5px; font-weight: 800; color: var(--purple-hi); text-transform: uppercase;
+  letter-spacing: .15em; padding: 0 16px; margin-bottom: 8px; opacity: 0.8;}
+
+.nav-btn{display:flex;align-items:center;gap:12px;width:100%;padding:10px 16px;color:var(--gray-hi);font-size:13.5px;
+  font-weight:500;text-align:left;transition:all .2s var(--ease);margin-bottom:2px;position:relative;
+  letter-spacing:-.01em;border-radius:8px;border:1px solid transparent;}
+.nav-btn:hover{background:rgba(255,255,255,.05);color:var(--white)}
 .nav-btn.active{background:linear-gradient(90deg,rgba(138,79,255,.15),rgba(138,79,255,.02));color:var(--white);
-  border-color:rgba(138,79,255,0.2);box-shadow:0 4px 15px -5px rgba(138,79,255,0.2);}
-.nav-btn.active::before{content:'';position:absolute;left:-16px;top:14px;bottom:14px;width:4px;background:var(--purple);border-radius:0 4px 4px 0;box-shadow:0 0 12px var(--purple);}
-.nav-icon{width:30px;height:30px;flex-shrink:0;display:grid;place-items:center;font-size:14px;
-  background:rgba(255,255,255,.03);border:1px solid var(--border);transition:all .2s var(--ease);border-radius:8px;}
+  font-weight:600;border-color:rgba(138,79,255,0.2);}
+.nav-btn.active::before{content:'';position:absolute;left:-16px;top:10px;bottom:10px;width:4px;background:var(--purple);border-radius:0 4px 4px 0;box-shadow:0 0 12px var(--purple);}
+.nav-icon{width:28px;height:28px;flex-shrink:0;display:grid;place-items:center;font-size:14px;
+  background:rgba(255,255,255,.03);border:1px solid var(--border);transition:all .2s var(--ease);border-radius:6px;}
 .nav-btn.active .nav-icon{background:rgba(138,79,255,.25);border-color:rgba(138,79,255,0.4);color:var(--white);box-shadow:0 0 10px -2px var(--purple-glow);}
 .nav-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
 
 /* CONTEÚDO PRINCIPAL */
 .content{flex:1;min-width:0;padding:48px 56px 120px;display:flex;flex-direction:column;align-items:center;
   transition:margin-left .35s cubic-bezier(0.4, 0, 0.2, 1); margin-left:280px;}
-.content.expanded { margin-left:0; }
-.content-inner{max-width:1000px;width:100%;flex:1}
+.content-inner{max-width:960px;width:100%;flex:1}
 
 /* ALERTAS */
 .alert{display:flex;align-items:center;gap:14px;padding:16px 20px;margin-bottom:32px;font-size:14px;
@@ -758,72 +762,71 @@ body {
 @keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 
 /* CARDS DE SEÇÃO (GLASSMORPHISM) */
-.section{display:none;background:rgba(15, 15, 15, 0.6);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
-  border:1px solid rgba(255,255,255,0.06);padding:48px;position:relative;border-radius:20px;
-  box-shadow:0 24px 60px -20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);}
-.section::before{content:'';position:absolute;top:-1px;left:48px;right:48px;height:1px;
+.section{display:none;background:rgba(12, 12, 12, 0.7);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border:1px solid rgba(255,255,255,0.06);padding:40px;position:relative;border-radius:16px;
+  box-shadow:0 24px 60px -20px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.05);}
+.section::before{content:'';position:absolute;top:-1px;left:40px;right:40px;height:1px;
   background:linear-gradient(90deg,transparent,var(--purple),transparent);opacity:.6;pointer-events:none}
 .section.active{display:block;animation:fadeUp .35s var(--ease)}
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-.section-head{margin-bottom:40px;padding-bottom:28px;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;flex-direction:column;gap:10px;}
-.section-head h2{font-family:'Archivo Black',sans-serif;font-size:30px;font-weight:400;letter-spacing:-.03em;
+.section-head{margin-bottom:32px;padding-bottom:24px;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;flex-direction:column;gap:8px;}
+.section-head h2{font-family:'Archivo Black',sans-serif;font-size:26px;font-weight:400;letter-spacing:-.03em;
   color:var(--white);display:flex;align-items:center;gap:14px;text-transform:uppercase;line-height:1.1}
-.section-head p{color:var(--gray-mid);font-size:14px;line-height:1.6;letter-spacing:-.005em}
+.section-head p{color:var(--gray-mid);font-size:13px;line-height:1.6;letter-spacing:-.005em}
 
 /* FORMULÁRIO GRID */
-.form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 32px; }
-.f { display: flex; flex-direction: column; gap: 12px; }
+.form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+.f { display: flex; flex-direction: column; gap: 8px; }
 .f.full-width { grid-column: 1 / -1; }
-.f label{font-size:12px;color:var(--white);font-weight:800;letter-spacing:.08em;text-transform:uppercase}
-.f .hint{font-size:12px;color:var(--gray-lo);line-height:1.5;letter-spacing:.01em;margin-top:2px;}
+.f label{font-size:11.5px;color:var(--white);font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+.f .hint{font-size:11.5px;color:var(--gray-lo);line-height:1.5;letter-spacing:.01em;margin-top:2px;}
 
 /* INPUTS */
 input[type=text],input[type=number],textarea,select{
-  width:100%;padding:16px;border:1px solid rgba(255,255,255,0.1);
-  background:rgba(0,0,0,0.4);color:var(--white);font:inherit;font-size:14.5px;letter-spacing:-.005em;
-  border-radius:10px;transition:all .2s var(--ease);box-shadow:inset 0 2px 4px rgba(0,0,0,0.3);}
-input[type=text]:hover,input[type=number]:hover,textarea:hover,select:hover { border-color: rgba(255,255,255,0.2); background: rgba(0,0,0,0.5);}
+  width:100%;padding:12px 16px;border:1px solid rgba(255,255,255,0.08);
+  background:rgba(0,0,0,0.3);color:var(--white);font:inherit;font-size:14px;letter-spacing:-.005em;
+  border-radius:8px;transition:all .2s var(--ease);box-shadow:inset 0 1px 2px rgba(0,0,0,0.2);}
+input[type=text]:hover,input[type=number]:hover,textarea:hover,select:hover { border-color: rgba(255,255,255,0.15); background: rgba(0,0,0,0.5);}
 input[type=text]:focus,input[type=number]:focus,textarea:focus,select:focus{
   outline:none;border-color:var(--purple);background:rgba(0,0,0,0.8);
-  box-shadow:0 0 0 3px rgba(138,79,255,0.25), inset 0 2px 4px rgba(0,0,0,0.3);}
+  box-shadow:0 0 0 2px rgba(138,79,255,0.2), inset 0 1px 2px rgba(0,0,0,0.2);}
 input::placeholder,textarea::placeholder{color:var(--gray-lo)}
-textarea{min-height:120px;resize:vertical;font-family:inherit;line-height:1.6}
-select[multiple]{min-height:180px;padding:10px}
-select[multiple] option{padding:12px;margin:2px 0;background:#0a0a0a;color:var(--white);border-radius:6px;font-weight:500;}
+textarea{min-height:100px;resize:vertical;font-family:inherit;line-height:1.6}
+select[multiple]{min-height:140px;padding:8px}
+select[multiple] option{padding:10px;margin:2px 0;background:#0a0a0a;color:var(--white);border-radius:4px;font-weight:500;}
 select[multiple] option:checked{background:var(--purple);color:var(--white)}
 
 /* COLOR PICKER CUSTOM */
-.color-wrapper { display: flex; align-items: center; gap: 16px; background: rgba(0,0,0,0.4); padding: 10px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); transition: all .2s; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);}
-.color-wrapper:hover { border-color: rgba(255,255,255,0.2); background: rgba(0,0,0,0.5);}
-input[type=color]{appearance:none; -webkit-appearance:none; width: 40px; height: 40px; border: none; padding: 0; background: transparent; cursor: pointer; border-radius: 8px; overflow: hidden;}
+.color-wrapper { display: flex; align-items: center; gap: 14px; background: rgba(0,0,0,0.3); padding: 8px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); transition: all .2s; box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);}
+.color-wrapper:hover { border-color: rgba(255,255,255,0.15); background: rgba(0,0,0,0.5);}
+input[type=color]{appearance:none; -webkit-appearance:none; width: 36px; height: 36px; border: none; padding: 0; background: transparent; cursor: pointer; border-radius: 6px; overflow: hidden;}
 input[type=color]::-webkit-color-swatch-wrapper{padding:0;}
-input[type=color]::-webkit-color-swatch{border: 2px solid rgba(255,255,255,0.15); border-radius: 8px;}
-.color-hex { font-family: ui-monospace, 'SF Mono', monospace; font-size: 15px; color: var(--white); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+input[type=color]::-webkit-color-swatch{border: 1px solid rgba(255,255,255,0.15); border-radius: 6px;}
+.color-hex { font-family: ui-monospace, 'SF Mono', monospace; font-size: 14px; color: var(--white); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
 
 /* TOGGLE */
-.sw{display:flex;align-items:center;gap:16px;padding:18px;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);
-  transition:all .2s var(--ease);cursor:pointer;border-radius:10px;box-shadow:inset 0 2px 4px rgba(0,0,0,0.3);}
-.sw:hover{border-color:rgba(255,255,255,0.2); background:rgba(0,0,0,0.5);}
-.sw input[type=checkbox]{appearance:none;-webkit-appearance:none;width:48px;height:26px;background:var(--gray-lo);
+.sw{display:flex;align-items:center;gap:16px;padding:14px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);
+  transition:all .2s var(--ease);cursor:pointer;border-radius:8px;box-shadow:inset 0 1px 2px rgba(0,0,0,0.2);}
+.sw:hover{border-color:rgba(255,255,255,0.15); background:rgba(0,0,0,0.5);}
+.sw input[type=checkbox]{appearance:none;-webkit-appearance:none;width:44px;height:24px;background:var(--gray-lo);
   position:relative;cursor:pointer;flex-shrink:0;transition:background .25s var(--ease);border-radius:99px;}
-.sw input[type=checkbox]::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;
+.sw input[type=checkbox]::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;
   background:#fff;transition:transform .25s var(--ease);box-shadow:0 2px 5px rgba(0,0,0,.5)}
 .sw input[type=checkbox]:checked{background:var(--purple);box-shadow:0 0 15px -2px var(--purple-glow)}
-.sw input[type=checkbox]:checked::after{transform:translateX(22px)}
-.sw span{color:var(--white);font-size:15px;font-weight:600;cursor:pointer;flex:1;letter-spacing:-.01em}
+.sw input[type=checkbox]:checked::after{transform:translateX(20px)}
+.sw span{color:var(--white);font-size:13.5px;font-weight:500;cursor:pointer;flex:1;letter-spacing:-.01em}
 
 /* BARRA SALVAR */
-.save-bar{position:fixed;bottom:0;left:280px;right:0;z-index:50;padding:20px 56px;background:rgba(10,10,10,.8);
+.save-bar{position:fixed;bottom:0;left:280px;right:0;z-index:50;padding:16px 56px;background:rgba(10,10,10,.85);
   backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-top:1px solid rgba(255,255,255,0.08);
   display:flex;justify-content:space-between;align-items:center;gap:16px;
   transition:left .35s cubic-bezier(0.4, 0, 0.2, 1);}
-.save-bar.expanded { left:0; }
 .save-bar::before{content:'';position:absolute;top:-1px;left:0;right:0;height:1px;
   background:linear-gradient(90deg,transparent,var(--purple),transparent);opacity:.4;pointer-events:none}
-.save-hint{color:var(--gray-mid);font-size:14px;letter-spacing:.01em; display:flex; align-items: center; gap: 10px; font-weight:500;}
+.save-hint{color:var(--gray-mid);font-size:13px;letter-spacing:.01em; display:flex; align-items: center; gap:10px; font-weight:500;}
 .save-hint svg { color: var(--purple); }
-.save-btn{padding:16px 40px;background:linear-gradient(135deg, var(--purple), #6B2EE0);color:var(--white);font-weight:800;font-size:14px;
-  letter-spacing:.05em;text-transform:uppercase;transition:all .2s var(--ease);border:1px solid rgba(255,255,255,0.1);border-radius:10px;
+.save-btn{padding:14px 32px;background:linear-gradient(135deg, var(--purple), #6B2EE0);color:var(--white);font-weight:800;font-size:13px;
+  letter-spacing:.05em;text-transform:uppercase;transition:all .2s var(--ease);border:1px solid rgba(255,255,255,0.1);border-radius:8px;
   display:inline-flex;align-items:center;gap:10px;position:relative;overflow:hidden;box-shadow: 0 8px 24px -8px rgba(138,79,255,0.6);}
 .save-btn::before{content:'';position:absolute;inset:0;
   background:linear-gradient(120deg,transparent,rgba(255,255,255,.2),transparent);
@@ -835,8 +838,10 @@ input[type=color]::-webkit-color-swatch{border: 2px solid rgba(255,255,255,0.15)
 /* RESPONSIVO */
 @media(max-width:1024px){
   .form-grid { grid-template-columns: 1fr; }
+  .content { padding: 32px 32px 120px; }
 }
 @media(max-width:960px){
+  .hamburger{display:flex;} /* Ativa apenas no mobile */
   .brand-text .sub{display:none}
   .user-trigger .name{display:none}
   .user-trigger{padding:6px}
@@ -844,20 +849,18 @@ input[type=color]::-webkit-color-swatch{border: 2px solid rgba(255,255,255,0.15)
   
   .sidebar { transform: translateX(-100%); box-shadow: 24px 0 60px -10px rgba(0,0,0,.9); border-right-color: var(--border-hi); background:#0a0a0a;}
   .sidebar.open { transform: none; }
-  .content { margin-left: 0; padding: 32px 20px 120px; }
+  
+  .content { margin-left: 0; padding: 24px 20px 120px; }
   .save-bar { left: 0; padding: 16px 20px; }
   .save-hint{display:none}
   .save-btn{width:100%;justify-content:center}
-  .section{padding:32px 24px;}
-}
-@media(max-width:480px){
-  .section{padding:24px 20px;}
-  .section-head h2{font-size:24px}
+  .section{padding:28px 20px;}
+  .section-head h2{font-size:22px}
 }
 </style></head>
 <body>
 <header class="topbar">
-  <button class="hamburger" id="hamburger" aria-label="Alternar menu" aria-expanded="true">
+  <button class="hamburger" id="hamburger" aria-label="Abrir menu" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
   <a href="/" class="brand" aria-label="PXKK Dashboard">
@@ -896,17 +899,54 @@ input[type=color]::-webkit-color-swatch{border: 2px solid rgba(255,255,255,0.15)
 <div class="layout">
   <div class="overlay" id="overlay"></div>
   <aside class="sidebar" id="sidebar" aria-label="Navegação">
-    <div class="sidebar-title">Configurações</div>
-    {% for title, _ in sections %}
-      {% set parts = title.split(' ', 1) %}
-      <button class="nav-btn {{'active' if loop.first}}" data-t="{{loop.index0}}">
-        <span class="nav-icon" aria-hidden="true">{{parts[0]}}</span>
-        <span class="nav-label">{{parts[1] if parts|length > 1 else title}}</span>
-      </button>
-    {% endfor %}
+    
+    <div class="sidebar-group">
+      <div class="sidebar-group-title">Geral</div>
+      {% for title, _ in sections[:4] %}
+        {% set parts = title.split(' ', 1) %}
+        <button class="nav-btn {{'active' if loop.first}}" data-t="{{loop.index0}}">
+          <span class="nav-icon" aria-hidden="true">{{parts[0]}}</span>
+          <span class="nav-label">{{parts[1] if parts|length > 1 else title}}</span>
+        </button>
+      {% endfor %}
+    </div>
+
+    <div class="sidebar-group">
+      <div class="sidebar-group-title">Segurança</div>
+      {% for title, _ in sections[4:7] %}
+        {% set parts = title.split(' ', 1) %}
+        <button class="nav-btn" data-t="{{loop.index0 + 4}}">
+          <span class="nav-icon" aria-hidden="true">{{parts[0]}}</span>
+          <span class="nav-label">{{parts[1] if parts|length > 1 else title}}</span>
+        </button>
+      {% endfor %}
+    </div>
+
+    <div class="sidebar-group">
+      <div class="sidebar-group-title">Atendimento</div>
+      {% for title, _ in sections[7:9] %}
+        {% set parts = title.split(' ', 1) %}
+        <button class="nav-btn" data-t="{{loop.index0 + 7}}">
+          <span class="nav-icon" aria-hidden="true">{{parts[0]}}</span>
+          <span class="nav-label">{{parts[1] if parts|length > 1 else title}}</span>
+        </button>
+      {% endfor %}
+    </div>
+
+    <div class="sidebar-group">
+      <div class="sidebar-group-title">Comunidade</div>
+      {% for title, _ in sections[9:] %}
+        {% set parts = title.split(' ', 1) %}
+        <button class="nav-btn" data-t="{{loop.index0 + 9}}">
+          <span class="nav-icon" aria-hidden="true">{{parts[0]}}</span>
+          <span class="nav-label">{{parts[1] if parts|length > 1 else title}}</span>
+        </button>
+      {% endfor %}
+    </div>
+
   </aside>
 
-  <main class="content" id="mainContent">
+  <main class="content">
     <div class="content-inner">
       {% for m in get_flashed_messages() %}
         <div class="alert" role="status">
@@ -997,7 +1037,7 @@ input[type=color]::-webkit-color-swatch{border: 2px solid rgba(255,255,255,0.15)
 </div>
 
 {% if sections %}
-<div class="save-bar" id="saveBar" role="region" aria-label="Salvar alterações">
+<div class="save-bar" role="region" aria-label="Salvar alterações">
   <div class="save-hint">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
     As alterações são aplicadas automaticamente.
@@ -1013,25 +1053,16 @@ input[type=color]::-webkit-color-swatch{border: 2px solid rgba(255,255,255,0.15)
 const hamburger = document.getElementById('hamburger');
 const sidebar   = document.getElementById('sidebar');
 const overlay   = document.getElementById('overlay');
-const mainContent = document.getElementById('mainContent');
-const saveBar   = document.getElementById('saveBar');
 
 function toggleSidebar(open){
-  const isMobile = window.innerWidth <= 960;
-  const isOpen = open ?? (isMobile ? !sidebar.classList.contains('open') : !sidebar.classList.contains('hidden'));
+  if (window.innerWidth > 960) return; // Ignora no desktop
   
-  if (isMobile) {
-    sidebar.classList.toggle('open', isOpen);
-    overlay.classList.toggle('show', isOpen);
-  } else {
-    sidebar.classList.toggle('hidden', !isOpen);
-    if(mainContent) mainContent.classList.toggle('expanded', !isOpen);
-    if(saveBar) saveBar.classList.toggle('expanded', !isOpen);
-  }
-  
-  hamburger.classList.toggle('open', !isOpen);
+  const isOpen = open ?? !sidebar.classList.contains('open');
+  sidebar.classList.toggle('open', isOpen);
+  overlay.classList.toggle('show', isOpen);
+  hamburger.classList.toggle('open', isOpen);
   hamburger.setAttribute('aria-expanded', String(isOpen));
-  if (isMobile) document.body.style.overflow = isOpen ? 'hidden' : '';
+  document.body.style.overflow = isOpen ? 'hidden' : '';
 }
 
 hamburger?.addEventListener('click', () => toggleSidebar());
@@ -1076,7 +1107,6 @@ document.addEventListener('keydown', (e) => {
     if (sidebar?.classList.contains('open')) toggleSidebar(false);
   }
 });
-// Color Picker live update
 document.querySelectorAll('input[type="color"]').forEach(input => {
     input.addEventListener('input', (e) => {
         const hexLabel = e.target.nextElementSibling;
