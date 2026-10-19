@@ -87,7 +87,27 @@ def init_db():
         user_id INTEGER, guild_id INTEGER, type TEXT,
         reason TEXT, expires_at TEXT, created_by INTEGER, created_at TEXT)''')
 
+    # ===== STATBOT (HISTÓRICO) =====
+    c.execute('''CREATE TABLE IF NOT EXISTS member_count_history (
+        guild_id INTEGER, date TEXT, member_count INTEGER,
+        PRIMARY KEY (guild_id, date))''')
+
     conn.commit(); conn.close()
+
+# ===================== STATBOT (HISTÓRICO) =====================
+def save_member_count(guild_id, count):
+    today = datetime.date.today().isoformat()
+    conn = get_db(); c = conn.cursor()
+    c.execute("INSERT OR REPLACE INTO member_count_history (guild_id, date, member_count) VALUES (?, ?, ?)",
+              (guild_id, today, count))
+    conn.commit(); conn.close()
+
+def get_member_history(guild_id, days=30):
+    conn = get_db(); c = conn.cursor()
+    since = (datetime.date.today() - datetime.timedelta(days=days)).isoformat()
+    c.execute("SELECT date, member_count FROM member_count_history WHERE guild_id = ? AND date >= ? ORDER BY date ASC", (guild_id, since))
+    rows = c.fetchall(); conn.close()
+    return [(r["date"], r["member_count"]) for r in rows]
 
 # ===================== WELCOME LEGACY =====================
 def get_welcome_message(user_id):
