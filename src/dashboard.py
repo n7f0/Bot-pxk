@@ -428,7 +428,6 @@ STYLE = """
   --gray-hi:#B8B8C2;--gray-mid:#7A7A88;--gray-lo:#4A4A55;
   --border:rgba(255,255,255,0.08);--border-hi:rgba(138,79,255,0.35);
   --ok:#4ade80;--warn:#fbbf24;--err:#f87171;
-  /* Aumentando o arredondamento para combinar com a referência */
   --radius-sm: 12px;
   --radius: 24px;
   --radius-lg: 32px;
@@ -465,99 +464,340 @@ LOGIN_HTML = """<!doctype html><html lang="pt-br"><head>
 <title>PXKK — Dashboard</title>
 """ + STYLE + """
 <style>
-/* Estilo do Login inspirado no design de referência (Cartões grandes, arredondados, soft) */
-.login-page{min-height:100vh;display:grid;grid-template-columns:1.2fr 1fr;background:var(--black);overflow:hidden;position:relative; padding: 24px; gap: 24px;}
-.hero{position:relative;padding:56px 72px;display:flex;flex-direction:column;justify-content:space-between;
-  background:
-    radial-gradient(ellipse 900px 600px at 20% 30%,rgba(138,79,255,0.15),transparent 60%),
-    var(--black-soft);
-  overflow:hidden;border:1px solid var(--border);border-radius:var(--radius-lg);min-height:calc(100vh - 48px);box-shadow: var(--shadow-soft);}
-.hero::before{content:'';position:absolute;inset:0;
-  background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);
-  background-size:64px 64px;
-  mask-image:radial-gradient(ellipse 70% 60% at 30% 40%,#000 30%,transparent 90%);
-  -webkit-mask-image:radial-gradient(ellipse 70% 60% at 30% 40%,#000 30%,transparent 90%);pointer-events:none; border-radius:var(--radius-lg);}
-.hero-top,.hero-mid,.hero-bottom{position:relative;z-index:1}
-.hero-brand{display:flex;align-items:center;gap:16px;font-family:'Archivo Black',sans-serif;
-  font-size:28px;letter-spacing:-0.04em;color:var(--white)}
-.hero-brand .mark{width:68px;height:68px;border:1px solid var(--purple);display:grid;place-items:center;
-  background:radial-gradient(circle at 30% 30%,rgba(138,79,255,.15),transparent 70%);
-  box-shadow:0 0 24px -8px var(--purple-glow);overflow:hidden;border-radius:var(--radius);}
-.hero-brand .mark img{width:100%;height:100%;object-fit:cover;display:block;}
-.hero-brand .name{display:flex;flex-direction:column;line-height:1}
-.hero-mid{max-width:560px}
-.hero-mid h1{font-family:'Archivo Black',sans-serif;font-size:clamp(42px,5.2vw,76px);line-height:.95;
-  color:var(--white);margin-bottom:28px;letter-spacing:-0.045em;text-transform:uppercase}
-.hero-mid h1 .accent{color:var(--purple);text-shadow:0 0 40px var(--purple-glow)}
-.hero-mid p{font-size:16px;color:var(--gray-hi);line-height:1.7;max-width:460px}
-.hero-bottom{display:flex;align-items:center;gap:24px;flex-wrap:wrap;font-size:12px;color:var(--gray-mid);letter-spacing:.02em}
-.stat{display:flex;align-items:center;gap:8px}
-.stat b{color:var(--white);font-weight:700}
-.divider{width:1px;height:12px;background:var(--border)}
-
-/* Painel de Login */
-.login-panel{display:flex;align-items:center;justify-content:center;padding:48px 32px;background:var(--black);position:relative;border-radius:var(--radius-lg);}
-.login-card{position:relative;width:100%;max-width:440px;padding:56px 48px;
-  border:1px solid var(--border);border-top:1px solid var(--border-hi);
-  background:var(--black-soft);
-  border-radius:var(--radius-lg);
-  box-shadow:var(--shadow-soft);}
-.login-card::before{content:'';position:absolute;top:-1px;left:40px;right:40px;height:1px;
-  background:linear-gradient(90deg,transparent,var(--purple),transparent);opacity:.8; border-radius: var(--radius-lg) var(--radius-lg) 0 0;}
-.card-head{margin-bottom:40px;text-align:center;}
-.card-head .mini-tag{display:inline-block;font-size:10px;font-weight:800;color:var(--white);
-  background:rgba(138,79,255,0.15);border:1px solid rgba(138,79,255,0.3);padding:6px 14px;
-  border-radius:var(--radius-pill);letter-spacing:.2em;margin-bottom:20px;text-transform:uppercase}
-.card-head h2{font-family:'Archivo Black',sans-serif;font-size:34px;letter-spacing:-0.03em;
-  color:var(--white);margin-bottom:12px;text-transform:uppercase;line-height:1.1}
-.card-head p{font-size:14px;color:var(--gray-hi);line-height:1.65}
-.btn-discord{display:flex;align-items:center;justify-content:space-between;gap:14px;
-  width:100%;padding:18px 28px;background:linear-gradient(135deg, var(--purple) 0%, #6B2EE0 100%);
-  color:var(--white);font-weight:700;font-size:15px;text-decoration:none;transition:all .25s var(--ease);
-  letter-spacing:-.005em;position:relative;overflow:hidden;border:1px solid rgba(255,255,255,0.15);border-radius:var(--radius-pill);
-  box-shadow:0 12px 30px -8px rgba(138,79,255,0.5);}
-.btn-discord::before{content:'';position:absolute;inset:0;
-  background:linear-gradient(120deg,transparent,rgba(255,255,255,.2),transparent);
-  transform:translateX(-100%);transition:transform .5s var(--ease)}
-.btn-discord:hover{background:linear-gradient(135deg, #A370FF 0%, #8A4FFF 100%);
-  box-shadow:0 16px 40px -8px rgba(138,79,255,0.7);transform:translateY(-2px);color:var(--white)}
-.btn-discord:hover::before{transform:translateX(100%)}
-.btn-discord .left{display:flex;align-items:center;gap:12px;position:relative;z-index:1}
-.btn-discord .arrow{position:relative;z-index:1;transition:transform .2s var(--ease)}
-.btn-discord:hover .arrow{transform:translateX(4px)}
-.login-foot{margin-top:32px;padding-top:24px;border-top:1px solid rgba(255,255,255,0.05);
-  display:flex;align-items:center;justify-content:space-between;gap:12px;}
-.status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: var(--radius-pill);
-  background: rgba(74, 222, 128, 0.05); border: 1px solid rgba(74, 222, 128, 0.15);
-  color: #86efac; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
-.status-dot { width: 6px; height: 6px; background: #4ade80; border-radius: 50%; box-shadow: 0 0 10px #4ade80;
-  animation: pulse-dot 2s infinite; }
-@keyframes pulse-dot { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.5); }
-  70% { transform: scale(1); box-shadow: 0 0 0 4px rgba(74, 222, 128, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); } }
-.secure-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);
-  color: var(--gray-hi); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
-.secure-pill svg { color: var(--purple-hi); }
-.page-mini-footer{position:fixed;bottom:24px;left:0;right:0;
-  font-size:11px;color:var(--gray-lo);display:flex;justify-content:center;z-index:100;letter-spacing:.1em;text-transform:uppercase;font-weight:600;}
-@media(max-width:960px){
-  .login-page{grid-template-columns:1fr; padding: 16px;}
-  .hero{padding:36px 28px 44px;min-height:auto;border-right:0;border-bottom:1px solid var(--border); border-radius: var(--radius);}
-  .login-panel{border-radius: var(--radius);}
-  .hero-mid h1{font-size:clamp(36px,9vw,52px)}
-  .hero-mid p{font-size:15px}
-  .hero-bottom{font-size:11px;gap:12px;flex-wrap:wrap}
-  .login-card{max-width:440px;padding:40px 28px; border-radius: var(--radius);}
-  .page-mini-footer{position:relative;margin-top:32px;bottom:auto;}
+/* TELA INTEIRA E FUNDO UNIFICADO */
+.login-page {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    background:
+        radial-gradient(circle at 15% 10%, rgba(138,79,255,0.15) 0%, transparent 50%),
+        radial-gradient(circle at 85% 90%, rgba(138,79,255,0.08) 0%, transparent 50%),
+        #040404;
+    position: relative;
+    overflow-x: hidden;
+    padding: 0;
+    gap: 0;
 }
-@media(max-width:480px){
-  .hero{padding:28px 20px 36px}
-  .hero-brand{font-size:24px;}
-  .hero-brand .mark{width:56px;height:56px;}
-  .login-panel{padding:28px 0px}
-  .login-card{padding:32px 22px}
-  .card-head h2{font-size:28px;}
+
+/* GRID PATTERN NO FUNDO INTEIRO */
+.login-page::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: 
+        linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, #000 20%, transparent 90%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, #000 20%, transparent 90%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* HERO SECTION - SEM CORTES E SEM BORDAS */
+.hero {
+    position: relative;
+    padding: 80px 10%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    z-index: 1;
+    /* Removemos bordas, fundos e limitadores de altura */
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    min-height: 100vh;
+}
+
+.hero-top, .hero-mid, .hero-bottom {
+    position: relative;
+    z-index: 1;
+}
+
+.hero-brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 28px;
+    letter-spacing: -0.04em;
+    color: var(--white);
+}
+
+.hero-brand .mark {
+    width: 68px;
+    height: 68px;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(circle at 30% 30%, rgba(138,79,255,.15), transparent 70%);
+    overflow: hidden;
+    border-radius: var(--radius);
+}
+
+.hero-brand .mark img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.hero-brand .name {
+    display: flex;
+    flex-direction: column;
+    line-height: 1;
+}
+
+.hero-mid {
+    max-width: 700px;
+    margin: 40px 0;
+}
+
+/* FONTE ADAPTÁVEL PARA NÃO CORTAR */
+.hero-mid h1 {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: clamp(36px, 5vw, 72px);
+    line-height: 0.95;
+    color: var(--white);
+    margin-bottom: 28px;
+    letter-spacing: -0.045em;
+    text-transform: uppercase;
+    word-wrap: break-word;
+}
+
+.hero-mid h1 .accent {
+    color: var(--purple);
+    text-shadow: 0 0 40px var(--purple-glow);
+}
+
+.hero-mid p {
+    font-size: 16px;
+    color: var(--gray-hi);
+    line-height: 1.7;
+    max-width: 500px;
+}
+
+.hero-bottom {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    color: var(--gray-mid);
+    letter-spacing: .02em;
+}
+
+.stat { display: flex; align-items: center; gap: 8px; }
+.stat b { color: var(--white); font-weight: 700; }
+.divider { width: 1px; height: 12px; background: var(--border); }
+
+/* LOGIN PANEL - SEM BORDAS E SEM FUNDO */
+.login-panel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 32px;
+    background: transparent;
+    border-radius: 0;
+    z-index: 1;
+}
+
+/* CARD DE LOGIN MANTIDO COM EFEITO PREMIUM */
+.login-card {
+    position: relative;
+    width: 100%;
+    max-width: 440px;
+    padding: 56px 48px;
+    border: 1px solid var(--border);
+    border-top: 1px solid var(--border-hi);
+    background: rgba(10, 10, 10, 0.6);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-soft);
+}
+
+.login-card::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 40px;
+    right: 40px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--purple), transparent);
+    opacity: .8;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.card-head { margin-bottom: 40px; text-align: center; }
+
+.card-head .mini-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--white);
+    background: rgba(138,79,255,0.15);
+    border: 1px solid rgba(138,79,255,0.3);
+    padding: 6px 14px;
+    border-radius: var(--radius-pill);
+    letter-spacing: .2em;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+}
+
+.card-head h2 {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 34px;
+    letter-spacing: -0.03em;
+    color: var(--white);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    line-height: 1.1;
+}
+
+.card-head p {
+    font-size: 14px;
+    color: var(--gray-hi);
+    line-height: 1.65;
+}
+
+.btn-discord {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    width: 100%;
+    padding: 18px 28px;
+    background: linear-gradient(135deg, var(--purple) 0%, #6B2EE0 100%);
+    color: var(--white);
+    font-weight: 700;
+    font-size: 15px;
+    text-decoration: none;
+    transition: all .25s var(--ease);
+    letter-spacing: -.005em;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: var(--radius-pill);
+    box-shadow: 0 12px 30px -8px rgba(138,79,255,0.5);
+}
+
+.btn-discord::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, transparent, rgba(255,255,255,.2), transparent);
+    transform: translateX(-100%);
+    transition: transform .5s var(--ease);
+}
+
+.btn-discord:hover {
+    background: linear-gradient(135deg, #A370FF 0%, #8A4FFF 100%);
+    box-shadow: 0 16px 40px -8px rgba(138,79,255,0.7);
+    transform: translateY(-2px);
+    color: var(--white);
+}
+
+.btn-discord:hover::before { transform: translateX(100%); }
+
+.btn-discord .left { display: flex; align-items: center; gap: 12px; position: relative; z-index: 1; }
+.btn-discord .arrow { position: relative; z-index: 1; transition: transform .2s var(--ease); }
+.btn-discord:hover .arrow { transform: translateX(4px); }
+
+.login-foot {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: var(--radius-pill);
+    background: rgba(74, 222, 128, 0.05);
+    border: 1px solid rgba(74, 222, 128, 0.15);
+    color: #86efac;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.status-dot {
+    width: 6px;
+    height: 6px;
+    background: #4ade80;
+    border-radius: 50%;
+    box-shadow: 0 0 10px #4ade80;
+    animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.5); }
+    70% { transform: scale(1); box-shadow: 0 0 0 4px rgba(74, 222, 128, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+}
+
+.secure-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--gray-hi);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.secure-pill svg { color: var(--purple-hi); }
+
+.page-mini-footer {
+    position: fixed;
+    bottom: 24px;
+    left: 0;
+    right: 0;
+    font-size: 11px;
+    color: var(--gray-lo);
+    display: flex;
+    justify-content: center;
+    z-index: 100;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    font-weight: 600;
+    pointer-events: none;
+}
+
+@media(max-width: 960px) {
+    .login-page {
+        grid-template-columns: 1fr;
+        padding-bottom: 60px;
+    }
+    .hero {
+        padding: 40px 24px 20px;
+        min-height: auto;
+    }
+    .login-panel {
+        padding: 20px 24px 40px;
+    }
+    .hero-mid h1 { font-size: clamp(32px, 8vw, 48px); }
+    .hero-bottom { display: none; }
+    .login-card { padding: 40px 28px; }
+    .page-mini-footer { position: relative; margin-top: 20px; bottom: auto; }
+}
+@media(max-width: 480px) {
+    .hero-brand { font-size: 24px; }
+    .hero-brand .mark { width: 56px; height: 56px; }
+    .login-card { padding: 32px 22px; }
+    .card-head h2 { font-size: 28px; }
 }
 </style></head>
 <body>
