@@ -2,6 +2,8 @@ import discord
 from discord import app_commands, ui
 from discord.ext import commands, tasks
 import json, os, datetime, random, logging, aiohttp, asyncio, re, shutil, time
+import urllib.parse
+import requests
 from database import *
 
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -119,6 +121,11 @@ DEFAULT_CONFIG = {
     "staff_movchat_goal":1000,"staff_call_goal_hours":30,
     "staff_report_channel_id":None,"staff_punish_channel_id":None,
     "staff_warn_ban_threshold":3,
+    # ===== STATBOT FEATURES =====
+    "counter_total_channel_id":None,
+    "counter_online_channel_id":None,
+    "counter_call_channel_id":None,
+    "statroles":[], # Ex: [{"tipo":"voice", "meta":36000, "role_id":123, "dias":30}]
 }
 
 def load_config():
@@ -2533,6 +2540,193 @@ async def sync_all_channels_emoji(guild):
         except Exception: pass
     return total
 
+# ===================== STATBOT: GRÁFICOS E RANKINGS =====================
+def _quickchart_url(config_dict, width=600, height=300):
+    payload = json.dumps(config_dict)
+    return f"https://quickchart.io/chart?c={urllib.parse.quote(payload)}&w={width}&h={height}&bkg=%23000000"
+
+def _get_message_stats(guild_id, days=30):
+    conn = get_db(); c = conn.cursor()
+    since = (datetime.date.today() - datetime.timedelta(days=days)).isoformat()
+    c.execute("""
+        SELECT date, SUM(count) as total FROM staff_message_counts
+        WHERE guild_id = ? AND date >= ?
+        GROUP BY date ORDER BY date ASC
+    """, (guild_id, since))
+    rows = c.fetchall(); conn.close()
+    return [(r["date"], r["total"]) for r in rows]
+
+def _get_voice_stats(guild_id, days=30):
+    conn = get_db(); c = conn.cursor()
+    since = (datetime.datetime.now() - datetime.timedelta(days=days)).isoformat()
+    c.execute("""
+        SELECT DATE(joined_at) as day, SUM(seconds) as total
+        FROM staff_call_hours
+        WHERE guild_id = ? AND joined_at > ?
+        GROUP BY day ORDER BY day ASC
+    """, (guild_id, since))
+    rows = c.fetchall(); conn.close()
+    return [(r["day"], r["total"] or 0) for r in rows]
+
+@bot.tree.command(name="chart", description="📊 Gera um gráfico de estatísticas do servidor")
+@app_commands.describe(tipo="Tipo de gráfico", dias="Período em dias (padrão: 30)")
+@app_commands.choices(tipo=[
+    app_commands.Choice(name="Membros", value="member"),
+    app_commands.Choice(name="Mensagens", value="message"),
+    app_commands.Choice(name="Tempo em Call", value="voice"),
+])
+async def cmd_chart(interaction, tipo: app_commands.Choice[str], dias: int = 30):
+    await interaction.response.defer()
+    gid = interaction.guild.id
+    if tipo.value == "member":
+        data = get_member_history(gid, dias)
+        label = "Contagem de Membros"
+        y_label = "Membros"
+    elif tipo.value == "message":
+        data = _get_message_stats(gid, dias)
+        label = "Mensagens por Dia"
+        y_label = "Mensagens"
+    else:
+        data = _get_voice_stats(gid, dias)
+        label = "Tempo em Call por Dia"
+        y_label = "Segundos"
+
+    if not data:
+        await interaction.followup.send("❌ Sem dados suficientes para gerar o gráfico. O bot precisa coletar dados por pelo menos alguns dias.", ephemeral=True)
+        return
+
+    labels = [d[0] for d in data]
+    values = [d[1] for d in data]
+
+    chart_config = {
+        "type": "line",
+        "data": {
+            "labels": labels,
+            "datasets": [{
+                "label": label,
+                "data": values,
+                "borderColor": "#8A4FFF",
+                "backgroundColor": "rgba(138, 79, 255, 0.1)",
+                "fill": True,
+                "tension": 0.4
+            }]
+        },
+        "options": {
+            "plugins": {
+                "legend": {"labels": {"color": "#FFF"}},
+                "title": {"display": True, "text": f"{label} — últimos {dias} dias", "color": "#FFF"}
+            },
+            "scales": {
+                "y": {"beginAtZero": True, "title": {"display": True, "text": y_label, "color": "#FFF"}, "ticks": {"color": "#AAA"}},
+                "x": {"ticks": {"color": "#AAA"}}
+            }
+        }
+    }
+    url = _quickchart_url(chart_config, width=800, height=400)
+    await interaction.followup.send(f"📊 **{label}** (últimos {dias} dias):\n{url}")
+
+@bot.tree.command(name="top", description="🏆 Ranking de membros mais ativos")
+@app_commands.describe(categoria="Categoria do ranking", limite="Quantidade de membros (1-25)")
+@app_commands.choices(categoria=[
+    app_commands.Choice(name="Mensagens", value="messages"),
+    app_commands.Choice(name="Tempo em Call", value="voice"),
+    app_commands.Choice(name="Nível (XP)", value="level"),
+])
+async def cmd_top(interaction, categoria: app_commands.Choice[str], limite: int = 10):
+    await interaction.response.defer()
+    gid = interaction.guild.id
+    limite = max(1, min(limite, 25))
+
+    if categoria.value == "messages":
+        conn = get_db(); c = conn.cursor()
+        c.execute("SELECT user_id, messages as total FROM user_levels WHERE guild_id = ? ORDER BY messages DESC LIMIT ?", (gid, limite))
+        rows = c.fetchall(); conn.close()
+        lines = [f"**{i+1}.** <@{r['user_id']}> — `{r['total']}` mensagens" for i, r in enumerate(rows)]
+        title = "🏆 Top Mensagens"
+    elif categoria.value == "voice":
+        conn = get_db(); c = conn.cursor()
+        since = (datetime.datetime.now() - datetime.timedelta(days=30)).isoformat()
+        c.execute("""
+            SELECT user_id, SUM(seconds) as total FROM staff_call_hours
+            WHERE guild_id = ? AND joined_at > ?
+            GROUP BY user_id ORDER BY total DESC LIMIT ?
+        """, (gid, since, limite))
+        rows = c.fetchall(); conn.close()
+        lines = [f"**{i+1}.** <@{r['user_id']}> — `{r['total']/3600:.1f}h` em call" for i, r in enumerate(rows)]
+        title = "🏆 Top Tempo em Call (30 dias)"
+    else:
+        rows = get_level_leaderboard(gid, limite)
+        lines = [f"**{i+1}.** <@{r['user_id']}> — Nível `{r['level']}` (`{r['xp']} XP`)" for i, r in enumerate(rows)]
+        title = "🏆 Top Níveis"
+
+    if not lines:
+        await interaction.followup.send("❌ Sem dados ainda.")
+        return
+
+    embed = discord.Embed(title=title, description="\n".join(lines), color=c_panel("levels", 0xFFD700))
+    await interaction.followup.send(embed=embed)
+
+# ===================== STATBOT: STATROLES & COUNTERS =====================
+@tasks.loop(hours=24)
+async def task_daily_member_count():
+    g = get_guild()
+    if g: save_member_count(g.id, g.member_count)
+
+@tasks.loop(minutes=5)
+async def task_update_counters():
+    g = get_guild()
+    if not g: return
+    # total
+    cid = config.get("counter_total_channel_id")
+    if cid:
+        ch = g.get_channel(cid)
+        if ch:
+            try: await ch.edit(name=f"👥 Membros: {g.member_count}")
+            except: pass
+    # online
+    cid = config.get("counter_online_channel_id")
+    if cid:
+        ch = g.get_channel(cid)
+        if ch:
+            online = sum(1 for m in g.members if m.status != discord.Status.offline)
+            try: await ch.edit(name=f"🟢 Online: {online}")
+            except: pass
+    # call
+    cid = config.get("counter_call_channel_id")
+    if cid:
+        ch = g.get_channel(cid)
+        if ch:
+            in_call = sum(len(vc.members) for vc in g.voice_channels)
+            try: await ch.edit(name=f"🎙️ Em call: {in_call}")
+            except: pass
+
+@tasks.loop(hours=6)
+async def task_statroles():
+    g = get_guild()
+    if not g: return
+    sr_list = config.get("statroles", [])
+    if not sr_list: return
+    for sr in sr_list:
+        role = g.get_role(sr.get("role_id"))
+        if not role: continue
+        tipo = sr.get("tipo")
+        meta = sr.get("meta", 0)
+        dias = sr.get("dias", 30)
+        conn = get_db(); c = conn.cursor()
+        if tipo == "voice":
+            since = (datetime.datetime.now() - datetime.timedelta(days=dias)).isoformat()
+            c.execute("SELECT user_id, SUM(seconds) as total FROM staff_call_hours WHERE guild_id = ? AND joined_at > ? GROUP BY user_id", (g.id, since))
+        elif tipo == "messages":
+            c.execute("SELECT user_id, messages as total FROM user_levels WHERE guild_id = ?", (g.id,))
+        else:
+            conn.close(); continue
+        rows = c.fetchall(); conn.close()
+        for r in rows:
+            m = g.get_member(r["user_id"])
+            if m and r["total"] >= meta and role not in m.roles:
+                try: await m.add_roles(role, reason="Statrole")
+                except: pass
+
 # ===================== COMANDOS =====================
 @bot.tree.command(name="painelpxkadmin", description="🖤 Painel administrativo")
 @app_commands.default_permissions(administrator=True)
@@ -2884,7 +3078,8 @@ async def on_ready():
     await bot_join_voice()
     await update_status(force=True)
     for t in (task_voice, task_activity, task_refresh_panels, task_voice_watchdog,
-              task_reload_config, task_voice_keepalive, task_auto_emoji):
+              task_reload_config, task_voice_keepalive, task_auto_emoji,
+              task_daily_member_count, task_update_counters, task_statroles):
         if not t.is_running(): t.start()
     try: await refresh_all_panels()
     except Exception: pass
