@@ -1,14 +1,24 @@
 version: '3.8'
+
 services:
   pxk-sistema:
     build: .
     container_name: pxk-sistema
     restart: unless-stopped
-    env_file: .env
+    # REMOVA a linha env_file: .env daqui
     ports:
       - "8080:8080"
     volumes:
       - ./data:/app/data
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
+      - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET}
+      - OWNER_IDS=${OWNER_IDS}
+      - DEV_IDS=${DEV_IDS}
+      - STAFF_PERMS=${STAFF_PERMS}
+      - BASE_URL=${BASE_URL}
+      - PANEL_SECRET=${PANEL_SECRET}
 
   cloudflared:
     image: cloudflare/cloudflared:latest
