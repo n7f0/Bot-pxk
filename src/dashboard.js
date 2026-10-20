@@ -209,4 +209,43 @@ app.get('/', requireAuth, async (req, res) => {
             <button class="nav-btn" data-target="s6">👮 Staff</button>
             <button class="nav-btn" data-target="s7">💎 VIP</button>
             <button class="nav-btn" data-target="s8">🔊 Voz e Status</button>
-            <button class="nav-btn" data-target="s9">🛡️ Filtros
+            <button class="nav-btn" data-target="s9">🛡️ Filtros & AntiBot</button>
+        </aside>
+        <main class="content">
+            <form method="POST" id="cfgForm">
+                <section id="s0" class="section active"><div class="section-head"><h2>Identidade Visual</h2><p>Personalize a marca do seu bot.</p></div><div class="form-grid">${renderField('brand_name', 'Nome da Marca', 'text')}${renderField('brand_emoji', 'Emoji da Marca', 'text')}${renderField('brand_footer', 'Rodapé', 'text')}${renderField('avatar_url', 'URL do Avatar', 'text')}${renderField('banner_painel_url', 'URL do Banner do Painel', 'text')}${renderField('banner_ticket_url', 'URL do Banner de Tickets', 'text')}</div></section>
+                <section id="s1" class="section"><div class="section-head"><h2>Cores dos Painéis</h2><p>Defina as cores hexadecimais.</p></div><div class="form-grid">${renderField('brand_color_primary', 'Cor Primária', 'color')}${renderField('brand_color_secondary', 'Cor Secundária', 'color')}${renderField('brand_color_success', 'Sucesso', 'color')}${renderField('brand_color_danger', 'Perigo', 'color')}</div></section>
+                <section id="s2" class="section"><div class="section-head"><h2>Verificação</h2><p>Configure o captcha de entrada.</p></div><div class="form-grid">${renderField('verification_enabled', 'Ativar Sistema de Verificação', 'bool')}${renderField('verified_role_ids', 'Cargos de Verificado', 'role')}${renderField('verification_channel_id', 'Canal de Verificação', 'ch')}${renderField('verification_panel_channel_id', 'Canal do Painel', 'ch')}${renderField('verification_log_channel_id', 'Canal de Log', 'ch')}</div></section>
+                <section id="s3" class="section"><div class="section-head"><h2>Tickets</h2><p>Configure as categorias de atendimento.</p></div><div class="form-grid">${renderField('ticket_panel_channel_id', 'Canal do Painel de Tickets', 'ch')}${renderField('ticket_logs_channel_id', 'Canal de Logs', 'ch')}${renderField('ticket_category_movcall_id', 'Categoria MOV CALL', 'cat')}${renderField('ticket_category_movchat_id', 'Categoria MOV CHAT', 'cat')}${renderField('ticket_category_recrute_id', 'Categoria RECRUTE-S', 'cat')}${renderField('ticket_category_support_id', 'Categoria SUPORTE', 'cat')}${renderField('ticket_category_others_id', 'Categoria OUTROS', 'cat')}${renderField('ticket_support_role_ids', 'Cargos de Staff', 'role')}</div></section>
+                <section id="s4" class="section"><div class="section-head"><h2>Níveis (MEE6)</h2><p>Sistema de XP e recompensas.</p></div><div class="form-grid">${renderField('levels_enabled', 'Ativar Sistema', 'bool')}${renderField('levels_xp_per_message', 'XP por Mensagem', 'num')}${renderField('levels_xp_cooldown_seconds', 'Cooldown (Segundos)', 'num')}${renderField('levels_announce_channel_id', 'Canal de Anúncio', 'ch')}${renderField('levels_message_up', 'Mensagem de Level Up', 'area')}</div></section>
+                <section id="s5" class="section"><div class="section-head"><h2>Boas-vindas</h2><p>Mensagens de entrada e saída.</p></div><div class="form-grid">${renderField('welcome_channel_id', 'Canal de Entrada', 'ch')}${renderField('welcome_message', 'Mensagem de Entrada', 'area')}${renderField('leave_channel_id', 'Canal de Saída', 'ch')}${renderField('leave_message', 'Mensagem de Saída', 'area')}${renderField('auto_role_id', 'Cargo Automático', 'role_single')}</div></section>
+                <section id="s6" class="section"><div class="section-head"><h2>Staff</h2><p>Metas e monitoramento da equipe.</p></div><div class="form-grid">${renderField('staff_role_ids', 'Cargos de Staff', 'role')}${renderField('staff_movchat_goal', 'Meta de Mensagens', 'num')}${renderField('staff_call_goal_hours', 'Meta de Horas em Call', 'num')}</div></section>
+                <section id="s7" class="section"><div class="section-head"><h2>VIP</h2><p>Sistema de vantagens.</p></div><div class="form-grid">${renderField('vip_enabled', 'Ativar VIP', 'bool')}${renderField('vip_role_base_id', 'Cargo Base VIP', 'role_single')}${renderField('vip_max_members', 'Limite de Membros', 'num')}</div></section>
+                <section id="s8" class="section"><div class="section-head"><h2>Voz e Status</h2><p>Presença do bot e logs de call.</p></div><div class="form-grid">${renderField('voice_channel_id', 'Canal de Voz 24h', 'vc')}${renderField('voice_join_log_channel_id', 'Log de Entrada (Call)', 'ch')}${renderField('voice_leave_log_channel_id', 'Log de Saída (Call)', 'ch')}${renderField('bot_status', 'Status', 'text')}</div></section>
+                <section id="s9" class="section"><div class="section-head"><h2>Filtros & AntiBot</h2><p>Proteção do servidor.</p></div><div class="form-grid">${renderField('filters_enabled', 'Ativar Filtros', 'bool')}${renderField('antibot_punish_ban', 'AntiBot: Banir', 'bool')}${renderField('antibot_channel_id', 'Canal Armadilha (AntiBot)', 'ch')}${renderField('filters_log_channel_id', 'Canal de Log de Filtro', 'ch')}</div></section>
+            </form>
+        </main>
+    </div>
+    <div class="save-bar"><span style="font-size: 13px; color: var(--gray-mid); font-weight: 500;">Salvo em tempo real.</span><button type="submit" form="cfgForm" class="save-btn">Salvar Alterações</button></div>
+    <script>
+        document.querySelectorAll('.nav-btn').forEach(btn => { btn.addEventListener('click', () => { document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.section').forEach(s => s.classList.remove('active')); btn.classList.add('active'); document.getElementById(btn.dataset.target).classList.add('active'); }); });
+        document.querySelectorAll('input[type="color"]').forEach(input => { input.addEventListener('input', (e) => { e.target.nextElementSibling.innerText = e.target.value.toUpperCase(); }); });
+    </script></body></html>`);
+});
+
+app.post('/', requireAuth, (req, res) => {
+    const cfg = getConfig();
+    for (const key in req.body) {
+        if (key.includes('_enabled') || key.includes('vip_allow_') || key.includes('antibot_punish')) cfg[key] = true;
+        else if (['verified_role_ids', 'ticket_support_role_ids', 'staff_role_ids', 'filters_links_allowed_role_ids'].includes(key)) cfg[key] = Array.isArray(req.body[key]) ? req.body[key] : [req.body[key]];
+        else if (key.includes('color')) cfg[key] = parseInt(req.body[key].replace('#', ''), 16);
+        else cfg[key] = req.body[key];
+    }
+    ['verification_enabled', 'levels_enabled', 'vip_enabled', 'filters_enabled', 'antibot_punish_ban', 'vip_allow_custom_color', 'vip_allow_custom_name'].forEach(boolKey => { if (!req.body[boolKey]) cfg[boolKey] = false; });
+    saveConfig(cfg);
+    req.flash('success', 'ok');
+    res.redirect('/');
+});
+
+app.listen(8080, '0.0.0.0', () => console.log('🌐 Dashboard rodando na porta 8080'));
+// FIM DO ARQUIVO - COPIE ATÉ AQUI
