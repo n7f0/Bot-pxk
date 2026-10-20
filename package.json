@@ -14,7 +14,8 @@
     "ejs": "^3.1.9",
     "express": "^4.19.2",
     "express-session": "^1.18.0",
-    "mongoose": "^8.24.4"
+    "mongoose": "^8.24.4",
+    "socket.io": "^4.7.5"
   },
   "engines": {
     "node": ">=18"
