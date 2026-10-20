@@ -9,7 +9,6 @@ const flash = require('connect-flash');
 const app = express();
 const CONFIG_FILE = path.join(__dirname, '../data', 'config.json');
 
-// Garante que a pasta data existe
 if (!fs.existsSync(path.join(__dirname, '../data'))) fs.mkdirSync(path.join(__dirname, '../data'), { recursive: true });
 
 const DEFAULT_CONFIG = {
@@ -39,9 +38,7 @@ const saveConfig = (cfg) => fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, nu
 
 app.set('trust proxy', 1);
 
-// =========================================================
-// CAMINHO DA PASTA PUBLIC (AGORA BUSCA NA RAIZ DO PROJETO)
-// =========================================================
+// Pasta public na raiz
 app.use(express.static(path.join(__dirname, '../public'))); 
 
 app.use(express.urlencoded({ extended: true }));
@@ -52,6 +49,16 @@ app.use(session({
     cookie: { secure: false, maxAge: 1000 * 60 * 60 * 24 } 
 }));
 app.use(flash());
+
+// ROTA DE TESTE PARA A LOGO (Acesse: seusite.com/checar-logo)
+app.get('/checar-logo', (req, res) => {
+    const logoPath = path.join(__dirname, '../public/logo.gif');
+    if (fs.existsSync(logoPath)) {
+        res.send(`<h1>✅ A logo EXISTE no servidor!</h1><p>Caminho: ${logoPath}</p><img src="/logo.gif" style="border:2px solid green; max-width:200px;">`);
+    } else {
+        res.send(`<h1>❌ A logo NÃO FOI ENCONTRADA no servidor.</h1><p>O servidor procurou aqui: <b>${logoPath}</b> e não achou.</p><p>Verifique se a pasta "public" está na raiz do seu repositório GitHub e se o arquivo se chama exatamente "logo.gif" (tudo minúsculo).</p>`);
+    }
+});
 
 let discordCache = { time: 0, data: { ch: [], vc: [], cat: [], role: [] } };
 async function getDiscordData(guildId) {
@@ -124,7 +131,8 @@ app.get('/login', (req, res) => {
             <section class="hero">
                 <div class="hero-brand">
                     <span class="mark">
-                        <img src="/logo.gif" alt="Logo" onerror="this.style.display='none'; this.parentElement.innerHTML='🖤';">
+                        <!-- Fallback: Se não achar o logo.gif, ele tenta carregar um ícone genérico do Discord -->
+                        <img src="/logo.gif" alt="Logo" onerror="this.onerror=null; this.src='https://cdn.discordapp.com/embed/avatars/0.png';">
                     </span>
                     <span class="name">PXKK</span>
                 </div>
@@ -208,14 +216,13 @@ app.get('/', requireAuth, async (req, res) => {
         return `<div class="f"><label>${label}</label><select name="${key}">${opts}</select></div>`;
     };
 
-    // Adicionado padding-bottom no content para o mobile não cortar atrás do botão de salvar
     res.send(`
     <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Dashboard - PXKK</title>
     <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root { --purple: #8A4FFF; --purple-hi: #A370FF; --black: #040404; --white: #fff; --gray-hi: #B8B8C2; --gray-mid: #7A7A88; --border: rgba(255,255,255,0.08); --border-hi: rgba(138,79,255,0.35); }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: radial-gradient(circle at 15% 10%, rgba(138,79,255,0.15) 0%, transparent 40%), radial-gradient(circle at 85% 90%, rgba(138,79,255,0.1) 0%, transparent 40%), var(--black); color: var(--white); font-family: 'Inter', sans-serif; min-height: 100vh; display: flex; flex-direction: column; padding: 16px; padding-bottom: 100px; /* ESPAÇO EXTRA AQUI */ }
+        body { background: radial-gradient(circle at 15% 10%, rgba(138,79,255,0.15) 0%, transparent 40%), radial-gradient(circle at 85% 90%, rgba(138,79,255,0.1) 0%, transparent 40%), var(--black); color: var(--white); font-family: 'Inter', sans-serif; min-height: 100vh; display: flex; flex-direction: column; padding: 16px; padding-bottom: 100px; }
         
         .topbar { display: flex; justify-content: space-between; align-items: center; background: rgba(10,10,10,0.7); backdrop-filter: blur(24px); padding: 15px 30px; border-radius: 99px; border: 1px solid var(--border); margin-bottom: 24px; }
         .brand { display: flex; align-items: center; gap: 15px; font-family: 'Archivo Black'; font-size: 20px; }
@@ -267,7 +274,7 @@ app.get('/', requireAuth, async (req, res) => {
         .save-btn:hover { background: var(--purple-hi); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(138,79,255,0.5); }
         
         @media(max-width: 900px) { 
-            body { padding-bottom: 120px; } /* Mais espaço no mobile */
+            body { padding-bottom: 120px; }
             .layout { flex-direction: column; } 
             .sidebar { width: 100%; height: auto; flex-direction: row; overflow-x: auto; padding: 10px; position: relative; top: 0; } 
             .nav-btn { white-space: nowrap; width: auto; padding: 10px 15px; } 
@@ -277,7 +284,7 @@ app.get('/', requireAuth, async (req, res) => {
         }
     </style></head><body>
     <header class="topbar">
-        <div class="brand"><img src="/logo.gif" onerror="this.style.display='none';"> PXKK Dashboard</div>
+        <div class="brand"><img src="/logo.gif" onerror="this.onerror=null; this.src='https://cdn.discordapp.com/embed/avatars/0.png';"> PXKK Dashboard</div>
         <div class="user-info"><img src="https://cdn.discordapp.com/avatars/${req.session.user.id}/${req.session.user.avatar}.png"> ${req.session.user.username} <a href="/logout">Sair</a></div>
     </header>
     <div class="layout">
