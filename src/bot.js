@@ -1,10 +1,19 @@
-const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ActivityType } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
-const { addUserXP, getUserLevel, setUserLevel, getTop, addOpenTicket, countTicketsLastHours, logStaffCall } = require('./database');
+const { 
+    addUserXP, getUserLevel, setUserLevel, getTop, addOpenTicket, 
+    countTicketsLastHours, logStaffCall, addWarning, countWarnings 
+} = require('./database');
 
 const client = new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildVoiceStates]
+    intents: [
+        GatewayIntentBits.Guilds, 
+        GatewayIntentBits.GuildMessages, 
+        GatewayIntentBits.MessageContent, 
+        GatewayIntentBits.GuildMembers, 
+        GatewayIntentBits.GuildVoiceStates
+    ]
 });
 
 const CONFIG_FILE = path.join(__dirname, '../data', 'config.json');
@@ -12,19 +21,39 @@ const getConfig = () => { try { return JSON.parse(fs.readFileSync(CONFIG_FILE, '
 
 const cooldowns = new Map();
 const tempVerify = new Map();
+const emojiMap = {
+    'bemvindo': '✨', 'welcome': '✨', 'regras': '📜', 'avisos': '📢', 'chat': '💬',
+    'ticket': '🎫', 'suporte': '🛠️', 'sugestao': '💡', 'feedback': '⭐', 'bot': '🤖',
+    'call': '🔊', 'membros': '👥', 'logs': '📋', 'rank': '🏆', 'jogos': '🎮'
+};
 
 client.once('ready', async () => {
     console.log(`🤖 Bot logado como ${client.user.tag}`);
     
+    // Registra os comandos Slash
     await client.application.commands.set([
         { name: 'painel', description: '🖤 Envia o painel administrativo' },
         { name: 'painelticket', description: '🎫 Envia o painel de tickets' },
         { name: 'painelverificacao', description: '✅ Envia o painel de verificação' },
         { name: 'rank', description: '🏆 Ver seu rank' },
-        { name: 'top', description: '🏆 Ranking de membros' }
+        { name: 'top', description: '🏆 Ranking de membros' },
+        { name: 'sincronizaremojis', description: '✨ Sincroniza emojis dos canais' }
     ]);
+
+    // Rotação de Status (Activity)
+    const cfg = getConfig();
+    if (cfg.activity_rotate_enabled) {
+        let index = 0;
+        setInterval(() => {
+            const msgs = cfg.activity_messages || [`🖤 PXKK System`];
+            if(msgs.length === 0) return;
+            client.user.setActivity(msgs[index], { type: ActivityType.Watching });
+            index = (index + 1) % msgs.length;
+        }, (cfg.activity_rotate_seconds || 30) * 1000);
+    }
 });
 
+// ================= INTERAÇÕES (Comandos, Menus, Botões) =================
 client.on('interactionCreate', async interaction => {
     if (interaction.isChatInputCommand()) {
         const cfg = getConfig();
@@ -69,8 +98,29 @@ client.on('interactionCreate', async interaction => {
             const embed = new EmbedBuilder().setTitle('🏆 Top Níveis').setDescription(desc).setColor(0xFFD700);
             await interaction.reply({ embeds: [embed] });
         }
+
+        if (interaction.commandName === 'sincronizaremojis') {
+            await interaction.deferReply({ ephemeral: true });
+            let count = 0;
+            interaction.guild.channels.cache.forEach(ch => {
+                if (ch.type === 0 || ch.type === 2) { // Text ou Voice
+                    let currentName = ch.name;
+                    // Remove emojis antigos
+                    currentName = currentName.replace(/^[^\w\s]+\s*/, '');
+                    for (const [key, emoji] of Object.entries(emojiMap)) {
+                        if (currentName.toLowerCase().includes(key)) {
+                            ch.setName(`${emoji}・${currentName}`).catch(()=>{});
+                            count++;
+                            break;
+                        }
+                    }
+                }
+            });
+            await interaction.editReply({ content: `✅ ${count} canais atualizados!` });
+        }
     }
 
+    // MENU DE TICKETS
     if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_menu') {
         const type = interaction.values[0];
         if (countTicketsLastHours(interaction.user.id, 8) >= 3) {
@@ -101,6 +151,7 @@ client.on('interactionCreate', async interaction => {
         } catch (e) { await interaction.editReply({ content: '❌ Erro ao criar ticket.' }); }
     }
 
+    // BOTÕES E MODAIS
     if (interaction.isButton()) {
         if (interaction.customId === 'ticket_close') {
             await interaction.reply({ content: '🔒 Fechando ticket em 5 segundos...' });
@@ -132,10 +183,54 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
+// ================= MENSAGENS (XP, FILTROS E ANTIBOT) =================
 client.on('messageCreate', async message => {
     if (message.author.bot || !message.guild) return;
     const cfg = getConfig();
 
+    // 1. SISTEMA ANTIBOT (Canal Armadilha)
+    if (cfg.antibot_channel_id && message.channel.id === cfg.antibot_channel_id) {
+        await message.delete().catch(()=>{});
+        if (cfg.antibot_punish_ban) {
+            await message.member.ban({ reason: 'AntiBot: Mensagem no canal armadilha' }).catch(()=>{});
+        }
+        return; // Para a execução aqui
+    }
+
+    // 2. FILTRO DE PALAVRAS E LINKS
+    if (cfg.filters_enabled) {
+        let punish = false;
+        const contentLower = message.content.toLowerCase();
+        
+        // Filtro de Palavras
+        const blocked = cfg.filters_blocked_words || [];
+        if (blocked.some(w => contentLower.includes(w))) punish = true;
+
+        // Filtro de Links
+        if (!punish) {
+            const linkRegex = /(https?:\/\/[^\s]+)/g;
+            if (linkRegex.test(message.content)) {
+                const allowedRoles = cfg.filters_links_allowed_role_ids || [];
+                const hasRole = message.member.roles.cache.some(r => allowedRoles.includes(r.id));
+                if (!hasRole) punish = true;
+            }
+        }
+
+        if (punish) {
+            await message.delete().catch(()=>{});
+            addWarning(message.author.id, message.guild.id, 'Filtro automático', 'BOT');
+            const warns = countWarnings(message.author.id, message.guild.id);
+            
+            message.channel.send(`⚠️ ${message.author}, você foi avisado. (Avisos: ${warns})`).then(m => setTimeout(()=>m.delete(), 5000));
+            
+            if (warns >= (cfg.filters_punish_after_warnings || 3)) {
+                await message.member.timeout(60 * 60 * 1000, 'Muitos avisos de filtro').catch(()=>{});
+            }
+            return;
+        }
+    }
+
+    // 3. SISTEMA DE NÍVEIS (XP)
     if (cfg.levels_enabled) {
         const now = Date.now();
         const cdKey = `${message.guild.id}-${message.author.id}`;
@@ -155,12 +250,62 @@ client.on('messageCreate', async message => {
     }
 });
 
+// ================= ENTRADA E SAÍDA (WELCOME / LEAVE) =================
+client.on('guildMemberAdd', async member => {
+    const cfg = getConfig();
+    
+    // Cargo Automático
+    if (cfg.auto_role_id) {
+        await member.roles.add(cfg.auto_role_id).catch(()=>{});
+    }
+
+    // Mensagem de Boas-vindas
+    if (cfg.welcome_channel_id) {
+        const channel = member.guild.channels.cache.get(cfg.welcome_channel_id);
+        if (channel) {
+            const embed = new EmbedBuilder()
+                .setTitle('✨ Novo Membro')
+                .setDescription(`Seja muito bem-vindo(a) ${member}!\nAgora somos **${member.guild.memberCount}** membros.`)
+                .setColor(0x8A4FFF)
+                .setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
+            channel.send({ embeds: [embed] }).catch(()=>{});
+        }
+    }
+});
+
+client.on('guildMemberRemove', async member => {
+    const cfg = getConfig();
+    if (cfg.leave_channel_id) {
+        const channel = member.guild.channels.cache.get(cfg.leave_channel_id);
+        if (channel) {
+            const embed = new EmbedBuilder()
+                .setTitle('🔒 Até Logo')
+                .setDescription(`**${member.user.username}** saiu do servidor. Sentiremos sua falta!`)
+                .setColor(0xFF3366)
+                .setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
+            channel.send({ embeds: [embed] }).catch(()=>{});
+        }
+    }
+});
+
+// ================= VOZ (STAFF E LOGS) =================
 client.on('voiceStateUpdate', (oldState, newState) => {
     const member = newState.member;
     if (!member || member.user.bot) return;
     const cfg = getConfig();
-    const isStaff = member.roles.cache.some(r => (cfg.staff_role_ids || []).includes(r.id));
 
+    // Logs de Voz
+    if (!oldState.channelId && newState.channelId && cfg.voice_join_log_channel_id) {
+        const logCh = member.guild.channels.cache.get(cfg.voice_join_log_channel_id);
+        if (logCh) logCh.send(`🔊 ${member} entrou no canal **${newState.channel.name}**`).catch(()=>{});
+    }
+    if (oldState.channelId && !newState.channelId && cfg.voice_leave_log_channel_id) {
+        const logCh = member.guild.channels.cache.get(cfg.voice_leave_log_channel_id);
+        if (logCh) logCh.send(`🔇 ${member} saiu do canal **${oldState.channel.name}**`).catch(()=>{});
+    }
+
+    // Horas de Staff em Call
+    const isStaff = member.roles.cache.some(r => (cfg.staff_role_ids || []).includes(r.id));
     if (isStaff) {
         if (!oldState.channelId && newState.channelId) logStaffCall(member.id, member.guild.id, newState.channelId, 'join');
         else if (oldState.channelId && !newState.channelId) logStaffCall(member.id, member.guild.id, oldState.channelId, 'leave');
