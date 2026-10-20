@@ -228,4 +228,23 @@ app.get('/', requireAuth, async (req, res) => {
     </div>
     <div class="save-bar"><span style="font-size: 13px; color: var(--gray-mid); font-weight: 500;">Salvo em tempo real.</span><button type="submit" form="cfgForm" class="save-btn">Salvar Alterações</button></div>
     <script>
-        document.querySelectorAll('.nav-btn').forEach(btn => { btn.addEventListener('click', () => { document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.section').forEach(s => s.classList.remove('active')); btn.classList.add('active'); document.getElementById(btn.dataset.target
+        document.querySelectorAll('.nav-btn').forEach(btn => { btn.addEventListener('click', () => { document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.section').forEach(s => s.classList.remove('active')); btn.classList.add('active'); document.getElementById(btn.dataset.target).classList.add('active'); }); });
+        document.querySelectorAll('input[type="color"]').forEach(input => { input.addEventListener('input', (e) => { e.target.nextElementSibling.innerText = e.target.value.toUpperCase(); }); });
+    </script></body></html>`);
+});
+
+app.post('/', requireAuth, (req, res) => {
+    const cfg = getConfig();
+    for (const key in req.body) {
+        if (key.includes('_enabled') || key.includes('vip_allow_') || key.includes('antibot_punish')) cfg[key] = true;
+        else if (['verified_role_ids', 'ticket_support_role_ids', 'staff_role_ids', 'filters_links_allowed_role_ids'].includes(key)) cfg[key] = Array.isArray(req.body[key]) ? req.body[key] : [req.body[key]];
+        else if (key.includes('color')) cfg[key] = parseInt(req.body[key].replace('#', ''), 16);
+        else cfg[key] = req.body[key];
+    }
+    ['verification_enabled', 'levels_enabled', 'vip_enabled', 'filters_enabled', 'antibot_punish_ban', 'vip_allow_custom_color', 'vip_allow_custom_name'].forEach(boolKey => { if (!req.body[boolKey]) cfg[boolKey] = false; });
+    saveConfig(cfg);
+    req.flash('success', 'ok');
+    res.redirect('/');
+});
+
+app.listen(8080, '0.0.0.0', () => console.log('🌐 Dashboard rodando na porta 8080'));
