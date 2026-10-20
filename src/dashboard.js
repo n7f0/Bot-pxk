@@ -9,6 +9,7 @@ const flash = require('connect-flash');
 const app = express();
 const CONFIG_FILE = path.join(__dirname, '../data', 'config.json');
 
+// Garante que a pasta data existe
 if (!fs.existsSync(path.join(__dirname, '../data'))) fs.mkdirSync(path.join(__dirname, '../data'), { recursive: true });
 
 const DEFAULT_CONFIG = {
@@ -39,7 +40,7 @@ const saveConfig = (cfg) => fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, nu
 app.set('trust proxy', 1);
 
 // =========================================================
-// AQUI ESTÁ A CORREÇÃO: '../public' em vez de 'public'
+// CAMINHO DA PASTA PUBLIC (AGORA BUSCA NA RAIZ DO PROJETO)
 // =========================================================
 app.use(express.static(path.join(__dirname, '../public'))); 
 
@@ -158,7 +159,6 @@ app.get('/auth', (req, res) => {
 
 app.get('/callback', async (req, res) => {
     if (req.query.state !== req.session.oauth_state) {
-        console.log("State Inválido! Redirecionando...");
         return res.redirect('/login');
     }
     try {
@@ -169,17 +169,13 @@ app.get('/callback', async (req, res) => {
         const devs = (process.env.DEV_IDS || '').split(',').map(i=>i.trim()).filter(i=>i);
         
         if (!owners.includes(user.data.id) && !devs.includes(user.data.id)) {
-            console.log(`Acesso negado para ID: ${user.data.id}`);
             return res.status(403).send("Acesso Negado. Verifique se o seu ID está no OWNER_IDS do Portainer.");
         }
         
         req.session.user = user.data; 
         req.session.user.role = devs.includes(user.data.id) ? 'dev' : 'owner';
         
-        req.session.save((err) => {
-            if(err) console.error("Erro ao salvar sessão:", err);
-            res.redirect('/');
-        });
+        req.session.save(() => res.redirect('/'));
     } catch (e) { res.status(400).send("Falha na autenticação."); }
 });
 
@@ -212,24 +208,28 @@ app.get('/', requireAuth, async (req, res) => {
         return `<div class="f"><label>${label}</label><select name="${key}">${opts}</select></div>`;
     };
 
+    // Adicionado padding-bottom no content para o mobile não cortar atrás do botão de salvar
     res.send(`
     <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Dashboard - PXKK</title>
     <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root { --purple: #8A4FFF; --purple-hi: #A370FF; --black: #040404; --white: #fff; --gray-hi: #B8B8C2; --gray-mid: #7A7A88; --border: rgba(255,255,255,0.08); --border-hi: rgba(138,79,255,0.35); }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: radial-gradient(circle at 15% 10%, rgba(138,79,255,0.15) 0%, transparent 40%), radial-gradient(circle at 85% 90%, rgba(138,79,255,0.1) 0%, transparent 40%), var(--black); color: var(--white); font-family: 'Inter', sans-serif; min-height: 100vh; display: flex; flex-direction: column; padding: 16px; }
+        body { background: radial-gradient(circle at 15% 10%, rgba(138,79,255,0.15) 0%, transparent 40%), radial-gradient(circle at 85% 90%, rgba(138,79,255,0.1) 0%, transparent 40%), var(--black); color: var(--white); font-family: 'Inter', sans-serif; min-height: 100vh; display: flex; flex-direction: column; padding: 16px; padding-bottom: 100px; /* ESPAÇO EXTRA AQUI */ }
+        
         .topbar { display: flex; justify-content: space-between; align-items: center; background: rgba(10,10,10,0.7); backdrop-filter: blur(24px); padding: 15px 30px; border-radius: 99px; border: 1px solid var(--border); margin-bottom: 24px; }
         .brand { display: flex; align-items: center; gap: 15px; font-family: 'Archivo Black'; font-size: 20px; }
         .brand img { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border-hi); }
         .user-info { display: flex; align-items: center; gap: 15px; font-size: 14px; font-weight: 600; }
         .user-info img { width: 35px; height: 35px; border-radius: 50%; border: 1px solid var(--border-hi); }
         .user-info a { color: #f87171; text-decoration: none; }
+        
         .layout { display: flex; gap: 24px; flex: 1; }
-        .sidebar { width: 260px; background: rgba(10,10,10,0.6); backdrop-filter: blur(20px); border: 1px solid var(--border); border-radius: 32px; padding: 20px; display: flex; flex-direction: column; gap: 8px; height: calc(100vh - 120px); overflow-y: auto; }
+        .sidebar { width: 260px; background: rgba(10,10,10,0.6); backdrop-filter: blur(20px); border: 1px solid var(--border); border-radius: 32px; padding: 20px; display: flex; flex-direction: column; gap: 8px; height: calc(100vh - 120px); overflow-y: auto; position: sticky; top: 16px; }
         .nav-btn { display: flex; align-items: center; gap: 12px; padding: 14px 20px; color: var(--gray-hi); font-size: 14px; font-weight: 500; border-radius: 99px; cursor: pointer; transition: 0.2s; border: 1px solid transparent; background: transparent; text-align: left; width: 100%; }
         .nav-btn:hover { background: rgba(255,255,255,0.04); color: var(--white); }
         .nav-btn.active { background: linear-gradient(90deg, rgba(138,79,255,0.15), rgba(138,79,255,0.05)); color: var(--white); font-weight: 600; border-color: rgba(138,79,255,0.3); }
+        
         .content { flex: 1; position: relative; }
         .section { display: none; background: rgba(10,10,10,0.6); backdrop-filter: blur(24px); border: 1px solid var(--border); border-radius: 32px; padding: 40px; animation: fadeIn 0.3s; }
         .section.active { display: block; }
@@ -237,6 +237,7 @@ app.get('/', requireAuth, async (req, res) => {
         .section-head { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .section-head h2 { font-family: 'Archivo Black'; font-size: 28px; text-transform: uppercase; margin-bottom: 8px; }
         .section-head p { color: var(--gray-mid); font-size: 14px; }
+        
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
         .f { display: flex; flex-direction: column; gap: 10px; }
         .f.full { grid-column: 1 / -1; }
@@ -248,20 +249,32 @@ app.get('/', requireAuth, async (req, res) => {
         .f select[multiple] option { padding: 12px; border-radius: 8px; margin-bottom: 4px; }
         .f select[multiple] option:checked { background: var(--purple); color: var(--white); }
         .hint { font-size: 11px; color: var(--gray-mid); }
+        
         .sw { display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.3); padding: 16px; border-radius: 16px; border: 1px solid var(--border); cursor: pointer; }
         .sw input[type="checkbox"] { width: 50px; height: 26px; appearance: none; background: #4A4A55; border-radius: 99px; position: relative; cursor: pointer; transition: 0.2s; flex-shrink: 0; }
         .sw input[type="checkbox"]::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; background: #fff; border-radius: 50%; transition: 0.2s; }
         .sw input[type="checkbox"]:checked { background: var(--purple); }
         .sw input[type="checkbox"]:checked::after { transform: translateX(24px); }
+        
         .color-wrapper { display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.3); padding: 10px 20px; border-radius: 99px; border: 1px solid var(--border); }
         .color-wrapper input[type="color"] { width: 35px; height: 35px; border: none; background: none; cursor: pointer; padding: 0; }
         .color-wrapper input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
         .color-wrapper input[type="color"]::-webkit-color-swatch { border: 2px solid rgba(255,255,255,0.2); border-radius: 50%; }
         .color-hex { font-family: monospace; font-size: 14px; font-weight: bold; text-transform: uppercase; }
+        
         .save-bar { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgba(15,15,15,0.95); backdrop-filter: blur(20px); border: 1px solid var(--border-hi); padding: 16px 32px; border-radius: 99px; display: flex; justify-content: space-between; align-items: center; gap: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); z-index: 100; }
         .save-btn { background: var(--purple); color: #fff; padding: 16px 36px; border: none; border-radius: 99px; font-weight: 800; font-size: 14px; text-transform: uppercase; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 10px; }
         .save-btn:hover { background: var(--purple-hi); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(138,79,255,0.5); }
-        @media(max-width: 900px) { .layout { flex-direction: column; } .sidebar { width: 100%; height: auto; flex-direction: row; overflow-x: auto; padding: 10px; } .nav-btn { white-space: nowrap; width: auto; padding: 10px 15px; } .form-grid { grid-template-columns: 1fr; } .save-bar { width: calc(100% - 32px); bottom: 16px; padding: 12px; border-radius: 20px; } .save-btn { width: 100%; justify-content: center; } }
+        
+        @media(max-width: 900px) { 
+            body { padding-bottom: 120px; } /* Mais espaço no mobile */
+            .layout { flex-direction: column; } 
+            .sidebar { width: 100%; height: auto; flex-direction: row; overflow-x: auto; padding: 10px; position: relative; top: 0; } 
+            .nav-btn { white-space: nowrap; width: auto; padding: 10px 15px; } 
+            .form-grid { grid-template-columns: 1fr; } 
+            .save-bar { width: calc(100% - 32px); bottom: 16px; padding: 12px; border-radius: 20px; } 
+            .save-btn { width: 100%; justify-content: center; } 
+        }
     </style></head><body>
     <header class="topbar">
         <div class="brand"><img src="/logo.gif" onerror="this.style.display='none';"> PXKK Dashboard</div>
