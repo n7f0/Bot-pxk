@@ -48,7 +48,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use(session({ secret: process.env.PANEL_SECRET || 'secret', resave: false, saveUninitialized: false, cookie: { secure: false, maxAge: 1000 * 60 * 60 * 24 } }));
 app.use(flash());
 
-// Cache de canais do Discord
 let discordCache = { time: 0, data: { ch: [], vc: [], cat: [], role: [] } };
 async function getDiscordData(guildId) {
     if (!guildId || !process.env.DISCORD_TOKEN) return discordCache.data;
@@ -73,7 +72,7 @@ async function getDiscordData(guildId) {
     } catch (e) { return discordCache.data; }
 }
 
-// CSS GLOBAL
+// CSS GLOBAL E COMPONENTES FIXOS (TOPO E RODAPÉ)
 const GLOBAL_CSS = `
     @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap');
     :root { --purple: #8A4FFF; --purple-hi: #A370FF; --black: #040404; --white: #fff; --gray-hi: #B8B8C2; --gray-mid: #7A7A88; --border: rgba(255,255,255,0.08); --border-hi: rgba(138,79,255,0.35); }
@@ -83,6 +82,7 @@ const GLOBAL_CSS = `
                     radial-gradient(circle at 85% 90%, rgba(138,79,255,0.1) 0%, transparent 50%), 
                     var(--black);
         color: var(--white); font-family: 'Inter', sans-serif; min-height: 100vh; overflow-x: hidden; 
+        display: flex; flex-direction: column;
     }
     body::before {
         content: ''; position: fixed; inset: 0;
@@ -92,6 +92,53 @@ const GLOBAL_CSS = `
         -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, #000 20%, transparent 90%);
         pointer-events: none; z-index: -1;
     }
+
+    /* TOPO (HEADER) */
+    .global-header {
+        width: 100%;
+        padding: 16px 40px;
+        display: flex;
+        align-items: center;
+        background: rgba(10,10,10,0.6);
+        backdrop-filter: blur(24px);
+        border-bottom: 1px solid var(--border);
+        z-index: 100;
+    }
+    .header-brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .square-logo {
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
+        border: 1px solid var(--border-hi);
+        object-fit: cover;
+        box-shadow: 0 0 15px rgba(138,79,255,0.2);
+    }
+    .header-brand span {
+        font-family: 'Archivo Black', sans-serif;
+        font-size: 22px;
+        letter-spacing: -0.03em;
+        color: var(--white);
+        text-transform: uppercase;
+    }
+
+    /* RODAPÉ (FOOTER) */
+    .global-footer {
+        width: 100%;
+        padding: 20px;
+        text-align: center;
+        font-size: 13px;
+        color: var(--gray-mid);
+        border-top: 1px solid var(--border);
+        margin-top: auto;
+        background: rgba(4,4,4,0.8);
+        backdrop-filter: blur(10px);
+        z-index: 10;
+    }
+    .global-footer b { color: var(--purple); }
 `;
 
 // ================= TELA DE LOGIN PREMIUM =================
@@ -102,158 +149,65 @@ app.get('/login', (req, res) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-        <title>PXKK — Dashboard</title>
+        <title>PXK — Dashboard</title>
         <style>
             ${GLOBAL_CSS}
+            
             .login-page { 
+                flex: 1; 
                 display: flex; 
-                min-height: 100vh; 
                 width: 100%; 
                 max-width: 1200px; 
                 margin: 0 auto; 
-                padding: 20px; 
+                padding: 40px 20px; 
                 align-items: center; 
                 justify-content: space-between;
                 gap: 40px;
             }
             
-            /* Esquerda - Texto */
             .hero { flex: 1; max-width: 600px; }
-            .hero h1 { 
-                font-family: 'Archivo Black', sans-serif; 
-                font-size: clamp(3rem, 6vw, 5rem); 
-                line-height: 0.95; 
-                text-transform: uppercase; 
-                margin-bottom: 20px; 
-                letter-spacing: -0.03em;
-            }
+            .hero h1 { font-family: 'Archivo Black', sans-serif; font-size: clamp(3rem, 6vw, 5rem); line-height: 0.95; text-transform: uppercase; margin-bottom: 20px; letter-spacing: -0.03em; }
             .hero h1 span { color: var(--purple); text-shadow: 0 0 40px rgba(138,79,255,0.4); }
-            .hero p { 
-                color: var(--gray-hi); 
-                font-size: clamp(1rem, 1.2vw, 1.2rem); 
-                line-height: 1.6; 
-                max-width: 450px; 
-            }
+            .hero p { color: var(--gray-hi); font-size: clamp(1rem, 1.2vw, 1.2rem); line-height: 1.6; max-width: 450px; }
             
-            /* Direita - Card */
-            .login-panel { 
-                width: 100%; 
-                max-width: 440px; 
-                flex-shrink: 0;
-            }
-            .login-card { 
-                background: rgba(10,10,10,0.6); 
-                border: 1px solid rgba(255,255,255,0.1); 
-                border-top: 1px solid var(--border-hi); 
-                backdrop-filter: blur(24px); 
-                padding: 48px; 
-                border-radius: 32px; 
-                box-shadow: 0 20px 40px rgba(0,0,0,0.4); 
-                text-align: center;
-            }
+            .login-panel { width: 100%; max-width: 440px; flex-shrink: 0; }
+            .login-card { background: rgba(10,10,10,0.6); border: 1px solid rgba(255,255,255,0.1); border-top: 1px solid var(--border-hi); backdrop-filter: blur(24px); padding: 48px; border-radius: 32px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); text-align: center; }
             
-            .mini-tag { 
-                display: inline-block; 
-                font-size: 10px; 
-                font-weight: 800; 
-                background: rgba(138,79,255,0.15); 
-                border: 1px solid rgba(138,79,255,0.3); 
-                padding: 6px 14px; 
-                border-radius: 99px; 
-                letter-spacing: 0.2em; 
-                text-transform: uppercase; 
-                margin-bottom: 20px; 
-                color: var(--purple-hi);
-            }
-            .login-card h2 { 
-                font-family: 'Archivo Black', sans-serif; 
-                font-size: 32px; 
-                text-transform: uppercase; 
-                line-height: 1.1; 
-                margin-bottom: 12px; 
-            }
-            .login-card p { 
-                color: var(--gray-hi); 
-                font-size: 14px; 
-                margin-bottom: 30px; 
-                line-height: 1.5;
-            }
+            .mini-tag { display: inline-block; font-size: 10px; font-weight: 800; background: rgba(138,79,255,0.15); border: 1px solid rgba(138,79,255,0.3); padding: 6px 14px; border-radius: 99px; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 20px; color: var(--purple-hi); }
+            .login-card h2 { font-family: 'Archivo Black', sans-serif; font-size: 32px; text-transform: uppercase; line-height: 1.1; margin-bottom: 12px; }
+            .login-card p { color: var(--gray-hi); font-size: 14px; margin-bottom: 30px; line-height: 1.5; }
             
-            .btn-discord { 
-                display: flex; 
-                align-items: center; 
-                justify-content: space-between; 
-                width: 100%; 
-                padding: 18px 28px; 
-                background: linear-gradient(135deg, var(--purple), #6B2EE0); 
-                color: #fff; 
-                text-decoration: none; 
-                border-radius: 99px; 
-                font-weight: 700; 
-                font-size: 15px;
-                transition: all 0.25s ease; 
-                box-shadow: 0 10px 20px rgba(138,79,255,0.3); 
-                border: 1px solid rgba(255,255,255,0.15);
-            }
-            .btn-discord:hover { 
-                transform: translateY(-2px); 
-                background: linear-gradient(135deg, #A370FF, var(--purple)); 
-                box-shadow: 0 15px 30px rgba(138,79,255,0.5); 
-            }
+            .btn-discord { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 18px 28px; background: linear-gradient(135deg, var(--purple), #6B2EE0); color: #fff; text-decoration: none; border-radius: 99px; font-weight: 700; font-size: 15px; transition: all 0.25s ease; box-shadow: 0 10px 20px rgba(138,79,255,0.3); border: 1px solid rgba(255,255,255,0.15); }
+            .btn-discord:hover { transform: translateY(-2px); background: linear-gradient(135deg, #A370FF, var(--purple)); box-shadow: 0 15px 30px rgba(138,79,255,0.5); }
             .btn-discord .left { display: flex; align-items: center; gap: 12px; }
             .btn-discord .arrow { transition: transform 0.2s; }
             .btn-discord:hover .arrow { transform: translateX(4px); }
             
-            .login-footer { 
-                margin-top: 32px; 
-                padding-top: 24px; 
-                border-top: 1px solid rgba(255,255,255,0.05); 
-                display: flex; 
-                justify-content: space-between; 
-                align-items: center;
-            }
-            .status-pill { 
-                display: flex; 
-                align-items: center; 
-                gap: 8px; 
-                font-size: 10px; 
-                font-weight: 700; 
-                color: #4ade80; 
-                letter-spacing: 0.08em; 
-                text-transform: uppercase; 
-            }
-            .status-dot { 
-                width: 6px; 
-                height: 6px; 
-                background: #4ade80; 
-                border-radius: 50%; 
-                box-shadow: 0 0 10px #4ade80; 
-                animation: pulse 2s infinite; 
-            }
+            .login-footer { margin-top: 32px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; }
+            .status-pill { display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 700; color: #4ade80; letter-spacing: 0.08em; text-transform: uppercase; }
+            .status-dot { width: 6px; height: 6px; background: #4ade80; border-radius: 50%; box-shadow: 0 0 10px #4ade80; animation: pulse 2s infinite; }
             @keyframes pulse { 0% { transform: scale(0.95); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.7; } 100% { transform: scale(0.95); opacity: 1; } }
-            .secure-pill { 
-                display: flex; 
-                align-items: center; 
-                gap: 6px; 
-                font-size: 10px; 
-                font-weight: 700; 
-                color: var(--gray-mid); 
-                text-transform: uppercase; 
-            }
+            .secure-pill { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 700; color: var(--gray-mid); text-transform: uppercase; }
 
-            /* Responsivo (Mobile) */
             @media (max-width: 968px) {
-                .login-page { flex-direction: column; justify-content: center; padding: 40px 24px; gap: 40px; }
+                .global-header { padding: 16px 20px; justify-content: center; }
+                .login-page { flex-direction: column; justify-content: center; padding: 30px 20px; gap: 30px; }
                 .hero { text-align: center; max-width: 100%; }
                 .hero h1 { font-size: clamp(2.5rem, 8vw, 3.5rem); margin-bottom: 16px; }
                 .hero p { margin: 0 auto; font-size: 15px; }
                 .login-card { padding: 40px 28px; }
                 .login-card h2 { font-size: 28px; }
-                .login-footer { flex-direction: row; justify-content: center; gap: 24px; }
             }
         </style>
     </head>
     <body>
+        <header class="global-header">
+            <div class="header-brand">
+                <img src="/logo.gif" alt="Logo" class="square-logo" onerror="this.style.display='none'">
+                <span>PXK</span>
+            </div>
+        </header>
+
         <main class="login-page">
             <section class="hero">
                 <h1>Gerencie seu<br>servidor com<br><span>precisão total.</span></h1>
@@ -284,6 +238,10 @@ app.get('/login', (req, res) => {
                 </div>
             </section>
         </main>
+
+        <footer class="global-footer">
+            &copy; 2026 <b>PXK</b> - Todos os direitos reservados.
+        </footer>
     </body>
     </html>`);
 });
@@ -304,7 +262,6 @@ app.get('/callback', async (req, res) => {
         const token = await axios.post('https://discord.com/api/oauth2/token', new URLSearchParams({ client_id: process.env.DISCORD_CLIENT_ID, client_secret: process.env.DISCORD_CLIENT_SECRET, grant_type: 'authorization_code', code: req.query.code, redirect_uri: `${process.env.BASE_URL}/callback` }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
         const user = await axios.get('https://discord.com/api/users/@me', { headers: { Authorization: `Bearer ${token.data.access_token}` } });
         
-        // CORREÇÃO AQUI: Verifica OWNER_IDS e DEV_IDS
         const owners = (process.env.OWNER_IDS || '').split(',').map(i=>i.trim()).filter(i=>i);
         const devs = (process.env.DEV_IDS || '').split(',').map(i=>i.trim()).filter(i=>i);
         
@@ -359,18 +316,19 @@ app.get('/', requireAuth, async (req, res) => {
     };
 
     res.send(`
-    <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Dashboard - PXKK</title>
+    <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Dashboard - PXK</title>
     <style>
         ${GLOBAL_CSS}
-        body { display: flex; flex-direction: column; padding: 16px; padding-bottom: 100px; }
+        
+        .dashboard-container { flex: 1; display: flex; flex-direction: column; padding: 24px; padding-bottom: 100px; width: 100%; max-width: 1400px; margin: 0 auto; }
         .topbar { display: flex; justify-content: space-between; align-items: center; background: rgba(10,10,10,0.6); backdrop-filter: blur(24px); padding: 15px 30px; border-radius: 99px; border: 1px solid var(--border); margin-bottom: 24px; }
         .brand { display: flex; align-items: center; gap: 15px; font-family: 'Archivo Black'; font-size: 20px; }
-        .brand img { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border-hi); }
+        .brand img { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--border-hi); object-fit: cover; }
         .user-info { display: flex; align-items: center; gap: 15px; font-size: 14px; font-weight: 600; }
         .user-info img { width: 35px; height: 35px; border-radius: 50%; border: 1px solid var(--border-hi); }
         .user-info a { color: #f87171; text-decoration: none; }
         .layout { display: flex; gap: 24px; flex: 1; }
-        .sidebar { width: 260px; background: rgba(10,10,10,0.6); backdrop-filter: blur(20px); border: 1px solid var(--border); border-radius: 32px; padding: 20px; display: flex; flex-direction: column; gap: 8px; height: calc(100vh - 120px); overflow-y: auto; position: sticky; top: 16px; }
+        .sidebar { width: 260px; background: rgba(10,10,10,0.6); backdrop-filter: blur(20px); border: 1px solid var(--border); border-radius: 32px; padding: 20px; display: flex; flex-direction: column; gap: 8px; height: calc(100vh - 200px); overflow-y: auto; position: sticky; top: 24px; }
         .nav-btn { display: flex; align-items: center; gap: 12px; padding: 14px 20px; color: var(--gray-hi); font-size: 14px; font-weight: 500; border-radius: 99px; cursor: pointer; transition: 0.2s; border: 1px solid transparent; background: transparent; text-align: left; width: 100%; }
         .nav-btn:hover { background: rgba(255,255,255,0.04); color: var(--white); }
         .nav-btn.active { background: linear-gradient(90deg, rgba(138,79,255,0.15), rgba(138,79,255,0.05)); color: var(--white); font-weight: 600; border-color: rgba(138,79,255,0.3); }
@@ -405,41 +363,66 @@ app.get('/', requireAuth, async (req, res) => {
         .save-bar { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgba(15,15,15,0.95); backdrop-filter: blur(20px); border: 1px solid var(--border-hi); padding: 16px 32px; border-radius: 99px; display: flex; justify-content: space-between; align-items: center; gap: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); z-index: 100; }
         .save-btn { background: var(--purple); color: #fff; padding: 16px 36px; border: none; border-radius: 99px; font-weight: 800; font-size: 14px; text-transform: uppercase; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 10px; }
         .save-btn:hover { background: var(--purple-hi); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(138,79,255,0.5); }
-        @media(max-width: 900px) { body { padding-bottom: 120px; } .layout { flex-direction: column; } .sidebar { width: 100%; height: auto; flex-direction: row; overflow-x: auto; padding: 10px; position: relative; top: 0; } .nav-btn { white-space: nowrap; width: auto; padding: 10px 15px; } .form-grid { grid-template-columns: 1fr; } .save-bar { width: calc(100% - 32px); bottom: 16px; padding: 12px; border-radius: 20px; } .save-btn { width: 100%; justify-content: center; } }
+        
+        @media(max-width: 900px) { 
+            .dashboard-container { padding: 16px; padding-bottom: 120px; }
+            .layout { flex-direction: column; } 
+            .sidebar { width: 100%; height: auto; flex-direction: row; overflow-x: auto; padding: 10px; position: relative; top: 0; } 
+            .nav-btn { white-space: nowrap; width: auto; padding: 10px 15px; } 
+            .form-grid { grid-template-columns: 1fr; } 
+            .save-bar { width: calc(100% - 32px); bottom: 16px; padding: 12px; border-radius: 20px; } 
+            .save-btn { width: 100%; justify-content: center; } 
+        }
     </style></head><body>
-    <header class="topbar">
-        <div class="brand"><img src="/logo.gif" onerror="this.style.display='none';"> PXKK Dashboard</div>
-        <div class="user-info"><img src="https://cdn.discordapp.com/avatars/${req.session.user.id}/${req.session.user.avatar}.png"> ${req.session.user.username} <a href="/logout">Sair</a> | <a href="/chat" style="color:var(--purple)">Chat ao Vivo</a></div>
+    <header class="global-header">
+        <div class="header-brand">
+            <img src="/logo.gif" alt="Logo" class="square-logo" onerror="this.style.display='none'">
+            <span>PXK</span>
+        </div>
     </header>
-    <div class="layout">
-        <aside class="sidebar">
-            <button class="nav-btn active" data-target="s0">🎨 Identidade</button>
-            <button class="nav-btn" data-target="s1">🌈 Cores</button>
-            <button class="nav-btn" data-target="s2">✅ Verificação</button>
-            <button class="nav-btn" data-target="s3">🎫 Tickets</button>
-            <button class="nav-btn" data-target="s4">🏆 Níveis</button>
-            <button class="nav-btn" data-target="s5">👋 Boas-vindas</button>
-            <button class="nav-btn" data-target="s6">👮 Staff</button>
-            <button class="nav-btn" data-target="s7">💎 VIP</button>
-            <button class="nav-btn" data-target="s8">🔊 Voz e Status</button>
-            <button class="nav-btn" data-target="s9">🛡️ Filtros & AntiBot</button>
-        </aside>
-        <main class="content">
-            <form method="POST" id="cfgForm">
-                <section id="s0" class="section active"><div class="section-head"><h2>Identidade Visual</h2><p>Personalize a marca do seu bot.</p></div><div class="form-grid">${renderField('brand_name', 'Nome da Marca', 'text')}${renderField('brand_emoji', 'Emoji da Marca', 'text')}${renderField('brand_footer', 'Rodapé', 'text')}${renderField('avatar_url', 'URL do Avatar', 'text')}${renderField('banner_painel_url', 'URL do Banner do Painel', 'text')}${renderField('banner_ticket_url', 'URL do Banner de Tickets', 'text')}</div></section>
-                <section id="s1" class="section"><div class="section-head"><h2>Cores dos Painéis</h2><p>Defina as cores hexadecimais.</p></div><div class="form-grid">${renderField('brand_color_primary', 'Cor Primária', 'color')}${renderField('brand_color_secondary', 'Cor Secundária', 'color')}${renderField('brand_color_success', 'Sucesso', 'color')}${renderField('brand_color_danger', 'Perigo', 'color')}</div></section>
-                <section id="s2" class="section"><div class="section-head"><h2>Verificação</h2><p>Configure o captcha de entrada.</p></div><div class="form-grid">${renderField('verification_enabled', 'Ativar Sistema de Verificação', 'bool')}${renderField('verified_role_ids', 'Cargos de Verificado', 'role')}${renderField('verification_channel_id', 'Canal de Verificação', 'ch')}${renderField('verification_panel_channel_id', 'Canal do Painel', 'ch')}${renderField('verification_log_channel_id', 'Canal de Log', 'ch')}</div></section>
-                <section id="s3" class="section"><div class="section-head"><h2>Tickets</h2><p>Configure as categorias de atendimento.</p></div><div class="form-grid">${renderField('ticket_panel_channel_id', 'Canal do Painel de Tickets', 'ch')}${renderField('ticket_logs_channel_id', 'Canal de Logs', 'ch')}${renderField('ticket_category_movcall_id', 'Categoria MOV CALL', 'cat')}${renderField('ticket_category_movchat_id', 'Categoria MOV CHAT', 'cat')}${renderField('ticket_category_recrute_id', 'Categoria RECRUTE-S', 'cat')}${renderField('ticket_category_support_id', 'Categoria SUPORTE', 'cat')}${renderField('ticket_category_others_id', 'Categoria OUTROS', 'cat')}${renderField('ticket_support_role_ids', 'Cargos de Staff', 'role')}</div></section>
-                <section id="s4" class="section"><div class="section-head"><h2>Níveis (MEE6)</h2><p>Sistema de XP e recompensas.</p></div><div class="form-grid">${renderField('levels_enabled', 'Ativar Sistema', 'bool')}${renderField('levels_xp_per_message', 'XP por Mensagem', 'num')}${renderField('levels_xp_cooldown_seconds', 'Cooldown (Segundos)', 'num')}${renderField('levels_announce_channel_id', 'Canal de Anúncio', 'ch')}${renderField('levels_message_up', 'Mensagem de Level Up', 'area')}</div></section>
-                <section id="s5" class="section"><div class="section-head"><h2>Boas-vindas</h2><p>Mensagens de entrada e saída.</p></div><div class="form-grid">${renderField('welcome_channel_id', 'Canal de Entrada', 'ch')}${renderField('welcome_message', 'Mensagem de Entrada', 'area')}${renderField('leave_channel_id', 'Canal de Saída', 'ch')}${renderField('leave_message', 'Mensagem de Saída', 'area')}${renderField('auto_role_id', 'Cargo Automático', 'role_single')}</div></section>
-                <section id="s6" class="section"><div class="section-head"><h2>Staff</h2><p>Metas e monitoramento da equipe.</p></div><div class="form-grid">${renderField('staff_role_ids', 'Cargos de Staff', 'role')}${renderField('staff_movchat_goal', 'Meta de Mensagens', 'num')}${renderField('staff_call_goal_hours', 'Meta de Horas em Call', 'num')}</div></section>
-                <section id="s7" class="section"><div class="section-head"><h2>VIP</h2><p>Sistema de vantagens.</p></div><div class="form-grid">${renderField('vip_enabled', 'Ativar VIP', 'bool')}${renderField('vip_role_base_id', 'Cargo Base VIP', 'role_single')}${renderField('vip_max_members', 'Limite de Membros', 'num')}</div></section>
-                <section id="s8" class="section"><div class="section-head"><h2>Voz e Status</h2><p>Presença do bot e logs de call.</p></div><div class="form-grid">${renderField('voice_channel_id', 'Canal de Voz 24h', 'vc')}${renderField('voice_join_log_channel_id', 'Log de Entrada (Call)', 'ch')}${renderField('voice_leave_log_channel_id', 'Log de Saída (Call)', 'ch')}${renderField('bot_status', 'Status', 'text')}</div></section>
-                <section id="s9" class="section"><div class="section-head"><h2>Filtros & AntiBot</h2><p>Proteção do servidor.</p></div><div class="form-grid">${renderField('filters_enabled', 'Ativar Filtros', 'bool')}${renderField('antibot_punish_ban', 'AntiBot: Banir', 'bool')}${renderField('antibot_channel_id', 'Canal Armadilha (AntiBot)', 'ch')}${renderField('filters_log_channel_id', 'Canal de Log de Filtro', 'ch')}</div></section>
-            </form>
-        </main>
+
+    <div class="dashboard-container">
+        <div class="topbar">
+            <div class="brand">Painel de Controle</div>
+            <div class="user-info"><img src="https://cdn.discordapp.com/avatars/${req.session.user.id}/${req.session.user.avatar}.png"> ${req.session.user.username} <a href="/logout">Sair</a> | <a href="/chat" style="color:var(--purple)">Chat ao Vivo</a></div>
+        </div>
+
+        <div class="layout">
+            <aside class="sidebar">
+                <button class="nav-btn active" data-target="s0">🎨 Identidade</button>
+                <button class="nav-btn" data-target="s1">🌈 Cores</button>
+                <button class="nav-btn" data-target="s2">✅ Verificação</button>
+                <button class="nav-btn" data-target="s3">🎫 Tickets</button>
+                <button class="nav-btn" data-target="s4">🏆 Níveis</button>
+                <button class="nav-btn" data-target="s5">👋 Boas-vindas</button>
+                <button class="nav-btn" data-target="s6">👮 Staff</button>
+                <button class="nav-btn" data-target="s7">💎 VIP</button>
+                <button class="nav-btn" data-target="s8">🔊 Voz e Status</button>
+                <button class="nav-btn" data-target="s9">🛡️ Filtros & AntiBot</button>
+            </aside>
+            <main class="content">
+                <form method="POST" id="cfgForm">
+                    <section id="s0" class="section active"><div class="section-head"><h2>Identidade Visual</h2><p>Personalize a marca do seu bot.</p></div><div class="form-grid">${renderField('brand_name', 'Nome da Marca', 'text')}${renderField('brand_emoji', 'Emoji da Marca', 'text')}${renderField('brand_footer', 'Rodapé', 'text')}${renderField('avatar_url', 'URL do Avatar', 'text')}${renderField('banner_painel_url', 'URL do Banner do Painel', 'text')}${renderField('banner_ticket_url', 'URL do Banner de Tickets', 'text')}</div></section>
+                    <section id="s1" class="section"><div class="section-head"><h2>Cores dos Painéis</h2><p>Defina as cores hexadecimais.</p></div><div class="form-grid">${renderField('brand_color_primary', 'Cor Primária', 'color')}${renderField('brand_color_secondary', 'Cor Secundária', 'color')}${renderField('brand_color_success', 'Sucesso', 'color')}${renderField('brand_color_danger', 'Perigo', 'color')}</div></section>
+                    <section id="s2" class="section"><div class="section-head"><h2>Verificação</h2><p>Configure o captcha de entrada.</p></div><div class="form-grid">${renderField('verification_enabled', 'Ativar Sistema de Verificação', 'bool')}${renderField('verified_role_ids', 'Cargos de Verificado', 'role')}${renderField('verification_channel_id', 'Canal de Verificação', 'ch')}${renderField('verification_panel_channel_id', 'Canal do Painel', 'ch')}${renderField('verification_log_channel_id', 'Canal de Log', 'ch')}</div></section>
+                    <section id="s3" class="section"><div class="section-head"><h2>Tickets</h2><p>Configure as categorias de atendimento.</p></div><div class="form-grid">${renderField('ticket_panel_channel_id', 'Canal do Painel de Tickets', 'ch')}${renderField('ticket_logs_channel_id', 'Canal de Logs', 'ch')}${renderField('ticket_category_movcall_id', 'Categoria MOV CALL', 'cat')}${renderField('ticket_category_movchat_id', 'Categoria MOV CHAT', 'cat')}${renderField('ticket_category_recrute_id', 'Categoria RECRUTE-S', 'cat')}${renderField('ticket_category_support_id', 'Categoria SUPORTE', 'cat')}${renderField('ticket_category_others_id', 'Categoria OUTROS', 'cat')}${renderField('ticket_support_role_ids', 'Cargos de Staff', 'role')}</div></section>
+                    <section id="s4" class="section"><div class="section-head"><h2>Níveis (MEE6)</h2><p>Sistema de XP e recompensas.</p></div><div class="form-grid">${renderField('levels_enabled', 'Ativar Sistema', 'bool')}${renderField('levels_xp_per_message', 'XP por Mensagem', 'num')}${renderField('levels_xp_cooldown_seconds', 'Cooldown (Segundos)', 'num')}${renderField('levels_announce_channel_id', 'Canal de Anúncio', 'ch')}${renderField('levels_message_up', 'Mensagem de Level Up', 'area')}</div></section>
+                    <section id="s5" class="section"><div class="section-head"><h2>Boas-vindas</h2><p>Mensagens de entrada e saída.</p></div><div class="form-grid">${renderField('welcome_channel_id', 'Canal de Entrada', 'ch')}${renderField('welcome_message', 'Mensagem de Entrada', 'area')}${renderField('leave_channel_id', 'Canal de Saída', 'ch')}${renderField('leave_message', 'Mensagem de Saída', 'area')}${renderField('auto_role_id', 'Cargo Automático', 'role_single')}</div></section>
+                    <section id="s6" class="section"><div class="section-head"><h2>Staff</h2><p>Metas e monitoramento da equipe.</p></div><div class="form-grid">${renderField('staff_role_ids', 'Cargos de Staff', 'role')}${renderField('staff_movchat_goal', 'Meta de Mensagens', 'num')}${renderField('staff_call_goal_hours', 'Meta de Horas em Call', 'num')}</div></section>
+                    <section id="s7" class="section"><div class="section-head"><h2>VIP</h2><p>Sistema de vantagens.</p></div><div class="form-grid">${renderField('vip_enabled', 'Ativar VIP', 'bool')}${renderField('vip_role_base_id', 'Cargo Base VIP', 'role_single')}${renderField('vip_max_members', 'Limite de Membros', 'num')}</div></section>
+                    <section id="s8" class="section"><div class="section-head"><h2>Voz e Status</h2><p>Presença do bot e logs de call.</p></div><div class="form-grid">${renderField('voice_channel_id', 'Canal de Voz 24h', 'vc')}${renderField('voice_join_log_channel_id', 'Log de Entrada (Call)', 'ch')}${renderField('voice_leave_log_channel_id', 'Log de Saída (Call)', 'ch')}${renderField('bot_status', 'Status', 'text')}</div></section>
+                    <section id="s9" class="section"><div class="section-head"><h2>Filtros & AntiBot</h2><p>Proteção do servidor.</p></div><div class="form-grid">${renderField('filters_enabled', 'Ativar Filtros', 'bool')}${renderField('antibot_punish_ban', 'AntiBot: Banir', 'bool')}${renderField('antibot_channel_id', 'Canal Armadilha (AntiBot)', 'ch')}${renderField('filters_log_channel_id', 'Canal de Log de Filtro', 'ch')}</div></section>
+                </form>
+            </main>
+        </div>
     </div>
+    
     <div class="save-bar"><span style="font-size: 13px; color: var(--gray-mid); font-weight: 500;">Salvo em tempo real.</span><button type="submit" form="cfgForm" class="save-btn">Salvar Alterações</button></div>
+
+    <footer class="global-footer">
+        &copy; 2026 <b>PXK</b> - Todos os direitos reservados.
+    </footer>
+
     <script>
         document.querySelectorAll('.nav-btn').forEach(btn => { btn.addEventListener('click', () => { document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.section').forEach(s => s.classList.remove('active')); btn.classList.add('active'); document.getElementById(btn.dataset.target).classList.add('active'); }); });
         document.querySelectorAll('input[type="color"]').forEach(input => { input.addEventListener('input', (e) => { e.target.nextElementSibling.innerText = e.target.value.toUpperCase(); }); });
@@ -463,10 +446,11 @@ app.post('/', requireAuth, (req, res) => {
 // ================= CHAT EM TEMPO REAL =================
 app.get('/chat', requireAuth, (req, res) => {
     res.send(`
-    <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Live Chat - PXKK</title>
+    <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Live Chat - PXK</title>
     <style>
         ${GLOBAL_CSS}
-        body { display: flex; flex-direction: column; padding: 20px; height: 100vh; }
+        body { height: 100vh; overflow: hidden; }
+        .chat-container { flex: 1; display: flex; flex-direction: column; padding: 20px; max-width: 1200px; margin: 0 auto; width: 100%; overflow: hidden; }
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 15px; margin-bottom: 20px; z-index: 1; }
         .header h1 { margin: 0; font-size: 24px; font-family: 'Archivo Black'; color: var(--purple); }
         .header a { color: #f87171; text-decoration: none; font-weight: bold; }
@@ -482,11 +466,25 @@ app.get('/chat', requireAuth, (req, res) => {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--purple); border-radius: 4px; }
     </style></head><body>
-        <div class="header">
-            <h1>📺 Live Chat do Servidor</h1>
-            <a href="/">Voltar ao Painel</a>
+        <header class="global-header">
+            <div class="header-brand">
+                <img src="/logo.gif" alt="Logo" class="square-logo" onerror="this.style.display='none'">
+                <span>PXK</span>
+            </div>
+        </header>
+
+        <div class="chat-container">
+            <div class="header">
+                <h1>📺 Live Chat do Servidor</h1>
+                <a href="/">Voltar ao Painel</a>
+            </div>
+            <div id="chat-box"></div>
         </div>
-        <div id="chat-box"></div>
+
+        <footer class="global-footer">
+            &copy; 2026 <b>PXK</b> - Todos os direitos reservados.
+        </footer>
+
         <script src="/socket.io/socket.io.js"></script>
         <script>
             const socket = io();
