@@ -37,8 +37,7 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared
     restart: unless-stopped
-    # CORREÇÃO DO CLOUDFLARE: O token agora é passado explicitamente no comando
-    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate run
     network_mode: "host"
     environment:
       - TUNNEL_TOKEN=${TUNNEL_TOKEN}
