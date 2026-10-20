@@ -48,7 +48,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(session({ secret: process.env.PANEL_SECRET || 'secret', resave: false, saveUninitialized: false, cookie: { secure: false, maxAge: 1000 * 60 * 60 * 24 } }));
 app.use(flash());
 
-// Cache para não floodar a API do Discord
+// Cache de canais do Discord
 let discordCache = { time: 0, data: { ch: [], vc: [], cat: [], role: [] } };
 async function getDiscordData(guildId) {
     if (!guildId || !process.env.DISCORD_TOKEN) return discordCache.data;
@@ -73,14 +73,14 @@ async function getDiscordData(guildId) {
     } catch (e) { return discordCache.data; }
 }
 
-// CSS GLOBAL (Fundo degradê + grade em todas as telas)
+// CSS GLOBAL
 const GLOBAL_CSS = `
     @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap');
     :root { --purple: #8A4FFF; --purple-hi: #A370FF; --black: #040404; --white: #fff; --gray-hi: #B8B8C2; --gray-mid: #7A7A88; --border: rgba(255,255,255,0.08); --border-hi: rgba(138,79,255,0.35); }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { 
-        background: radial-gradient(circle at 15% 10%, rgba(138,79,255,0.15) 0%, transparent 50%), 
-                    radial-gradient(circle at 85% 90%, rgba(138,79,255,0.08) 0%, transparent 50%), 
+        background: radial-gradient(circle at 15% 10%, rgba(138,79,255,0.2) 0%, transparent 50%), 
+                    radial-gradient(circle at 85% 90%, rgba(138,79,255,0.1) 0%, transparent 50%), 
                     var(--black);
         color: var(--white); font-family: 'Inter', sans-serif; min-height: 100vh; overflow-x: hidden; 
     }
@@ -94,38 +94,198 @@ const GLOBAL_CSS = `
     }
 `;
 
-// ================= TELA DE LOGIN =================
+// ================= TELA DE LOGIN PREMIUM =================
 app.get('/login', (req, res) => {
     res.send(`
-    <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Login - PXKK</title>
-    <style>
-        ${GLOBAL_CSS}
-        .container { display: flex; max-width: 1000px; width: 100%; padding: 20px; gap: 40px; align-items: center; flex-wrap: wrap; min-height: 100vh; margin: 0 auto; }
-        .hero { flex: 1; min-width: 300px; }
-        .hero h1 { font-family: 'Archivo Black', sans-serif; font-size: clamp(32px, 5vw, 64px); line-height: 1; text-transform: uppercase; margin-bottom: 20px; }
-        .hero h1 span { color: var(--purple); text-shadow: 0 0 40px rgba(138,79,255,0.4); }
-        .hero p { color: var(--gray-hi); font-size: 16px; line-height: 1.6; }
-        .card { background: rgba(10,10,10,0.6); border: 1px solid rgba(255,255,255,0.1); border-top: 1px solid var(--purple); backdrop-filter: blur(24px); padding: 50px; border-radius: 32px; width: 100%; max-width: 400px; text-align: center; }
-        .card h2 { font-family: 'Archivo Black', sans-serif; font-size: 28px; margin-bottom: 10px; text-transform: uppercase; }
-        .card p { color: var(--gray-hi); margin-bottom: 30px; font-size: 14px; }
-        .btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 18px; background: linear-gradient(135deg, var(--purple), #6B2EE0); color: #fff; text-decoration: none; border-radius: 99px; font-weight: 700; transition: 0.2s; }
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(138,79,255,0.4); }
-        
-        /* Responsivo: Mantém o texto em cima no celular */
-        @media(max-width: 768px) { 
-            .container { flex-direction: column; justify-content: center; text-align: center; padding-top: 40px; padding-bottom: 40px; } 
-            .hero h1 { font-size: clamp(28px, 8vw, 48px); }
-            .hero p { font-size: 14px; margin-bottom: 20px; }
-            .card { padding: 40px 24px; }
-        }
-    </style></head><body>
-    <div class="container">
-        <div class="hero"><h1>Gerencie seu<br>servidor com<br><span>precisão total.</span></h1><p>Toda a configuração do seu bot em um painel único, seguro e intuitivo.</p></div>
-        <div class="card">
-            <h2>Bem-vindo</h2><p>Autentique-se com sua conta do Discord para acessar o painel.</p>
-            <a href="/auth" class="btn"><svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M20.3 4.4A19.7 19.7 0 0 0 15.4 3l-.3.5a14.7 14.7 0 0 1 4.3 2.2 15 15 0 0 0-12.8 0A14.6 14.6 0 0 1 10.9 3.5L10.6 3a19.7 19.7 0 0 0-4.9 1.4C2.6 8.6 1.9 12.7 2.3 16.7a19.8 19.8 0 0 0 6 3l.8-1.3a13 13 0 0 1-2-1l.5-.4a14 14 0 0 0 12.8 0l.5.4a13 13 0 0 1-2 1l.8 1.3a19.8 19.8 0 0 0 6-3c.5-4.6-.7-8.6-3.4-12.3ZM9 14.6c-1.2 0-2.2-1.1-2.2-2.4S7.8 9.8 9 9.8s2.2 1.1 2.2 2.4S10.2 14.6 9 14.6Zm6 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Z"/></svg> Entrar com Discord</a>
-        </div>
-    </div></body></html>`);
+    <!DOCTYPE html>
+    <html lang="pt-br">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+        <title>PXKK — Dashboard</title>
+        <style>
+            ${GLOBAL_CSS}
+            .login-page { 
+                display: flex; 
+                min-height: 100vh; 
+                width: 100%; 
+                max-width: 1200px; 
+                margin: 0 auto; 
+                padding: 20px; 
+                align-items: center; 
+                justify-content: space-between;
+                gap: 40px;
+            }
+            
+            /* Esquerda - Texto */
+            .hero { flex: 1; max-width: 600px; }
+            .hero h1 { 
+                font-family: 'Archivo Black', sans-serif; 
+                font-size: clamp(3rem, 6vw, 5rem); 
+                line-height: 0.95; 
+                text-transform: uppercase; 
+                margin-bottom: 20px; 
+                letter-spacing: -0.03em;
+            }
+            .hero h1 span { color: var(--purple); text-shadow: 0 0 40px rgba(138,79,255,0.4); }
+            .hero p { 
+                color: var(--gray-hi); 
+                font-size: clamp(1rem, 1.2vw, 1.2rem); 
+                line-height: 1.6; 
+                max-width: 450px; 
+            }
+            
+            /* Direita - Card */
+            .login-panel { 
+                width: 100%; 
+                max-width: 440px; 
+                flex-shrink: 0;
+            }
+            .login-card { 
+                background: rgba(10,10,10,0.6); 
+                border: 1px solid rgba(255,255,255,0.1); 
+                border-top: 1px solid var(--border-hi); 
+                backdrop-filter: blur(24px); 
+                padding: 48px; 
+                border-radius: 32px; 
+                box-shadow: 0 20px 40px rgba(0,0,0,0.4); 
+                text-align: center;
+            }
+            
+            .mini-tag { 
+                display: inline-block; 
+                font-size: 10px; 
+                font-weight: 800; 
+                background: rgba(138,79,255,0.15); 
+                border: 1px solid rgba(138,79,255,0.3); 
+                padding: 6px 14px; 
+                border-radius: 99px; 
+                letter-spacing: 0.2em; 
+                text-transform: uppercase; 
+                margin-bottom: 20px; 
+                color: var(--purple-hi);
+            }
+            .login-card h2 { 
+                font-family: 'Archivo Black', sans-serif; 
+                font-size: 32px; 
+                text-transform: uppercase; 
+                line-height: 1.1; 
+                margin-bottom: 12px; 
+            }
+            .login-card p { 
+                color: var(--gray-hi); 
+                font-size: 14px; 
+                margin-bottom: 30px; 
+                line-height: 1.5;
+            }
+            
+            .btn-discord { 
+                display: flex; 
+                align-items: center; 
+                justify-content: space-between; 
+                width: 100%; 
+                padding: 18px 28px; 
+                background: linear-gradient(135deg, var(--purple), #6B2EE0); 
+                color: #fff; 
+                text-decoration: none; 
+                border-radius: 99px; 
+                font-weight: 700; 
+                font-size: 15px;
+                transition: all 0.25s ease; 
+                box-shadow: 0 10px 20px rgba(138,79,255,0.3); 
+                border: 1px solid rgba(255,255,255,0.15);
+            }
+            .btn-discord:hover { 
+                transform: translateY(-2px); 
+                background: linear-gradient(135deg, #A370FF, var(--purple)); 
+                box-shadow: 0 15px 30px rgba(138,79,255,0.5); 
+            }
+            .btn-discord .left { display: flex; align-items: center; gap: 12px; }
+            .btn-discord .arrow { transition: transform 0.2s; }
+            .btn-discord:hover .arrow { transform: translateX(4px); }
+            
+            .login-footer { 
+                margin-top: 32px; 
+                padding-top: 24px; 
+                border-top: 1px solid rgba(255,255,255,0.05); 
+                display: flex; 
+                justify-content: space-between; 
+                align-items: center;
+            }
+            .status-pill { 
+                display: flex; 
+                align-items: center; 
+                gap: 8px; 
+                font-size: 10px; 
+                font-weight: 700; 
+                color: #4ade80; 
+                letter-spacing: 0.08em; 
+                text-transform: uppercase; 
+            }
+            .status-dot { 
+                width: 6px; 
+                height: 6px; 
+                background: #4ade80; 
+                border-radius: 50%; 
+                box-shadow: 0 0 10px #4ade80; 
+                animation: pulse 2s infinite; 
+            }
+            @keyframes pulse { 0% { transform: scale(0.95); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.7; } 100% { transform: scale(0.95); opacity: 1; } }
+            .secure-pill { 
+                display: flex; 
+                align-items: center; 
+                gap: 6px; 
+                font-size: 10px; 
+                font-weight: 700; 
+                color: var(--gray-mid); 
+                text-transform: uppercase; 
+            }
+
+            /* Responsivo (Mobile) */
+            @media (max-width: 968px) {
+                .login-page { flex-direction: column; justify-content: center; padding: 40px 24px; gap: 40px; }
+                .hero { text-align: center; max-width: 100%; }
+                .hero h1 { font-size: clamp(2.5rem, 8vw, 3.5rem); margin-bottom: 16px; }
+                .hero p { margin: 0 auto; font-size: 15px; }
+                .login-card { padding: 40px 28px; }
+                .login-card h2 { font-size: 28px; }
+                .login-footer { flex-direction: row; justify-content: center; gap: 24px; }
+            }
+        </style>
+    </head>
+    <body>
+        <main class="login-page">
+            <section class="hero">
+                <h1>Gerencie seu<br>servidor com<br><span>precisão total.</span></h1>
+                <p>Toda a configuração do seu bot em um painel único, seguro e intuitivo. Controle tickets, verificação, níveis e muito mais.</p>
+            </section>
+            
+            <section class="login-panel">
+                <div class="login-card">
+                    <span class="mini-tag">Autenticação</span>
+                    <h2>Bem-vindo<br>de volta</h2>
+                    <p>Autentique-se com sua conta do Discord para acessar o painel administrativo.</p>
+                    
+                    <a href="/auth" class="btn-discord">
+                        <span class="left">
+                            <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M20.3 4.4A19.7 19.7 0 0 0 15.4 3l-.3.5a14.7 14.7 0 0 1 4.3 2.2 15 15 0 0 0-12.8 0A14.6 14.6 0 0 1 10.9 3.5L10.6 3a19.7 19.7 0 0 0-4.9 1.4C2.6 8.6 1.9 12.7 2.3 16.7a19.8 19.8 0 0 0 6 3l.8-1.3a13 13 0 0 1-2-1l.5-.4a14 14 0 0 0 12.8 0l.5.4a13 13 0 0 1-2 1l.8 1.3a19.8 19.8 0 0 0 6-3c.5-4.6-.7-8.6-3.4-12.3ZM9 14.6c-1.2 0-2.2-1.1-2.2-2.4S7.8 9.8 9 9.8s2.2 1.1 2.2 2.4S10.2 14.6 9 14.6Zm6 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Z"/></svg>
+                            Entrar com Discord
+                        </span>
+                        <svg class="arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </a>
+                    
+                    <div class="login-footer">
+                        <div class="status-pill"><span class="status-dot"></span> Online</div>
+                        <div class="secure-pill">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                            Seguro
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </body>
+    </html>`);
 });
 
 // ================= OAUTH =================
@@ -138,25 +298,25 @@ app.get('/auth', (req, res) => {
 
 app.get('/callback', async (req, res) => {
     if (req.query.state !== req.session.oauth_state) {
-        console.log("Erro: State inválido.");
         return res.redirect('/login');
     }
     try {
         const token = await axios.post('https://discord.com/api/oauth2/token', new URLSearchParams({ client_id: process.env.DISCORD_CLIENT_ID, client_secret: process.env.DISCORD_CLIENT_SECRET, grant_type: 'authorization_code', code: req.query.code, redirect_uri: `${process.env.BASE_URL}/callback` }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
         const user = await axios.get('https://discord.com/api/users/@me', { headers: { Authorization: `Bearer ${token.data.access_token}` } });
         
+        // CORREÇÃO AQUI: Verifica OWNER_IDS e DEV_IDS
         const owners = (process.env.OWNER_IDS || '').split(',').map(i=>i.trim()).filter(i=>i);
+        const devs = (process.env.DEV_IDS || '').split(',').map(i=>i.trim()).filter(i=>i);
         
-        // Se o ID do usuário NÃO estiver na lista, mostra a tela de debug
-        if (!owners.includes(user.data.id)) {
-            console.log(`Acesso negado para ID: ${user.data.id}`);
+        if (!owners.includes(user.data.id) && !devs.includes(user.data.id)) {
             return res.status(403).send(`
                 <body style="background:#040404; color:#fff; font-family:sans-serif; display:grid; place-items:center; height:100vh; text-align:center; padding:20px;">
                     <div style="background:rgba(10,10,10,0.6); padding:40px; border-radius:24px; border:1px solid #f87171; max-width:500px;">
                         <h1 style="color:#f87171; margin-bottom:15px;">Acesso Negado 🚫</h1>
                         <p style="margin-bottom:10px;">O seu ID do Discord é:<br><b style="font-size:20px; color:#8A4FFF;">${user.data.id}</b></p>
-                        <p style="margin-bottom:20px;">Os IDs autorizados (OWNER_IDS) são:<br><b style="font-size:20px; color:#8A4FFF;">${owners.join(', ') || 'Nenhum configurado'}</b></p>
-                        <p style="color:#7A7A88; margin-bottom:20px; font-size:14px;">Copie o seu ID acima e cole na variável <b>OWNER_IDS</b> no Portainer.</p>
+                        <p style="margin-bottom:20px;">IDs autorizados (OWNER_IDS):<br><b style="font-size:16px; color:#8A4FFF;">${owners.join(', ') || 'Nenhum'}</b></p>
+                        <p style="margin-bottom:20px;">IDs autorizados (DEV_IDS):<br><b style="font-size:16px; color:#8A4FFF;">${devs.join(', ') || 'Nenhum'}</b></p>
+                        <p style="color:#7A7A88; margin-bottom:20px; font-size:14px;">Copie o seu ID acima e cole na variável respectiva no Portainer.</p>
                         <a href="/login" style="color:#8A4FFF; text-decoration:none; font-weight:bold; border:1px solid #8A4FFF; padding:10px 20px; border-radius:99px; display:inline-block;">Voltar ao Login</a>
                     </div>
                 </body>
@@ -166,7 +326,6 @@ app.get('/callback', async (req, res) => {
         req.session.user = user.data; 
         req.session.save(() => res.redirect('/'));
     } catch (e) { 
-        console.error("Erro na autenticação:", e.message);
         res.status(400).send("Falha na autenticação com o Discord."); 
     }
 });
