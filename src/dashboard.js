@@ -110,7 +110,14 @@ app.get('/login', (req, res) => {
         .card p { color: var(--gray-hi); margin-bottom: 30px; font-size: 14px; }
         .btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 18px; background: linear-gradient(135deg, var(--purple), #6B2EE0); color: #fff; text-decoration: none; border-radius: 99px; font-weight: 700; transition: 0.2s; }
         .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(138,79,255,0.4); }
-        @media(max-width: 768px) { .container { flex-direction: column; justify-content: center; text-align: center; } .hero { display: none; } }
+        
+        /* Responsivo: Mantém o texto em cima no celular */
+        @media(max-width: 768px) { 
+            .container { flex-direction: column; justify-content: center; text-align: center; padding-top: 40px; padding-bottom: 40px; } 
+            .hero h1 { font-size: clamp(28px, 8vw, 48px); }
+            .hero p { font-size: 14px; margin-bottom: 20px; }
+            .card { padding: 40px 24px; }
+        }
     </style></head><body>
     <div class="container">
         <div class="hero"><h1>Gerencie seu<br>servidor com<br><span>precisão total.</span></h1><p>Toda a configuração do seu bot em um painel único, seguro e intuitivo.</p></div>
@@ -130,15 +137,38 @@ app.get('/auth', (req, res) => {
 });
 
 app.get('/callback', async (req, res) => {
-    if (req.query.state !== req.session.oauth_state) return res.redirect('/login');
+    if (req.query.state !== req.session.oauth_state) {
+        console.log("Erro: State inválido.");
+        return res.redirect('/login');
+    }
     try {
         const token = await axios.post('https://discord.com/api/oauth2/token', new URLSearchParams({ client_id: process.env.DISCORD_CLIENT_ID, client_secret: process.env.DISCORD_CLIENT_SECRET, grant_type: 'authorization_code', code: req.query.code, redirect_uri: `${process.env.BASE_URL}/callback` }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
         const user = await axios.get('https://discord.com/api/users/@me', { headers: { Authorization: `Bearer ${token.data.access_token}` } });
+        
         const owners = (process.env.OWNER_IDS || '').split(',').map(i=>i.trim()).filter(i=>i);
-        if (!owners.includes(user.data.id)) return res.status(403).send("Acesso Negado.");
+        
+        // Se o ID do usuário NÃO estiver na lista, mostra a tela de debug
+        if (!owners.includes(user.data.id)) {
+            console.log(`Acesso negado para ID: ${user.data.id}`);
+            return res.status(403).send(`
+                <body style="background:#040404; color:#fff; font-family:sans-serif; display:grid; place-items:center; height:100vh; text-align:center; padding:20px;">
+                    <div style="background:rgba(10,10,10,0.6); padding:40px; border-radius:24px; border:1px solid #f87171; max-width:500px;">
+                        <h1 style="color:#f87171; margin-bottom:15px;">Acesso Negado 🚫</h1>
+                        <p style="margin-bottom:10px;">O seu ID do Discord é:<br><b style="font-size:20px; color:#8A4FFF;">${user.data.id}</b></p>
+                        <p style="margin-bottom:20px;">Os IDs autorizados (OWNER_IDS) são:<br><b style="font-size:20px; color:#8A4FFF;">${owners.join(', ') || 'Nenhum configurado'}</b></p>
+                        <p style="color:#7A7A88; margin-bottom:20px; font-size:14px;">Copie o seu ID acima e cole na variável <b>OWNER_IDS</b> no Portainer.</p>
+                        <a href="/login" style="color:#8A4FFF; text-decoration:none; font-weight:bold; border:1px solid #8A4FFF; padding:10px 20px; border-radius:99px; display:inline-block;">Voltar ao Login</a>
+                    </div>
+                </body>
+            `);
+        }
+
         req.session.user = user.data; 
         req.session.save(() => res.redirect('/'));
-    } catch (e) { res.status(400).send("Falha na autenticação."); }
+    } catch (e) { 
+        console.error("Erro na autenticação:", e.message);
+        res.status(400).send("Falha na autenticação com o Discord."); 
+    }
 });
 
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/login'); });
