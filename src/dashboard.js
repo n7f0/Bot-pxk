@@ -21,7 +21,11 @@ const DEFAULT_CONFIG = {
     ticket_panel_channel_id: "", ticket_logs_channel_id: "", ticket_category_movcall_id: "", ticket_category_movchat_id: "", ticket_category_recrute_id: "", ticket_category_support_id: "", ticket_category_others_id: "", ticket_support_role_ids: [],
     welcome_channel_id: "", welcome_message: "Seja muito bem-vindo(a)!", leave_channel_id: "", leave_message: "Até logo!", auto_role_id: "",
     staff_role_ids: [], staff_movchat_role_ids: [], staff_movchat_goal: 1000, staff_call_goal_hours: 30,
-    vip_enabled: true, vip_role_base_id: "", vip_allow_custom_color: true, vip_allow_custom_name: true, vip_max_members: 5
+    vip_enabled: true, vip_role_base_id: "", vip_allow_custom_color: true, vip_allow_custom_name: true, vip_max_members: 5,
+    activity_rotate_enabled: false, activity_type: "watching", activity_rotate_seconds: 30, activity_messages: [],
+    antibot_channel_id: "", antibot_log_channel_id: "", antibot_punish_ban: true, antibot_delete_messages: true,
+    filters_enabled: true, filters_punish_after_warnings: 3, filters_links_allowed_role_ids: [], filters_log_channel_id: "", filters_blocked_words: [], filters_allowed_domains: [],
+    voice_channel_id: "", voice_mute: true, bot_status: "online", voice_join_log_channel_id: "", voice_leave_log_channel_id: "", moderation_logs_channel_id: "", guild_id: ""
 };
 
 const getConfig = () => {
@@ -38,21 +42,16 @@ app.use(express.urlencoded({ extended: true }));
 app.use(session({ secret: process.env.PANEL_SECRET || 'secret', resave: false, saveUninitialized: false, cookie: { secure: process.env.BASE_URL.startsWith('https') } }));
 app.use(flash());
 
-// Cache para não floodar a API do Discord
 let discordCache = { time: 0, data: { ch: [], vc: [], cat: [], role: [] } };
-
 async function getDiscordData(guildId) {
     if (!guildId || !process.env.DISCORD_TOKEN) return discordCache.data;
-    if (Date.now() - discordCache.time < 60000) return discordCache.data; // 1 min cache
-
+    if (Date.now() - discordCache.time < 60000) return discordCache.data;
     try {
         const headers = { Authorization: `Bot ${process.env.DISCORD_TOKEN}` };
         const chs = await axios.get(`https://discord.com/api/v10/guilds/${guildId}/channels`, { headers });
         const roles = await axios.get(`https://discord.com/api/v10/guilds/${guildId}/roles`, { headers });
-
         const cats = {};
         chs.data.filter(c => c.type === 4).forEach(c => cats[c.id] = c.name);
-
         const data = { ch: [], vc: [], cat: [], role: [] };
         chs.data.sort((a,b) => a.position - b.position).forEach(c => {
             let label = c.name;
@@ -61,22 +60,15 @@ async function getDiscordData(guildId) {
             if (c.type === 2) data.vc.push({ id: c.id, name: `🔊 ${label}` });
             if (c.type === 4) data.cat.push({ id: c.id, name: c.name });
         });
-        roles.data.sort((a,b) => b.position - a.position).forEach(r => {
-            if (r.name !== '@everyone') data.role.push({ id: r.id, name: `@${r.name}` });
-        });
-
+        roles.data.sort((a,b) => b.position - a.position).forEach(r => { if (r.name !== '@everyone') data.role.push({ id: r.id, name: `@${r.name}` }); });
         discordCache = { time: Date.now(), data };
         return data;
-    } catch (e) {
-        console.error("Erro ao buscar dados do Discord:", e.message);
-        return discordCache.data;
-    }
+    } catch (e) { return discordCache.data; }
 }
 
-// ================= AUTH =================
 app.get('/login', (req, res) => {
-    const html = `
-    <!DOCTYPE html><html lang="pt-br"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Login - PXKK</title>
+    res.send(`
+    <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Login - PXKK</title>
     <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         :root { --purple: #8A4FFF; --black: #040404; --white: #fff; --gray: #B8B8C2; }
@@ -95,20 +87,12 @@ app.get('/login', (req, res) => {
         @media(max-width: 768px) { .container { flex-direction: column; justify-content: center; text-align: center; } .hero { display: none; } }
     </style></head><body>
     <div class="container">
-        <div class="hero">
-            <h1>Gerencie seu<br>servidor com<br><span>precisão total.</span></h1>
-            <p>Toda a configuração do seu bot em um painel único, seguro e intuitivo.</p>
-        </div>
+        <div class="hero"><h1>Gerencie seu<br>servidor com<br><span>precisão total.</span></h1><p>Toda a configuração do seu bot em um painel único, seguro e intuitivo.</p></div>
         <div class="card">
-            <h2>Bem-vindo</h2>
-            <p>Autentique-se com sua conta do Discord para acessar o painel.</p>
-            <a href="/auth" class="btn">
-                <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M20.3 4.4A19.7 19.7 0 0 0 15.4 3l-.3.5a14.7 14.7 0 0 1 4.3 2.2 15 15 0 0 0-12.8 0A14.6 14.6 0 0 1 10.9 3.5L10.6 3a19.7 19.7 0 0 0-4.9 1.4C2.6 8.6 1.9 12.7 2.3 16.7a19.8 19.8 0 0 0 6 3l.8-1.3a13 13 0 0 1-2-1l.5-.4a14 14 0 0 0 12.8 0l.5.4a13 13 0 0 1-2 1l.8 1.3a19.8 19.8 0 0 0 6-3c.5-4.6-.7-8.6-3.4-12.3ZM9 14.6c-1.2 0-2.2-1.1-2.2-2.4S7.8 9.8 9 9.8s2.2 1.1 2.2 2.4S10.2 14.6 9 14.6Zm6 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Z"/></svg>
-                Entrar com Discord
-            </a>
+            <h2>Bem-vindo</h2><p>Autentique-se com sua conta do Discord para acessar o painel.</p>
+            <a href="/auth" class="btn"><svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M20.3 4.4A19.7 19.7 0 0 0 15.4 3l-.3.5a14.7 14.7 0 0 1 4.3 2.2 15 15 0 0 0-12.8 0A14.6 14.6 0 0 1 10.9 3.5L10.6 3a19.7 19.7 0 0 0-4.9 1.4C2.6 8.6 1.9 12.7 2.3 16.7a19.8 19.8 0 0 0 6 3l.8-1.3a13 13 0 0 1-2-1l.5-.4a14 14 0 0 0 12.8 0l.5.4a13 13 0 0 1-2 1l.8 1.3a19.8 19.8 0 0 0 6-3c.5-4.6-.7-8.6-3.4-12.3ZM9 14.6c-1.2 0-2.2-1.1-2.2-2.4S7.8 9.8 9 9.8s2.2 1.1 2.2 2.4S10.2 14.6 9 14.6Zm6 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Z"/></svg> Entrar com Discord</a>
         </div>
-    </div></body></html>`;
-    res.send(html);
+    </div></body></html>`);
 });
 
 app.get('/auth', (req, res) => {
@@ -123,27 +107,21 @@ app.get('/callback', async (req, res) => {
     try {
         const token = await axios.post('https://discord.com/api/oauth2/token', new URLSearchParams({ client_id: process.env.DISCORD_CLIENT_ID, client_secret: process.env.DISCORD_CLIENT_SECRET, grant_type: 'authorization_code', code: req.query.code, redirect_uri: `${process.env.BASE_URL}/callback` }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
         const user = await axios.get('https://discord.com/api/users/@me', { headers: { Authorization: `Bearer ${token.data.access_token}` } });
-        
         const owners = (process.env.OWNER_IDS || '').split(',').map(i=>i.trim()).filter(i=>i);
         const devs = (process.env.DEV_IDS || '').split(',').map(i=>i.trim()).filter(i=>i);
         if (!owners.includes(user.data.id) && !devs.includes(user.data.id)) return res.status(403).send("Acesso Negado.");
-
-        req.session.user = user.data;
-        req.session.user.role = devs.includes(user.data.id) ? 'dev' : 'owner';
+        req.session.user = user.data; req.session.user.role = devs.includes(user.data.id) ? 'dev' : 'owner';
         req.session.save(() => res.redirect('/'));
     } catch (e) { res.status(400).send("Falha na autenticação."); }
 });
 
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/login'); });
 
-// ================= DASHBOARD =================
 const requireAuth = (req, res, next) => { if (!req.session.user) return res.redirect('/login'); next(); };
 
 app.get('/', requireAuth, async (req, res) => {
     const cfg = getConfig();
-    const dd = await getDiscordData(cfg.guild_id); // Puxa dados do Discord
-
-    // Funções auxiliares para renderizar inputs
+    const dd = await getDiscordData(cfg.guild_id);
     const hexcolor = (n) => '#' + (n ? parseInt(n).toString(16).padStart(6, '0') : '000000');
     
     const renderField = (key, label, type) => {
@@ -153,47 +131,36 @@ app.get('/', requireAuth, async (req, res) => {
         if (type === 'num') return `<div class="f"><label>${label}</label><input type="number" name="${key}" value="${val || 0}"></div>`;
         if (type === 'area') return `<div class="f full"><label>${label}</label><textarea name="${key}">${val || ''}</textarea></div>`;
         if (type === 'color') return `<div class="f"><label>${label}</label><div class="color-wrapper"><input type="color" name="${key}" value="${hexcolor(val)}"><span class="color-hex">${hexcolor(val)}</span></div></div>`;
-        
-        let opts = '';
-        if (type === 'ch') opts = `<option value="">— nenhum —</option>` + dd.ch.map(o => `<option value="${o.id}" ${val == o.id ? 'selected' : ''}>${o.name}</option>`).join('');
-        if (type === 'vc') opts = `<option value="">— nenhum —</option>` + dd.vc.map(o => `<option value="${o.id}" ${val == o.id ? 'selected' : ''}>${o.name}</option>`).join('');
-        if (type === 'cat') opts = `<option value="">— nenhum —</option>` + dd.cat.map(o => `<option value="${o.id}" ${val == o.id ? 'selected' : ''}>${o.name}</option>`).join('');
-        if (type === 'role_single') opts = `<option value="">— nenhum —</option>` + dd.role.map(o => `<option value="${o.id}" ${val == o.id ? 'selected' : ''}>${o.name}</option>`).join('');
-        
+        let opts = `<option value="">— nenhum —</option>`;
+        if (type === 'ch') opts += dd.ch.map(o => `<option value="${o.id}" ${val == o.id ? 'selected' : ''}>${o.name}</option>`).join('');
+        if (type === 'vc') opts += dd.vc.map(o => `<option value="${o.id}" ${val == o.id ? 'selected' : ''}>${o.name}</option>`).join('');
+        if (type === 'cat') opts += dd.cat.map(o => `<option value="${o.id}" ${val == o.id ? 'selected' : ''}>${o.name}</option>`).join('');
+        if (type === 'role_single') opts += dd.role.map(o => `<option value="${o.id}" ${val == o.id ? 'selected' : ''}>${o.name}</option>`).join('');
         if (type === 'role') {
             opts = dd.role.map(o => `<option value="${o.id}" ${(val||[]).includes(o.id) ? 'selected' : ''}>${o.name}</option>`).join('');
             return `<div class="f full"><label>${label}</label><select name="${key}" multiple size="5">${opts}</select><span class="hint">Segure Ctrl/Cmd para selecionar vários</span></div>`;
         }
-
         return `<div class="f"><label>${label}</label><select name="${key}">${opts}</select></div>`;
     };
 
-    const html = `
-    <!DOCTYPE html><html lang="pt-br"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Dashboard - PXKK</title>
+    res.send(`
+    <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Dashboard - PXKK</title>
     <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        :root { --purple: #8A4FFF; --purple-hi: #A370FF; --black: #040404; --black-soft: #0a0a0a; --white: #fff; --gray-hi: #B8B8C2; --gray-mid: #7A7A88; --border: rgba(255,255,255,0.08); --border-hi: rgba(138,79,255,0.35); }
+        :root { --purple: #8A4FFF; --purple-hi: #A370FF; --black: #040404; --white: #fff; --gray-hi: #B8B8C2; --gray-mid: #7A7A88; --border: rgba(255,255,255,0.08); --border-hi: rgba(138,79,255,0.35); }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: radial-gradient(circle at 15% 10%, rgba(138,79,255,0.15) 0%, transparent 40%), radial-gradient(circle at 85% 90%, rgba(138,79,255,0.1) 0%, transparent 40%), var(--black); color: var(--white); font-family: 'Inter', sans-serif; min-height: 100vh; display: flex; flex-direction: column; padding: 16px; }
-        
-        /* TOPBAR */
         .topbar { display: flex; justify-content: space-between; align-items: center; background: rgba(10,10,10,0.7); backdrop-filter: blur(24px); padding: 15px 30px; border-radius: 99px; border: 1px solid var(--border); margin-bottom: 24px; }
         .brand { display: flex; align-items: center; gap: 15px; font-family: 'Archivo Black'; font-size: 20px; }
         .brand img { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border-hi); }
         .user-info { display: flex; align-items: center; gap: 15px; font-size: 14px; font-weight: 600; }
         .user-info img { width: 35px; height: 35px; border-radius: 50%; border: 1px solid var(--border-hi); }
         .user-info a { color: #f87171; text-decoration: none; }
-
-        /* LAYOUT */
         .layout { display: flex; gap: 24px; flex: 1; }
-        
-        /* SIDEBAR */
         .sidebar { width: 260px; background: rgba(10,10,10,0.6); backdrop-filter: blur(20px); border: 1px solid var(--border); border-radius: 32px; padding: 20px; display: flex; flex-direction: column; gap: 8px; height: calc(100vh - 120px); overflow-y: auto; }
         .nav-btn { display: flex; align-items: center; gap: 12px; padding: 14px 20px; color: var(--gray-hi); font-size: 14px; font-weight: 500; border-radius: 99px; cursor: pointer; transition: 0.2s; border: 1px solid transparent; background: transparent; text-align: left; width: 100%; }
         .nav-btn:hover { background: rgba(255,255,255,0.04); color: var(--white); }
         .nav-btn.active { background: linear-gradient(90deg, rgba(138,79,255,0.15), rgba(138,79,255,0.05)); color: var(--white); font-weight: 600; border-color: rgba(138,79,255,0.3); }
-
-        /* CONTEÚDO */
         .content { flex: 1; position: relative; }
         .section { display: none; background: rgba(10,10,10,0.6); backdrop-filter: blur(24px); border: 1px solid var(--border); border-radius: 32px; padding: 40px; animation: fadeIn 0.3s; }
         .section.active { display: block; }
@@ -201,8 +168,6 @@ app.get('/', requireAuth, async (req, res) => {
         .section-head { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .section-head h2 { font-family: 'Archivo Black'; font-size: 28px; text-transform: uppercase; margin-bottom: 8px; }
         .section-head p { color: var(--gray-mid); font-size: 14px; }
-
-        /* FORMULÁRIO */
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
         .f { display: flex; flex-direction: column; gap: 10px; }
         .f.full { grid-column: 1 / -1; }
@@ -214,8 +179,6 @@ app.get('/', requireAuth, async (req, res) => {
         .f select[multiple] option { padding: 12px; border-radius: 8px; margin-bottom: 4px; }
         .f select[multiple] option:checked { background: var(--purple); color: var(--white); }
         .hint { font-size: 11px; color: var(--gray-mid); }
-
-        /* SWITCH E COR */
         .sw { display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.3); padding: 16px; border-radius: 16px; border: 1px solid var(--border); cursor: pointer; }
         .sw input[type="checkbox"] { width: 50px; height: 26px; appearance: none; background: #4A4A55; border-radius: 99px; position: relative; cursor: pointer; transition: 0.2s; flex-shrink: 0; }
         .sw input[type="checkbox"]::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; background: #fff; border-radius: 50%; transition: 0.2s; }
@@ -226,34 +189,17 @@ app.get('/', requireAuth, async (req, res) => {
         .color-wrapper input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
         .color-wrapper input[type="color"]::-webkit-color-swatch { border: 2px solid rgba(255,255,255,0.2); border-radius: 50%; }
         .color-hex { font-family: monospace; font-size: 14px; font-weight: bold; text-transform: uppercase; }
-
-        /* SALVAR */
         .save-bar { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgba(15,15,15,0.95); backdrop-filter: blur(20px); border: 1px solid var(--border-hi); padding: 16px 32px; border-radius: 99px; display: flex; justify-content: space-between; align-items: center; gap: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); z-index: 100; }
         .save-btn { background: var(--purple); color: #fff; padding: 16px 36px; border: none; border-radius: 99px; font-weight: 800; font-size: 14px; text-transform: uppercase; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 10px; }
         .save-btn:hover { background: var(--purple-hi); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(138,79,255,0.5); }
-
-        /* RESPONSIVO */
-        @media(max-width: 900px) {
-            .layout { flex-direction: column; }
-            .sidebar { width: 100%; height: auto; flex-direction: row; overflow-x: auto; padding: 10px; }
-            .nav-btn { white-space: nowrap; width: auto; padding: 10px 15px; }
-            .form-grid { grid-template-columns: 1fr; }
-            .save-bar { width: calc(100% - 32px); bottom: 16px; padding: 12px; border-radius: 20px; }
-            .save-btn { width: 100%; justify-content: center; }
-        }
+        @media(max-width: 900px) { .layout { flex-direction: column; } .sidebar { width: 100%; height: auto; flex-direction: row; overflow-x: auto; padding: 10px; } .nav-btn { white-space: nowrap; width: auto; padding: 10px 15px; } .form-grid { grid-template-columns: 1fr; } .save-bar { width: calc(100% - 32px); bottom: 16px; padding: 12px; border-radius: 20px; } .save-btn { width: 100%; justify-content: center; } }
     </style></head><body>
-
     <header class="topbar">
         <div class="brand"><img src="/logo.gif"> PXKK Dashboard</div>
-        <div class="user-info">
-            <img src="https://cdn.discordapp.com/avatars/${req.session.user.id}/${req.session.user.avatar}.png">
-            ${req.session.user.username}
-            <a href="/logout">Sair</a>
-        </div>
+        <div class="user-info"><img src="https://cdn.discordapp.com/avatars/${req.session.user.id}/${req.session.user.avatar}.png"> ${req.session.user.username} <a href="/logout">Sair</a></div>
     </header>
-
     <div class="layout">
-        <aside class="sidebar" id="sidebar">
+        <aside class="sidebar">
             <button class="nav-btn active" data-target="s0">🎨 Identidade</button>
             <button class="nav-btn" data-target="s1">🌈 Cores</button>
             <button class="nav-btn" data-target="s2">✅ Verificação</button>
@@ -263,173 +209,23 @@ app.get('/', requireAuth, async (req, res) => {
             <button class="nav-btn" data-target="s6">👮 Staff</button>
             <button class="nav-btn" data-target="s7">💎 VIP</button>
             <button class="nav-btn" data-target="s8">🔊 Voz e Status</button>
+            <button class="nav-btn" data-target="s9">🛡️ Filtros & AntiBot</button>
         </aside>
-
         <main class="content">
             <form method="POST" id="cfgForm">
-                
-                <section id="s0" class="section active">
-                    <div class="section-head"><h2>Identidade Visual</h2><p>Personalize a marca do seu bot.</p></div>
-                    <div class="form-grid">
-                        ${renderField('brand_name', 'Nome da Marca', 'text')}
-                        ${renderField('brand_emoji', 'Emoji da Marca', 'text')}
-                        ${renderField('brand_footer', 'Rodapé', 'text')}
-                        ${renderField('avatar_url', 'URL do Avatar', 'text')}
-                        ${renderField('banner_painel_url', 'URL do Banner do Painel', 'text')}
-                        ${renderField('banner_ticket_url', 'URL do Banner de Tickets', 'text')}
-                    </div>
-                </section>
-
-                <section id="s1" class="section">
-                    <div class="section-head"><h2>Cores dos Painéis</h2><p>Defina as cores hexadecimais.</p></div>
-                    <div class="form-grid">
-                        ${renderField('brand_color_primary', 'Cor Primária', 'color')}
-                        ${renderField('brand_color_secondary', 'Cor Secundária', 'color')}
-                        ${renderField('brand_color_success', 'Sucesso', 'color')}
-                        ${renderField('brand_color_danger', 'Perigo', 'color')}
-                    </div>
-                </section>
-
-                <section id="s2" class="section">
-                    <div class="section-head"><h2>Verificação</h2><p>Configure o captcha de entrada.</p></div>
-                    <div class="form-grid">
-                        ${renderField('verification_enabled', 'Ativar Sistema de Verificação', 'bool')}
-                        ${renderField('verified_role_ids', 'Cargos de Verificado', 'role')}
-                        ${renderField('verification_channel_id', 'Canal de Verificação', 'ch')}
-                        ${renderField('verification_panel_channel_id', 'Canal do Painel', 'ch')}
-                        ${renderField('verification_log_channel_id', 'Canal de Log', 'ch')}
-                    </div>
-                </section>
-
-                <section id="s3" class="section">
-                    <div class="section-head"><h2>Tickets</h2><p>Configure as categorias de atendimento.</p></div>
-                    <div class="form-grid">
-                        ${renderField('ticket_panel_channel_id', 'Canal do Painel de Tickets', 'ch')}
-                        ${renderField('ticket_logs_channel_id', 'Canal de Logs', 'ch')}
-                        ${renderField('ticket_category_movcall_id', 'Categoria MOV CALL', 'cat')}
-                        ${renderField('ticket_category_movchat_id', 'Categoria MOV CHAT', 'cat')}
-                        ${renderField('ticket_category_recrute_id', 'Categoria RECRUTE-S', 'cat')}
-                        ${renderField('ticket_category_support_id', 'Categoria SUPORTE', 'cat')}
-                        ${renderField('ticket_category_others_id', 'Categoria OUTROS', 'cat')}
-                        ${renderField('ticket_support_role_ids', 'Cargos de Staff', 'role')}
-                    </div>
-                </section>
-
-                <section id="s4" class="section">
-                    <div class="section-head"><h2>Níveis (MEE6)</h2><p>Sistema de XP e recompensas.</p></div>
-                    <div class="form-grid">
-                        ${renderField('levels_enabled', 'Ativar Sistema', 'bool')}
-                        ${renderField('levels_xp_per_message', 'XP por Mensagem', 'num')}
-                        ${renderField('levels_xp_cooldown_seconds', 'Cooldown (Segundos)', 'num')}
-                        ${renderField('levels_announce_channel_id', 'Canal de Anúncio', 'ch')}
-                        ${renderField('levels_message_up', 'Mensagem de Level Up', 'area')}
-                    </div>
-                </section>
-
-                <section id="s5" class="section">
-                    <div class="section-head"><h2>Boas-vindas</h2><p>Mensagens de entrada e saída.</p></div>
-                    <div class="form-grid">
-                        ${renderField('welcome_channel_id', 'Canal de Entrada', 'ch')}
-                        ${renderField('welcome_message', 'Mensagem de Entrada', 'area')}
-                        ${renderField('leave_channel_id', 'Canal de Saída', 'ch')}
-                        ${renderField('leave_message', 'Mensagem de Saída', 'area')}
-                        ${renderField('auto_role_id', 'Cargo Automático', 'role_single')}
-                    </div>
-                </section>
-
-                <section id="s6" class="section">
-                    <div class="section-head"><h2>Staff</h2><p>Metas e monitoramento da equipe.</p></div>
-                    <div class="form-grid">
-                        ${renderField('staff_role_ids', 'Cargos de Staff', 'role')}
-                        ${renderField('staff_movchat_goal', 'Meta de Mensagens', 'num')}
-                        ${renderField('staff_call_goal_hours', 'Meta de Horas em Call', 'num')}
-                    </div>
-                </section>
-
-                <section id="s7" class="section">
-                    <div class="section-head"><h2>VIP</h2><p>Sistema de vantagens.</p></div>
-                    <div class="form-grid">
-                        ${renderField('vip_enabled', 'Ativar VIP', 'bool')}
-                        ${renderField('vip_role_base_id', 'Cargo Base VIP', 'role_single')}
-                        ${renderField('vip_max_members', 'Limite de Membros', 'num')}
-                    </div>
-                </section>
-
-                <section id="s8" class="section">
-                    <div class="section-head"><h2>Voz e Status</h2><p>Presença do bot e logs de call.</p></div>
-                    <div class="form-grid">
-                        ${renderField('voice_channel_id', 'Canal de Voz 24h', 'vc')}
-                        ${renderField('voice_join_log_channel_id', 'Log de Entrada (Call)', 'ch')}
-                        ${renderField('voice_leave_log_channel_id', 'Log de Saída (Call)', 'ch')}
-                    </div>
-                </section>
-
+                <section id="s0" class="section active"><div class="section-head"><h2>Identidade Visual</h2><p>Personalize a marca do seu bot.</p></div><div class="form-grid">${renderField('brand_name', 'Nome da Marca', 'text')}${renderField('brand_emoji', 'Emoji da Marca', 'text')}${renderField('brand_footer', 'Rodapé', 'text')}${renderField('avatar_url', 'URL do Avatar', 'text')}${renderField('banner_painel_url', 'URL do Banner do Painel', 'text')}${renderField('banner_ticket_url', 'URL do Banner de Tickets', 'text')}</div></section>
+                <section id="s1" class="section"><div class="section-head"><h2>Cores dos Painéis</h2><p>Defina as cores hexadecimais.</p></div><div class="form-grid">${renderField('brand_color_primary', 'Cor Primária', 'color')}${renderField('brand_color_secondary', 'Cor Secundária', 'color')}${renderField('brand_color_success', 'Sucesso', 'color')}${renderField('brand_color_danger', 'Perigo', 'color')}</div></section>
+                <section id="s2" class="section"><div class="section-head"><h2>Verificação</h2><p>Configure o captcha de entrada.</p></div><div class="form-grid">${renderField('verification_enabled', 'Ativar Sistema de Verificação', 'bool')}${renderField('verified_role_ids', 'Cargos de Verificado', 'role')}${renderField('verification_channel_id', 'Canal de Verificação', 'ch')}${renderField('verification_panel_channel_id', 'Canal do Painel', 'ch')}${renderField('verification_log_channel_id', 'Canal de Log', 'ch')}</div></section>
+                <section id="s3" class="section"><div class="section-head"><h2>Tickets</h2><p>Configure as categorias de atendimento.</p></div><div class="form-grid">${renderField('ticket_panel_channel_id', 'Canal do Painel de Tickets', 'ch')}${renderField('ticket_logs_channel_id', 'Canal de Logs', 'ch')}${renderField('ticket_category_movcall_id', 'Categoria MOV CALL', 'cat')}${renderField('ticket_category_movchat_id', 'Categoria MOV CHAT', 'cat')}${renderField('ticket_category_recrute_id', 'Categoria RECRUTE-S', 'cat')}${renderField('ticket_category_support_id', 'Categoria SUPORTE', 'cat')}${renderField('ticket_category_others_id', 'Categoria OUTROS', 'cat')}${renderField('ticket_support_role_ids', 'Cargos de Staff', 'role')}</div></section>
+                <section id="s4" class="section"><div class="section-head"><h2>Níveis (MEE6)</h2><p>Sistema de XP e recompensas.</p></div><div class="form-grid">${renderField('levels_enabled', 'Ativar Sistema', 'bool')}${renderField('levels_xp_per_message', 'XP por Mensagem', 'num')}${renderField('levels_xp_cooldown_seconds', 'Cooldown (Segundos)', 'num')}${renderField('levels_announce_channel_id', 'Canal de Anúncio', 'ch')}${renderField('levels_message_up', 'Mensagem de Level Up', 'area')}</div></section>
+                <section id="s5" class="section"><div class="section-head"><h2>Boas-vindas</h2><p>Mensagens de entrada e saída.</p></div><div class="form-grid">${renderField('welcome_channel_id', 'Canal de Entrada', 'ch')}${renderField('welcome_message', 'Mensagem de Entrada', 'area')}${renderField('leave_channel_id', 'Canal de Saída', 'ch')}${renderField('leave_message', 'Mensagem de Saída', 'area')}${renderField('auto_role_id', 'Cargo Automático', 'role_single')}</div></section>
+                <section id="s6" class="section"><div class="section-head"><h2>Staff</h2><p>Metas e monitoramento da equipe.</p></div><div class="form-grid">${renderField('staff_role_ids', 'Cargos de Staff', 'role')}${renderField('staff_movchat_goal', 'Meta de Mensagens', 'num')}${renderField('staff_call_goal_hours', 'Meta de Horas em Call', 'num')}</div></section>
+                <section id="s7" class="section"><div class="section-head"><h2>VIP</h2><p>Sistema de vantagens.</p></div><div class="form-grid">${renderField('vip_enabled', 'Ativar VIP', 'bool')}${renderField('vip_role_base_id', 'Cargo Base VIP', 'role_single')}${renderField('vip_max_members', 'Limite de Membros', 'num')}</div></section>
+                <section id="s8" class="section"><div class="section-head"><h2>Voz e Status</h2><p>Presença do bot e logs de call.</p></div><div class="form-grid">${renderField('voice_channel_id', 'Canal de Voz 24h', 'vc')}${renderField('voice_join_log_channel_id', 'Log de Entrada (Call)', 'ch')}${renderField('voice_leave_log_channel_id', 'Log de Saída (Call)', 'ch')}${renderField('bot_status', 'Status', 'text')}</div></section>
+                <section id="s9" class="section"><div class="section-head"><h2>Filtros & AntiBot</h2><p>Proteção do servidor.</p></div><div class="form-grid">${renderField('filters_enabled', 'Ativar Filtros', 'bool')}${renderField('antibot_punish_ban', 'AntiBot: Banir', 'bool')}${renderField('antibot_channel_id', 'Canal Armadilha (AntiBot)', 'ch')}${renderField('filters_log_channel_id', 'Canal de Log de Filtros', 'ch')}</div></section>
             </form>
         </main>
     </div>
-
-    <div class="save-bar">
-        <span style="font-size: 13px; color: var(--gray-mid); font-weight: 500;">As alterações são salvas instantaneamente.</span>
-        <button type="submit" form="cfgForm" class="save-btn">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
-            Salvar Alterações
-        </button>
-    </div>
-
+    <div class="save-bar"><span style="font-size: 13px; color: var(--gray-mid); font-weight: 500;">Salvo em tempo real.</span><button type="submit" form="cfgForm" class="save-btn">Salvar Alterações</button></div>
     <script>
-        // Navegação das abas
-        document.querySelectorAll('.nav-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-                document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-                btn.classList.add('active');
-                document.getElementById(btn.dataset.target).classList.add('active');
-            });
-        });
-
-        // Atualiza o texto do HEX visualmente ao mudar a cor
-        document.querySelectorAll('input[type="color"]').forEach(input => {
-            input.addEventListener('input', (e) => {
-                e.target.nextElementSibling.innerText = e.target.value.toUpperCase();
-            });
-        });
-    </script>
-    </body></html>`;
-    res.send(html);
-});
-
-// ================= SALVAR DADOS =================
-app.post('/', requireAuth, (req, res) => {
-    const cfg = getConfig();
-    
-    // Parser para os campos
-    for (const key in req.body) {
-        if (key.includes('_enabled') || key.includes('vip_allow_')) {
-            cfg[key] = true; // Se estiver no body, o checkbox estava marcado
-        } else if (['verified_role_ids', 'ticket_support_role_ids', 'staff_role_ids'].includes(key)) {
-            // Arrays de cargos (select multiple)
-            cfg[key] = Array.isArray(req.body[key]) ? req.body[key] : [req.body[key]];
-        } else if (key.includes('color')) {
-            // Converte HEX de volta para Inteiro
-            cfg[key] = parseInt(req.body[key].replace('#', ''), 16);
-        } else {
-            cfg[key] = req.body[key];
-        }
-    }
-
-    // Trata checkboxes desmarcados (que não vão no body)
-    ['verification_enabled', 'levels_enabled', 'vip_enabled', 'vip_allow_custom_color', 'vip_allow_custom_name'].forEach(boolKey => {
-        if (!req.body[boolKey]) cfg[boolKey] = false;
-    });
-
-    // Trata arrays vazios
-    ['verified_role_ids', 'ticket_support_role_ids', 'staff_role_ids'].forEach(arrKey => {
-        if (!req.body[arrKey]) cfg[arrKey] = [];
-    });
-
-    saveConfig(cfg);
-    req.flash('success', 'ok');
-    res.redirect('/');
-});
-
-app.listen(8080, '0.0.0.0', () => console.log('🌐 Dashboard completo rodando na porta 8080'));
+        document.querySelectorAll('.nav-btn').forEach(btn => { btn.addEventListener('click', () => { document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.section').forEach(s => s.classList.remove('active')); btn.classList.add('active'); document.getElementById(btn.dataset.target
