@@ -38,7 +38,7 @@ const saveConfig = (cfg) => fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, nu
 
 app.set('trust proxy', 1);
 
-// Pasta public na raiz
+// Busca a logo na raiz (pasta public fora de src)
 app.use(express.static(path.join(__dirname, '../public'))); 
 
 app.use(express.urlencoded({ extended: true }));
@@ -49,16 +49,6 @@ app.use(session({
     cookie: { secure: false, maxAge: 1000 * 60 * 60 * 24 } 
 }));
 app.use(flash());
-
-// ROTA DE TESTE PARA A LOGO (Acesse: seusite.com/checar-logo)
-app.get('/checar-logo', (req, res) => {
-    const logoPath = path.join(__dirname, '../public/logo.gif');
-    if (fs.existsSync(logoPath)) {
-        res.send(`<h1>✅ A logo EXISTE no servidor!</h1><p>Caminho: ${logoPath}</p><img src="/logo.gif" style="border:2px solid green; max-width:200px;">`);
-    } else {
-        res.send(`<h1>❌ A logo NÃO FOI ENCONTRADA no servidor.</h1><p>O servidor procurou aqui: <b>${logoPath}</b> e não achou.</p><p>Verifique se a pasta "public" está na raiz do seu repositório GitHub e se o arquivo se chama exatamente "logo.gif" (tudo minúsculo).</p>`);
-    }
-});
 
 let discordCache = { time: 0, data: { ch: [], vc: [], cat: [], role: [] } };
 async function getDiscordData(guildId) {
@@ -131,8 +121,7 @@ app.get('/login', (req, res) => {
             <section class="hero">
                 <div class="hero-brand">
                     <span class="mark">
-                        <!-- Fallback: Se não achar o logo.gif, ele tenta carregar um ícone genérico do Discord -->
-                        <img src="/logo.gif" alt="Logo" onerror="this.onerror=null; this.src='https://cdn.discordapp.com/embed/avatars/0.png';">
+                        <img src="/logo.gif" alt="Logo" onerror="this.style.display='none'; this.parentElement.innerHTML='🖤';">
                     </span>
                     <span class="name">PXKK</span>
                 </div>
@@ -284,7 +273,7 @@ app.get('/', requireAuth, async (req, res) => {
         }
     </style></head><body>
     <header class="topbar">
-        <div class="brand"><img src="/logo.gif" onerror="this.onerror=null; this.src='https://cdn.discordapp.com/embed/avatars/0.png';"> PXKK Dashboard</div>
+        <div class="brand"><img src="/logo.gif" onerror="this.style.display='none';"> PXKK Dashboard</div>
         <div class="user-info"><img src="https://cdn.discordapp.com/avatars/${req.session.user.id}/${req.session.user.avatar}.png"> ${req.session.user.username} <a href="/logout">Sair</a></div>
     </header>
     <div class="layout">
