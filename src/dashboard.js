@@ -9,6 +9,9 @@ const flash = require('connect-flash');
 const app = express();
 const CONFIG_FILE = path.join(__dirname, '../data', 'config.json');
 
+// Garante que a pasta data existe na raiz
+if (!fs.existsSync(path.join(__dirname, '../data'))) fs.mkdirSync(path.join(__dirname, '../data'), { recursive: true });
+
 const DEFAULT_CONFIG = {
     brand_name: "𝚙𝚡𝚔", brand_emoji: "🖤", brand_footer: "🖤 𝚙𝚡𝚔 • Sistema Oficial",
     brand_color_primary: 0x3D1A5C, brand_color_secondary: 0x5B2A8E,
@@ -30,9 +33,14 @@ const getConfig = () => {
 const saveConfig = (cfg) => fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 4));
 
 app.set('trust proxy', 1);
-app.use(express.static(path.join(__dirname, 'public'))); // Puxa o logo.gif de src/public
+app.use(express.static(path.join(__dirname, 'public'))); 
 app.use(express.urlencoded({ extended: true }));
-app.use(session({ secret: process.env.PANEL_SECRET || 'secret', resave: false, saveUninitialized: false, cookie: { secure: process.env.BASE_URL.startsWith('https') } }));
+app.use(session({ 
+    secret: process.env.PANEL_SECRET || 'secret', 
+    resave: false, 
+    saveUninitialized: false, 
+    cookie: { secure: process.env.BASE_URL.startsWith('https') } 
+}));
 app.use(flash());
 
 // ================= AUTH =================
@@ -62,23 +70,76 @@ app.get('/login', (req, res) => {
 app.get('/auth', (req, res) => {
     const state = crypto.randomBytes(16).toString('hex');
     req.session.oauth_state = state;
-    const params = new URLSearchParams({ client_id: process.env.DISCORD_CLIENT_ID, redirect_uri: `${process.env.BASE_URL}/callback`, response_type: 'code', scope: 'identify guilds', state });
+    const params = new URLSearchParams({ 
+        client_id: process.env.DISCORD_CLIENT_ID, 
+        redirect_uri: `${process.env.BASE_URL}/callback`, 
+        response_type: 'code', 
+        scope: 'identify guilds', 
+        state 
+    });
     res.redirect(`https://discord.com/oauth2/authorize?${params}`);
 });
 
 app.get('/callback', async (req, res) => {
-    if (req.query.state !== req.session.oauth_state) return res.redirect('/login');
+    // Verifica o State para segurança
+    if (req.query.state !== req.session.oauth_state) {
+        console.log("❌ Erro: State inválido (Sessão expirou ou URL forçada).");
+        return res.redirect('/login');
+    }
+    
     try {
-        const token = await axios.post('https://discord.com/api/oauth2/token', new URLSearchParams({ client_id: process.env.DISCORD_CLIENT_ID, client_secret: process.env.DISCORD_CLIENT_SECRET, grant_type: 'authorization_code', code: req.query.code, redirect_uri: `${process.env.BASE_URL}/callback` }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-        const user = await axios.get('https://discord.com/api/users/@me', { headers: { Authorization: `Bearer ${token.data.access_token}` } });
+        // Troca o Code pelo Token
+        const token = await axios.post('https://discord.com/api/oauth2/token', new URLSearchParams({ 
+            client_id: process.env.DISCORD_CLIENT_ID, 
+            client_secret: process.env.DISCORD_CLIENT_SECRET, 
+            grant_type: 'authorization_code', 
+            code: req.query.code, 
+            redirect_uri: `${process.env.BASE_URL}/callback` 
+        }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
         
-        const owners = (process.env.OWNER_IDS || '').split(',').map(i=>i.trim());
-        if (!owners.includes(user.data.id)) return res.status(403).send("Acesso Negado");
+        // Pega os dados do usuário
+        const user = await axios.get('https://discord.com/api/users/@me', { 
+            headers: { Authorization: `Bearer ${token.data.access_token}` } 
+        });
+        
+        const userId = user.data.id;
 
+        // ===== VERIFICAÇÃO DE PERMISSÃO =====
+        // Lê os IDs do .env e limpa espaços
+        const owners = (process.env.OWNER_IDS || '').split(',').map(i => i.trim()).filter(i => i);
+        const devs = (process.env.DEV_IDS || '').split(',').map(i => i.trim()).filter(i => i);
+
+        // LOG DE DEBUG (Aparece nos logs do Portainer)
+        console.log(`[LOGIN] Tentativa do ID: ${userId}`);
+        console.log(`[LOGIN] IDs Autorizados (OWNER): ${owners.join(', ')}`);
+
+        if (!owners.includes(userId) && !devs.includes(userId)) {
+            console.log(`❌ Acesso negado para o ID ${userId}. Ele não está no OWNER_IDS.`);
+            return res.status(403).send(`
+                <body style="background:#040404; color:#fff; font-family:sans-serif; display:grid; place-items:center; height:100vh; text-align:center;">
+                    <div>
+                        <h1 style="color:#f87171; font-size: 40px;">Acesso Negado 🚫</h1>
+                        <p>O ID <b>${userId}</b> não tem permissão.</p>
+                        <p style="color:#7A7A88;">Se este é o seu ID, copie-o e coloque no campo <b>OWNER_IDS</b> no Portainer.</p>
+                        <a href="/login" style="color:#8A4FFF; margin-top: 20px; display: block;">Voltar</a>
+                    </div>
+                </body>
+            `);
+        }
+
+        // Se passou, salva a sessão
         req.session.user = user.data;
-        req.session.user.role = 'owner';
-        req.session.save(() => res.redirect('/'));
-    } catch (e) { res.send("Erro na autenticação"); }
+        req.session.user.role = devs.includes(userId) ? 'dev' : 'owner';
+        
+        req.session.save((err) => {
+            if (err) console.error("Erro ao salvar sessão:", err);
+            res.redirect('/');
+        });
+
+    } catch (e) { 
+        console.error("Erro no OAuth:", e.response ? e.response.data : e.message);
+        res.status(400).send("Falha na autenticação. Verifique os logs do servidor."); 
+    }
 });
 
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/login'); });
