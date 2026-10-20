@@ -9,14 +9,26 @@ services:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
       - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
       - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET}
-      - OWNER_IDS=${OWNER_IDS}
-      - DEV_IDS=${DEV_IDS}
+      - DATABASE_URL=${DATABASE_URL}
       - BASE_URL=${BASE_URL}
       - PANEL_SECRET=${PANEL_SECRET}
+      - OWNER_IDS=${OWNER_IDS}
+      - DEV_IDS=${DEV_IDS}
+      - SERVER_PRINCIPAL_ID=${SERVER_PRINCIPAL_ID}
+      - SERVER_INTERNO_ID=${SERVER_INTERNO_ID}
     ports:
       - "8080:8080"
+    depends_on:
+      - pxk-mongodb
+
+  pxk-mongodb:
+    image: mongo:latest
+    container_name: pxk-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
     volumes:
-      - ./data:/app/data
+      - ./mongo-data:/data/db
 
   cloudflared:
     image: cloudflare/cloudflared:latest
