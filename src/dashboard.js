@@ -11,12 +11,6 @@ const CONFIG_FILE = path.join(__dirname, '../data', 'config.json');
 
 if (!fs.existsSync(path.join(__dirname, '../data'))) fs.mkdirSync(path.join(__dirname, '../data'), { recursive: true });
 
-// Configuração de arquivos estáticos (para achar a pasta public e o logo.gif)
-app.use(express.static(path.join(__dirname, 'public'))); 
-app.use(express.urlencoded({ extended: true }));
-app.use(session({ secret: process.env.PANEL_SECRET || 'secret', resave: false, saveUninitialized: false, cookie: { secure: process.env.BASE_URL.startsWith('https') } }));
-app.use(flash());
-
 const DEFAULT_CONFIG = {
     brand_name: "𝚙𝚡𝚔", brand_emoji: "🖤", brand_footer: "🖤 𝚙𝚡𝚔 • Sistema Oficial",
     brand_color_primary: 0x3D1A5C, brand_color_secondary: 0x5B2A8E, brand_color_success: 0x00FF88, brand_color_danger: 0xFF3366,
@@ -42,7 +36,22 @@ const getConfig = () => {
 };
 const saveConfig = (cfg) => fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 4));
 
-// Cache de canais do Discord
+app.set('trust proxy', 1);
+
+// =========================================================
+// AQUI ESTÁ A CORREÇÃO: '../public' em vez de 'public'
+// =========================================================
+app.use(express.static(path.join(__dirname, '../public'))); 
+
+app.use(express.urlencoded({ extended: true }));
+app.use(session({ 
+    secret: process.env.PANEL_SECRET || 'pxk_secret_key_super_segura', 
+    resave: false, 
+    saveUninitialized: true, 
+    cookie: { secure: false, maxAge: 1000 * 60 * 60 * 24 } 
+}));
+app.use(flash());
+
 let discordCache = { time: 0, data: { ch: [], vc: [], cat: [], role: [] } };
 async function getDiscordData(guildId) {
     if (!guildId || !process.env.DISCORD_TOKEN) return discordCache.data;
@@ -78,63 +87,32 @@ app.get('/login', (req, res) => {
         <title>PXKK — Dashboard</title>
         <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <style>
-            :root {
-                --black: #050505; --black-soft: #0a0a0a; --purple: #8A4FFF;
-                --purple-hi: #A370FF; --white: #FFFFFF; --gray-hi: #B8B8C2;
-                --gray-mid: #7A7A88; --border: rgba(255,255,255,0.08); --border-hi: rgba(138,79,255,0.35);
-            }
+            :root { --black: #050505; --purple: #8A4FFF; --white: #FFFFFF; --gray-hi: #B8B8C2; --gray-mid: #7A7A88; --border: rgba(255,255,255,0.08); --border-hi: rgba(138,79,255,0.35); }
             * { box-sizing: border-box; margin: 0; padding: 0; }
-            body {
-                background: radial-gradient(circle at 15% 10%, rgba(138,79,255,0.15) 0%, transparent 50%), 
-                            radial-gradient(circle at 85% 90%, rgba(138,79,255,0.08) 0%, transparent 50%), 
-                            var(--black);
-                color: var(--white); font-family: 'Inter', sans-serif; min-height: 100vh; overflow-x: hidden;
-            }
-            /* Efeito de grade no fundo */
-            body::before {
-                content: ''; position: fixed; inset: 0;
-                background-image: linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
-                background-size: 64px 64px;
-                mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, #000 20%, transparent 90%);
-                -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, #000 20%, transparent 90%);
-                pointer-events: none; z-index: 0;
-            }
-            
-            /* Layout Flexível para se adaptar a qualquer tela */
+            body { background: radial-gradient(circle at 15% 10%, rgba(138,79,255,0.15) 0%, transparent 50%), radial-gradient(circle at 85% 90%, rgba(138,79,255,0.08) 0%, transparent 50%), var(--black); color: var(--white); font-family: 'Inter', sans-serif; min-height: 100vh; overflow-x: hidden; }
+            body::before { content: ''; position: fixed; inset: 0; background-image: linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px); background-size: 64px 64px; mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, #000 20%, transparent 90%); -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, #000 20%, transparent 90%); pointer-events: none; z-index: 0; }
             .login-page { display: grid; grid-template-columns: 1.2fr 1fr; min-height: 100vh; position: relative; z-index: 1; }
-            
             .hero { padding: 8% 10%; display: flex; flex-direction: column; justify-content: space-between; }
             .hero-brand { display: flex; align-items: center; gap: 16px; font-family: 'Archivo Black', sans-serif; font-size: 28px; }
             .hero-brand .mark { width: 68px; height: 68px; border-radius: 24px; overflow: hidden; background: rgba(138,79,255,0.15); display: flex; align-items: center; justify-content: center; border: 1px solid var(--border-hi); }
             .hero-brand img { width: 100%; height: 100%; object-fit: cover; }
-            
             .hero-mid { margin: 40px 0; max-width: 700px; }
-            /* clamp() faz a fonte crescer/diminuir dependendo do tamanho da tela */
             .hero-mid h1 { font-family: 'Archivo Black', sans-serif; font-size: clamp(2.5rem, 5vw, 5rem); line-height: 0.95; text-transform: uppercase; letter-spacing: -0.04em; margin-bottom: 20px; }
             .hero-mid h1 span { color: var(--purple); text-shadow: 0 0 40px rgba(138,79,255,0.4); }
             .hero-mid p { font-size: clamp(1rem, 1.2vw, 1.2rem); color: var(--gray-hi); line-height: 1.6; max-width: 500px; }
-            
-            .hero-bottom { display: flex; gap: 24px; font-size: 12px; color: var(--gray-mid); font-weight: 600; }
-            .divider { width: 1px; height: 12px; background: var(--border); }
-
             .login-panel { display: flex; align-items: center; justify-content: center; padding: 40px; }
             .login-card { background: rgba(10,10,10,0.6); backdrop-filter: blur(24px); border: 1px solid var(--border); border-top: 1px solid var(--border-hi); border-radius: 32px; padding: 56px 48px; width: 100%; max-width: 440px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4); position: relative; }
             .login-card::before { content: ''; position: absolute; top: -1px; left: 40px; right: 40px; height: 1px; background: linear-gradient(90deg, transparent, var(--purple), transparent); opacity: 0.8; }
-            
             .mini-tag { display: inline-block; font-size: 10px; font-weight: 800; background: rgba(138,79,255,0.15); border: 1px solid rgba(138,79,255,0.3); padding: 6px 14px; border-radius: 99px; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 20px; }
             .login-card h2 { font-family: 'Archivo Black', sans-serif; font-size: clamp(2rem, 3vw, 2.5rem); text-transform: uppercase; line-height: 1.1; margin-bottom: 12px; }
             .login-card p { color: var(--gray-hi); font-size: 14px; margin-bottom: 30px; }
-            
             .btn-discord { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; padding: 18px; background: linear-gradient(135deg, var(--purple), #6B2EE0); color: #fff; text-decoration: none; border-radius: 99px; font-weight: 700; transition: all 0.25s ease; box-shadow: 0 10px 20px rgba(138,79,255,0.3); }
             .btn-discord:hover { transform: translateY(-2px); background: linear-gradient(135deg, #A370FF, var(--purple)); box-shadow: 0 15px 30px rgba(138,79,255,0.5); }
-
-            /* RESPONSIVIDADE: Se a tela for menor que 968px (Tablets e Celulares) */
             @media (max-width: 968px) {
                 .login-page { grid-template-columns: 1fr; }
                 .hero { padding: 40px 24px 20px; text-align: center; align-items: center; justify-content: center; }
                 .hero-mid { margin: 30px 0; }
                 .hero-mid p { margin: 0 auto; }
-                .hero-bottom { display: none; } /* Esconde a barra inferior no celular */
                 .login-panel { padding: 20px 24px 60px; }
                 .login-card { padding: 40px 24px; }
             }
@@ -145,7 +123,6 @@ app.get('/login', (req, res) => {
             <section class="hero">
                 <div class="hero-brand">
                     <span class="mark">
-                        <!-- onerror tenta carregar o logo, se falhar mostra o emoji 🖤 -->
                         <img src="/logo.gif" alt="Logo" onerror="this.style.display='none'; this.parentElement.innerHTML='🖤';">
                     </span>
                     <span class="name">PXKK</span>
@@ -154,19 +131,12 @@ app.get('/login', (req, res) => {
                     <h1>Gerencie seu<br>servidor com<br><span>precisão total.</span></h1>
                     <p>Toda a configuração do seu bot em um painel único, seguro e intuitivo. Controle tickets, verificação, níveis e muito mais.</p>
                 </div>
-                <div class="hero-bottom">
-                    <div><b>OAuth2</b> Discord</div><span class="divider"></span>
-                    <div><b>Cloudflare</b></div><span class="divider"></span>
-                    <div><b>100%</b> real-time</div>
-                </div>
             </section>
-            
             <section class="login-panel">
                 <div class="login-card">
                     <span class="mini-tag">Autenticação</span>
                     <h2>Bem-vindo<br>de volta</h2>
                     <p>Autentique-se com sua conta do Discord para acessar o painel administrativo.</p>
-                    
                     <a href="/auth" class="btn-discord">
                         <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M20.3 4.4A19.7 19.7 0 0 0 15.4 3l-.3.5a14.7 14.7 0 0 1 4.3 2.2 15 15 0 0 0-12.8 0A14.6 14.6 0 0 1 10.9 3.5L10.6 3a19.7 19.7 0 0 0-4.9 1.4C2.6 8.6 1.9 12.7 2.3 16.7a19.8 19.8 0 0 0 6 3l.8-1.3a13 13 0 0 1-2-1l.5-.4a14 14 0 0 0 12.8 0l.5.4a13 13 0 0 1-2 1l.8 1.3a19.8 19.8 0 0 0 6-3c.5-4.6-.7-8.6-3.4-12.3ZM9 14.6c-1.2 0-2.2-1.1-2.2-2.4S7.8 9.8 9 9.8s2.2 1.1 2.2 2.4S10.2 14.6 9 14.6Zm6 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Z"/></svg>
                         Entrar com Discord
@@ -187,16 +157,29 @@ app.get('/auth', (req, res) => {
 });
 
 app.get('/callback', async (req, res) => {
-    if (req.query.state !== req.session.oauth_state) return res.redirect('/login');
+    if (req.query.state !== req.session.oauth_state) {
+        console.log("State Inválido! Redirecionando...");
+        return res.redirect('/login');
+    }
     try {
         const token = await axios.post('https://discord.com/api/oauth2/token', new URLSearchParams({ client_id: process.env.DISCORD_CLIENT_ID, client_secret: process.env.DISCORD_CLIENT_SECRET, grant_type: 'authorization_code', code: req.query.code, redirect_uri: `${process.env.BASE_URL}/callback` }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
         const user = await axios.get('https://discord.com/api/users/@me', { headers: { Authorization: `Bearer ${token.data.access_token}` } });
+        
         const owners = (process.env.OWNER_IDS || '').split(',').map(i=>i.trim()).filter(i=>i);
         const devs = (process.env.DEV_IDS || '').split(',').map(i=>i.trim()).filter(i=>i);
-        if (!owners.includes(user.data.id) && !devs.includes(user.data.id)) return res.status(403).send("Acesso Negado.");
         
-        req.session.user = user.data; req.session.user.role = devs.includes(user.data.id) ? 'dev' : 'owner';
-        req.session.save(() => res.redirect('/'));
+        if (!owners.includes(user.data.id) && !devs.includes(user.data.id)) {
+            console.log(`Acesso negado para ID: ${user.data.id}`);
+            return res.status(403).send("Acesso Negado. Verifique se o seu ID está no OWNER_IDS do Portainer.");
+        }
+        
+        req.session.user = user.data; 
+        req.session.user.role = devs.includes(user.data.id) ? 'dev' : 'owner';
+        
+        req.session.save((err) => {
+            if(err) console.error("Erro ao salvar sessão:", err);
+            res.redirect('/');
+        });
     } catch (e) { res.status(400).send("Falha na autenticação."); }
 });
 
@@ -281,7 +264,7 @@ app.get('/', requireAuth, async (req, res) => {
         @media(max-width: 900px) { .layout { flex-direction: column; } .sidebar { width: 100%; height: auto; flex-direction: row; overflow-x: auto; padding: 10px; } .nav-btn { white-space: nowrap; width: auto; padding: 10px 15px; } .form-grid { grid-template-columns: 1fr; } .save-bar { width: calc(100% - 32px); bottom: 16px; padding: 12px; border-radius: 20px; } .save-btn { width: 100%; justify-content: center; } }
     </style></head><body>
     <header class="topbar">
-        <div class="brand"><img src="/logo.gif" onerror="this.src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; this.style.display='none'; this.parentElement.innerHTML='🖤 PXKK';"> PXKK Dashboard</div>
+        <div class="brand"><img src="/logo.gif" onerror="this.style.display='none';"> PXKK Dashboard</div>
         <div class="user-info"><img src="https://cdn.discordapp.com/avatars/${req.session.user.id}/${req.session.user.avatar}.png"> ${req.session.user.username} <a href="/logout">Sair</a></div>
     </header>
     <div class="layout">
