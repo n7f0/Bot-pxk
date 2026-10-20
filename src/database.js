@@ -11,7 +11,6 @@ function initDB() {
         CREATE TABLE IF NOT EXISTS user_levels (user_id TEXT, guild_id TEXT, xp INTEGER DEFAULT 0, level INTEGER DEFAULT 0, messages INTEGER DEFAULT 0, PRIMARY KEY (user_id, guild_id));
         CREATE TABLE IF NOT EXISTS level_rewards (guild_id TEXT, level INTEGER, role_id TEXT, PRIMARY KEY (guild_id, level));
         CREATE TABLE IF NOT EXISTS word_filters (guild_id TEXT, word TEXT, PRIMARY KEY (guild_id, word));
-        CREATE TABLE IF NOT EXISTS link_whitelist (guild_id TEXT, domain TEXT, PRIMARY KEY (guild_id, domain));
         CREATE TABLE IF NOT EXISTS user_warnings (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, guild_id TEXT, reason TEXT, warned_by TEXT, created_at TEXT);
         CREATE TABLE IF NOT EXISTS vip_roles (user_id TEXT, guild_id TEXT, role_id TEXT, color INTEGER, name TEXT, tag TEXT, PRIMARY KEY (user_id, guild_id));
         CREATE TABLE IF NOT EXISTS vip_members (owner_id TEXT, guild_id TEXT, member_id TEXT, PRIMARY KEY (owner_id, guild_id, member_id));
@@ -25,14 +24,11 @@ function initDB() {
         CREATE TABLE IF NOT EXISTS member_count_history (guild_id TEXT, date TEXT, member_count INTEGER, PRIMARY KEY (guild_id, date));
         CREATE TABLE IF NOT EXISTS general_feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, rating INTEGER, comment TEXT, created_at TEXT);
     `);
-    console.log("✅ Banco de dados SQLite inicializado.");
 }
 
 module.exports = {
     initDB, db,
-    addUserXP: (uid, gid, xp) => {
-        db.prepare(`INSERT INTO user_levels (user_id, guild_id, xp, messages) VALUES (?, ?, ?, 1) ON CONFLICT(user_id, guild_id) DO UPDATE SET xp = xp + excluded.xp, messages = messages + 1`).run(uid, gid, xp);
-    },
+    addUserXP: (uid, gid, xp) => db.prepare(`INSERT INTO user_levels (user_id, guild_id, xp, messages) VALUES (?, ?, ?, 1) ON CONFLICT(user_id, guild_id) DO UPDATE SET xp = xp + excluded.xp, messages = messages + 1`).run(uid, gid, xp),
     getUserLevel: (uid, gid) => db.prepare(`SELECT * FROM user_levels WHERE user_id = ? AND guild_id = ?`).get(uid, gid),
     setUserLevel: (uid, gid, lvl) => db.prepare(`UPDATE user_levels SET level = ? WHERE user_id = ? AND guild_id = ?`).run(lvl, uid, gid),
     getTop: (gid, limit=10) => db.prepare(`SELECT * FROM user_levels WHERE guild_id = ? ORDER BY xp DESC LIMIT ?`).all(gid, limit),
@@ -41,6 +37,7 @@ module.exports = {
     addSuggestion: (msgId, chId, uid, content) => db.prepare(`INSERT INTO suggestions (message_id, channel_id, user_id, content, created_at) VALUES (?, ?, ?, ?, ?)`).run(msgId, chId, uid, content, new Date().toISOString()),
     getSuggestion: (id) => db.prepare(`SELECT * FROM suggestions WHERE id = ?`).get(id),
     addOpenTicket: (uid, chId) => db.prepare(`INSERT INTO open_tickets (user_id, channel_id, opened_at) VALUES (?, ?, ?)`).run(uid, chId, new Date().toISOString()),
+    removeOpenTicket: (chId) => db.prepare(`DELETE FROM open_tickets WHERE channel_id = ?`).run(chId),
     countTicketsLastHours: (uid, hours) => {
         const since = new Date(Date.now() - hours * 3600000).toISOString();
         return db.prepare(`SELECT COUNT(*) as c FROM open_tickets WHERE user_id = ? AND opened_at > ?`).get(uid, since).c;
