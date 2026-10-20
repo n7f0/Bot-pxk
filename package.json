@@ -1,18 +1,22 @@
 {
   "name": "pxk-bot",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "deploy": "node src/bot/deploy-commands.js"
   },
   "dependencies": {
     "axios": "^1.6.8",
-    "better-sqlite3": "^9.4.3",
     "connect-flash": "^0.1.1",
-    "discord.js": "^14.14.1",
+    "discord.js": "^14.27.0",
     "dotenv": "^16.4.5",
     "ejs": "^3.1.9",
     "express": "^4.19.2",
-    "express-session": "^1.18.0"
+    "express-session": "^1.18.0",
+    "mongoose": "^8.24.4"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
