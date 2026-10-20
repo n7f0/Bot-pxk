@@ -8,6 +8,7 @@ services:
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
       - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
+      - CLIENT_ID=${DISCORD_CLIENT_ID} 
       - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET}
       - DATABASE_URL=${DATABASE_URL}
       - BASE_URL=${BASE_URL}
@@ -18,6 +19,8 @@ services:
       - SERVER_INTERNO_ID=${SERVER_INTERNO_ID}
     ports:
       - "8080:8080"
+    volumes:
+      - ./data:/app/data
     depends_on:
       - pxk-mongodb
 
@@ -29,3 +32,13 @@ services:
       - "27017:27017"
     volumes:
       - ./mongo-data:/data/db
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    # CORREÇÃO DO CLOUDFLARE: O token agora é passado explicitamente no comando
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+    network_mode: "host"
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
