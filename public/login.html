@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PXK - Login</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;800&display=swap');
+        /* Importando Montserrat com peso 900 (Ultra Bold) e Inter para o resto */
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@900&family=Inter:wght@400;500;600;700&display=swap');
         
         :root {
-            /* Paleta Fosca extraída da imagem */
+            /* Paleta Fosca */
             --bg-dark: #1c202c;
             --card-bg: #31323e;
             --purple: #60519b;
@@ -28,12 +29,11 @@
             overflow: hidden;
         }
 
-        /* FUNDO COM IMAGEM (fundo.png) + Overlay Fosco */
+        /* FUNDO COM IMAGEM + Overlay Fosco */
         body::before {
             content: '';
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            /* O linear-gradient cria a máscara escura sobre a sua imagem */
             background-image: 
                 linear-gradient(to bottom, rgba(28, 32, 44, 0.85), rgba(28, 32, 44, 0.95)),
                 url('/fundo.png');
@@ -55,13 +55,13 @@
         .brand-header { display: flex; align-items: center; gap: 12px; }
         .brand-header img { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; border: 1px solid var(--border); }
         
-        /* PXK com brilho sutil */
+        /* PXK Grosso e sem brilho */
         .brand-header span { 
-            font-family: 'Archivo Black', sans-serif; 
-            font-size: 22px; 
-            letter-spacing: 2px; 
-            color: var(--text-main);
-            text-shadow: 0 0 20px rgba(191, 192, 209, 0.3);
+            font-family: 'Montserrat', sans-serif; 
+            font-weight: 900;
+            font-size: 24px; 
+            letter-spacing: 1px; 
+            color: #ffffff;
         }
 
         .hero-text { 
@@ -69,24 +69,24 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
-            max-width: 650px; 
+            max-width: 700px; 
             margin-top: -60px;
         }
 
+        /* Título Grosso, sem brilho */
         .hero-text h1 {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 900;
             font-size: clamp(3.5rem, 5.5vw, 5rem); 
-            font-family: 'Archivo Black', sans-serif;
-            line-height: 1.05; 
+            line-height: 1.1; 
             margin-bottom: 24px; 
-            letter-spacing: -1px;
+            letter-spacing: -2px;
             color: #ffffff;
-            text-shadow: 0 0 30px rgba(0, 0, 0, 0.5); /* Sombra para destacar do fundo */
         }
 
-        /* Brilho sutil na palavra "precisão" */
+        /* Palavra "precisão" apenas colorida, sem brilho */
         .hero-text h1 span { 
             color: var(--purple); 
-            text-shadow: 0 0 25px rgba(96, 81, 155, 0.6);
         }
 
         .hero-text p { 
@@ -94,18 +94,18 @@
             color: var(--text-muted); 
             line-height: 1.6; 
             max-width: 450px; 
+            font-weight: 500;
         }
 
         /* --- PAINEL DIREITO (Card de Login Fosco) --- */
         .right-panel {
             flex: 0 0 550px; display: flex; align-items: center; justify-content: center;
             padding: 40px; 
-            background: rgba(28, 32, 44, 0.5); /* Leve camada extra de escurecimento no lado direito */
+            background: rgba(28, 32, 44, 0.4); 
             border-left: 1px solid var(--border);
         }
 
         .login-card {
-            /* Efeito Fosco (Sem glassmorphism, cor sólida) */
             background: var(--card-bg); 
             border: 1px solid rgba(255,255,255,0.03); 
             border-top: 1px solid rgba(255,255,255,0.08);
@@ -113,7 +113,6 @@
             padding: 48px;
             width: 100%; 
             max-width: 420px;
-            /* Sombra pesada e suave, sem brilho */
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
             position: relative;
         }
@@ -124,10 +123,10 @@
         }
         .card-icon img { width: 28px; height: 28px; border-radius: 4px; object-fit: cover; }
 
-        .login-card h2 { font-size: 26px; margin-bottom: 8px; font-weight: 600; letter-spacing: -0.5px; color: #fff; }
+        .login-card h2 { font-size: 26px; margin-bottom: 8px; font-weight: 700; letter-spacing: -0.5px; color: #fff; }
         .login-card p { font-size: 14px; color: var(--text-muted); margin-bottom: 32px; line-height: 1.5; }
 
-        /* Botão do Discord Fosco (Sem gradiente, cor sólida) */
+        /* Botão do Discord Fosco (Cor sólida) */
         .btn-discord {
             display: flex; align-items: center; justify-content: center; gap: 12px;
             width: 100%; padding: 18px; 
@@ -141,7 +140,7 @@
         .btn-discord:hover {
             background: var(--purple-hover);
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(96, 81, 155, 0.3);
+            box-shadow: 0 8px 25px rgba(96, 81, 155, 0.4);
         }
         
         .btn-discord svg { width: 22px; height: 22px; fill: currentColor; }
