@@ -8,30 +8,38 @@
         @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;800&display=swap');
         
         :root {
-            --purple: #8A4FFF;
-            --purple-hi: #A370FF;
-            --bg: #050308;
-            --text-main: #FFFFFF;
-            --text-muted: #8E8E9A;
-            --border: rgba(255,255,255,0.08);
+            /* Paleta Fosca extraída da imagem */
+            --bg-dark: #1c202c;
+            --card-bg: #31323e;
+            --purple: #60519b;
+            --purple-hover: #7160b5;
+            --text-main: #bfc0d1;
+            --text-muted: #8a8b9e;
+            --border: rgba(255,255,255,0.05);
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
 
         body {
-            background-color: var(--bg);
+            background-color: var(--bg-dark);
             color: var(--text-main);
             height: 100vh;
             display: flex;
             overflow: hidden;
         }
 
-        /* Luz de fundo suave */
+        /* FUNDO COM IMAGEM (fundo.png) + Overlay Fosco */
         body::before {
-            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: 
-                radial-gradient(circle at 15% 30%, rgba(138,79,255,0.1) 0%, transparent 40%),
-                radial-gradient(circle at 85% 70%, rgba(138,79,255,0.05) 0%, transparent 40%);
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            /* O linear-gradient cria a máscara escura sobre a sua imagem */
+            background-image: 
+                linear-gradient(to bottom, rgba(28, 32, 44, 0.85), rgba(28, 32, 44, 0.95)),
+                url('/fundo.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
             z-index: -1;
             pointer-events: none;
         }
@@ -47,15 +55,15 @@
         .brand-header { display: flex; align-items: center; gap: 12px; }
         .brand-header img { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; border: 1px solid var(--border); }
         
-        /* Brilho no PXK */
+        /* PXK com brilho sutil */
         .brand-header span { 
             font-family: 'Archivo Black', sans-serif; 
             font-size: 22px; 
             letter-spacing: 2px; 
-            text-shadow: 0 0 15px rgba(138, 79, 255, 0.8), 0 0 30px rgba(138, 79, 255, 0.4);
+            color: var(--text-main);
+            text-shadow: 0 0 20px rgba(191, 192, 209, 0.3);
         }
 
-        /* Centraliza o texto na tela */
         .hero-text { 
             flex: 1;
             display: flex;
@@ -71,14 +79,14 @@
             line-height: 1.05; 
             margin-bottom: 24px; 
             letter-spacing: -1px;
-            /* Brilho sutil no texto branco */
-            text-shadow: 0 0 20px rgba(255, 255, 255, 0.15);
+            color: #ffffff;
+            text-shadow: 0 0 30px rgba(0, 0, 0, 0.5); /* Sombra para destacar do fundo */
         }
 
-        /* Brilho forte na palavra "precisão" */
+        /* Brilho sutil na palavra "precisão" */
         .hero-text h1 span { 
             color: var(--purple); 
-            text-shadow: 0 0 30px rgba(138, 79, 255, 0.9), 0 0 15px rgba(138, 79, 255, 0.6);
+            text-shadow: 0 0 25px rgba(96, 81, 155, 0.6);
         }
 
         .hero-text p { 
@@ -88,61 +96,52 @@
             max-width: 450px; 
         }
 
-        /* --- PAINEL DIREITO (Card de Login) --- */
+        /* --- PAINEL DIREITO (Card de Login Fosco) --- */
         .right-panel {
             flex: 0 0 550px; display: flex; align-items: center; justify-content: center;
-            padding: 40px; background: rgba(0,0,0,0.1); border-left: 1px solid rgba(255,255,255,0.02);
+            padding: 40px; 
+            background: rgba(28, 32, 44, 0.5); /* Leve camada extra de escurecimento no lado direito */
+            border-left: 1px solid var(--border);
         }
 
         .login-card {
-            /* Fundo de vidro translúcido igual a referência */
-            background: rgba(22, 16, 30, 0.4); 
-            backdrop-filter: blur(30px); 
-            -webkit-backdrop-filter: blur(30px);
-            border: 1px solid rgba(255,255,255,0.08); 
-            border-top: 1px solid rgba(255,255,255,0.15);
+            /* Efeito Fosco (Sem glassmorphism, cor sólida) */
+            background: var(--card-bg); 
+            border: 1px solid rgba(255,255,255,0.03); 
+            border-top: 1px solid rgba(255,255,255,0.08);
             border-radius: 24px; 
             padding: 48px;
             width: 100%; 
             max-width: 420px;
-            /* Sombra interna e externa simulando iluminação */
-            box-shadow: 
-                0 30px 60px rgba(0,0,0,0.6), 
-                inset 0 0 20px rgba(138,79,255,0.05);
+            /* Sombra pesada e suave, sem brilho */
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
             position: relative;
         }
 
         .card-icon {
-            width: 48px; height: 48px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+            width: 48px; height: 48px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05);
             border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 24px;
         }
         .card-icon img { width: 28px; height: 28px; border-radius: 4px; object-fit: cover; }
 
-        .login-card h2 { font-size: 28px; margin-bottom: 8px; font-weight: 600; letter-spacing: -0.5px; }
+        .login-card h2 { font-size: 26px; margin-bottom: 8px; font-weight: 600; letter-spacing: -0.5px; color: #fff; }
         .login-card p { font-size: 14px; color: var(--text-muted); margin-bottom: 32px; line-height: 1.5; }
 
-        /* Botão do Discord com a iluminação igual a referência */
+        /* Botão do Discord Fosco (Sem gradiente, cor sólida) */
         .btn-discord {
             display: flex; align-items: center; justify-content: center; gap: 12px;
             width: 100%; padding: 18px; 
-            background: linear-gradient(135deg, #9A5CFF, #7B3FF2);
-            color: #fff; text-decoration: none; border-radius: 99px; font-weight: 700; font-size: 15px;
-            transition: all 0.3s ease; 
-            /* Brilho externo e interno no botão */
-            box-shadow: 
-                0 0 20px rgba(138,79,255,0.4), 
-                0 10px 20px rgba(0,0,0,0.4),
-                inset 0 1px 1px rgba(255,255,255,0.3);
+            background: var(--purple);
+            color: #fff; text-decoration: none; border-radius: 12px; font-weight: 700; font-size: 15px;
+            transition: all 0.2s ease; 
             border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
         
         .btn-discord:hover {
-            transform: translateY(-2px); 
-            box-shadow: 
-                0 0 30px rgba(138,79,255,0.7), 
-                0 15px 30px rgba(0,0,0,0.5),
-                inset 0 1px 1px rgba(255,255,255,0.4);
-            background: linear-gradient(135deg, #B07FFF, #9A5CFF);
+            background: var(--purple-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(96, 81, 155, 0.3);
         }
         
         .btn-discord svg { width: 22px; height: 22px; fill: currentColor; }
@@ -151,6 +150,9 @@
             margin-top: 32px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.05);
             display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted);
         }
+        
+        .card-footer a { color: var(--text-muted); text-decoration: none; transition: 0.2s; }
+        .card-footer a:hover { color: var(--text-main); }
 
         /* Responsividade */
         @media (max-width: 1024px) {
@@ -165,7 +167,6 @@
 </head>
 <body>
     <div class="layout">
-        <!-- Painel Esquerdo -->
         <div class="left-panel">
             <div class="brand-header">
                 <img src="/logo.gif" alt="Logo" onerror="this.style.display='none'">
@@ -176,11 +177,8 @@
                 <h1>Gerencie seu<br>servidor com<br><span>precisão.</span></h1>
                 <p>Toda a configuração do seu bot em um painel único, seguro e intuitivo. Controle tickets, verificação, níveis e muito mais.</p>
             </div>
-            
-            <!-- Elementos removidos (A little clarity e Menos ruido) -->
         </div>
 
-        <!-- Painel Direito -->
         <div class="right-panel">
             <div class="login-card">
                 <div class="card-icon">
@@ -197,7 +195,7 @@
 
                 <div class="card-footer">
                     <span>&copy; 2026 PXK</span>
-                    <a href="/login" style="color: var(--text-muted); text-decoration: none;">Suporte</a>
+                    <a href="/login">Suporte</a>
                 </div>
             </div>
         </div>
