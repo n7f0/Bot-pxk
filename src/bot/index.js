@@ -50,15 +50,17 @@ function updateBotPresence(cfg) {
 
   // 3. Configura as atividades (presets)
   const presets = cfg.presences || [];
-  if (presets.length === 0) return;
+  // Filtra para remover presets vazios que o usuário possa ter deixado em branco
+  const validPresets = presets.filter(p => p && p.text && p.text.trim() !== '');
+  
+  if (validPresets.length === 0) return;
 
   let currentIndex = 0;
 
   // Função que aplica o preset atual
   const applyPreset = () => {
-    const preset = presets[currentIndex];
-    if (!preset || !preset.text) return;
-
+    const preset = validPresets[currentIndex];
+    
     let activityType = ActivityType.Playing; // Padrão
     
     // Mapeia os tipos configurados no site para os tipos do Discord
@@ -73,7 +75,7 @@ function updateBotPresence(cfg) {
 
     const activityOptions = {
       type: activityType,
-      name: preset.text // Aqui o emoji padrão ou do servidor (<:nome:id>) já é reconhecido automaticamente
+      name: preset.text // O Discord lida nativamente com emojis padrão e <:nome:id> aqui
     };
 
     // O Discord exige uma URL se o tipo for "Transmitindo" (Streaming)
@@ -88,10 +90,10 @@ function updateBotPresence(cfg) {
   applyPreset();
 
   // 4. Lógica de Rotação
-  if (cfg.presence_rotation && presets.length > 1) {
+  if (cfg.presence_rotation && validPresets.length > 1) {
     const intervalMs = (cfg.presence_interval || 30) * 1000; // Converte segundos para milissegundos
     presenceInterval = setInterval(() => {
-      currentIndex = (currentIndex + 1) % presets.length;
+      currentIndex = (currentIndex + 1) % validPresets.length;
       applyPreset();
     }, intervalMs);
   }
