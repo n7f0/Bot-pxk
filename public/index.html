@@ -89,9 +89,6 @@
         h3 { font-size: 12px; color: var(--purple-hover); margin: 30px 0 15px; border-bottom: 1px solid var(--border); padding-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
         
         .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
-        @media(max-width: 1200px) { .grid { grid-template-columns: 1fr 1fr; } }
-        @media(max-width: 800px) { .grid { grid-template-columns: 1fr; } }
-        
         .full { grid-column: 1 / -1; }
         label { display: block; font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; }
         input, select, textarea { 
@@ -140,6 +137,7 @@
             background: rgba(28, 32, 44, 0.95); backdrop-filter: blur(10px); padding: 12px 24px; 
             border-radius: 99px; border: 1px solid var(--purple); gap: 20px; 
             align-items: center; box-shadow: 0 10px 40px rgba(0,0,0,0.9); z-index: 100; animation: slideUp 0.3s;
+            width: max-content; max-width: 90vw;
         }
         @keyframes slideUp { from { bottom: 0; opacity: 0; } to { bottom: 24px; opacity: 1; } }
         .btn-save { 
@@ -153,6 +151,44 @@
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--purple); border-radius: 4px; }
+
+        /* =========================================
+           CORREÇÃO PARA CELULAR (MOBILE) 
+           ========================================= */
+        @media(max-width: 900px) {
+            body { 
+                overflow: auto; /* Permite rolar a página inteira */
+                height: auto;
+                min-height: 100vh;
+            }
+            .header { padding: 16px 20px; }
+            .container { 
+                flex-direction: column; /* Empilha a sidebar em cima e o form embaixo */
+                overflow: visible; 
+                padding: 16px;
+                gap: 16px;
+            }
+            .sidebar { 
+                width: 100%; 
+                flex-shrink: 1;
+                max-height: 250px; /* Limita a altura do menu para não empurrar o form muito pra baixo */
+            }
+            .content { 
+                width: 100%;
+                padding: 20px;
+                overflow: visible; 
+            }
+            .grid { 
+                grid-template-columns: 1fr; /* Inputs ocupam 100% da largura no celular */
+            }
+            .save-bar {
+                padding: 10px 16px;
+                flex-direction: column;
+                border-radius: 16px;
+                gap: 10px;
+            }
+            .btn-save { width: 100%; padding: 10px; }
+        }
     </style>
 </head>
 <body>
@@ -232,7 +268,7 @@
         });
 
         // =========================================================================
-        // SCHEMA MESTRE (Atualizado com Presenças)
+        // SCHEMA MESTRE
         // =========================================================================
         const SCHEMA = {
             identidade: {
@@ -492,27 +528,22 @@
                         { key: 'presence_rotation', label: 'Rotação de Status?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
                         { key: 'presence_interval', label: 'Tempo de Rotação (Segundos)', type: 'number' },
                         
-                        // PRESET 1
                         { key: 'presences.0.type', label: 'Preset 1 - Tipo', type: 'select', options: [{v:'PLAYING',l:'Jogando'},{v:'WATCHING',l:'Assistindo'},{v:'LISTENING',l:'Ouvindo'},{v:'COMPETING',l:'Competindo'},{v:'STREAMING',l:'Transmitindo'}] },
                         { key: 'presences.0.text', label: 'Preset 1 - Texto', type: 'text', help: 'Aceita emojis ou <:nome:id>' },
                         { key: 'presences.0.url', label: 'Preset 1 - URL (Twitch)', type: 'text', help: 'Só p/ Transmitindo' },
                         
-                        // PRESET 2
                         { key: 'presences.1.type', label: 'Preset 2 - Tipo', type: 'select', options: [{v:'PLAYING',l:'Jogando'},{v:'WATCHING',l:'Assistindo'},{v:'LISTENING',l:'Ouvindo'},{v:'COMPETING',l:'Competindo'},{v:'STREAMING',l:'Transmitindo'}] },
                         { key: 'presences.1.text', label: 'Preset 2 - Texto', type: 'text' },
                         { key: 'presences.1.url', label: 'Preset 2 - URL', type: 'text' },
                         
-                        // PRESET 3
                         { key: 'presences.2.type', label: 'Preset 3 - Tipo', type: 'select', options: [{v:'PLAYING',l:'Jogando'},{v:'WATCHING',l:'Assistindo'},{v:'LISTENING',l:'Ouvindo'},{v:'COMPETING',l:'Competindo'},{v:'STREAMING',l:'Transmitindo'}] },
                         { key: 'presences.2.text', label: 'Preset 3 - Texto', type: 'text' },
                         { key: 'presences.2.url', label: 'Preset 3 - URL', type: 'text' },
                         
-                        // PRESET 4
                         { key: 'presences.3.type', label: 'Preset 4 - Tipo', type: 'select', options: [{v:'PLAYING',l:'Jogando'},{v:'WATCHING',l:'Assistindo'},{v:'LISTENING',l:'Ouvindo'},{v:'COMPETING',l:'Competindo'},{v:'STREAMING',l:'Transmitindo'}] },
                         { key: 'presences.3.text', label: 'Preset 4 - Texto', type: 'text' },
                         { key: 'presences.3.url', label: 'Preset 4 - URL', type: 'text' },
                         
-                        // PRESET 5
                         { key: 'presences.4.type', label: 'Preset 5 - Tipo', type: 'select', options: [{v:'PLAYING',l:'Jogando'},{v:'WATCHING',l:'Assistindo'},{v:'LISTENING',l:'Ouvindo'},{v:'COMPETING',l:'Competindo'},{v:'STREAMING',l:'Transmitindo'}] },
                         { key: 'presences.4.text', label: 'Preset 5 - Texto', type: 'text' },
                         { key: 'presences.4.url', label: 'Preset 5 - URL', type: 'text' },
@@ -523,7 +554,6 @@
 
         const getVal = (obj, path) => path.split('.').reduce((o, k) => (o ? o[k] : undefined), obj);
         
-        // ATUALIZADO: Agora detecta se a próxima chave é um número para criar um Array em vez de Object
         function setVal(obj, path, value) {
             const keys = path.split('.');
             let curr = obj;
@@ -641,14 +671,12 @@
                 if (!ddRes.ok) throw new Error('Falha ao buscar dados do Discord');
                 discordData = await ddRes.json() || { ch: [], vc: [], cat: [], role: [] };
 
-                // Preenche selects únicos
                 document.querySelectorAll('.discord-data').forEach(sel => {
                     const type = sel.dataset.type;
                     const list = discordData[type] || [];
                     sel.innerHTML = `<option value="">— nenhum —</option>` + list.map(item => `<option value="${item.id}">${item.name}</option>`).join('');
                 });
 
-                // Preenche os multi-selects customizados
                 document.querySelectorAll('[data-multi="true"]').forEach(input => {
                     const key = input.dataset.key;
                     const fieldId = key.replace(/\./g, '_');
@@ -667,7 +695,6 @@
                     updateMSLabel(fieldId);
                 });
 
-                // Preenche os inputs normais
                 document.querySelectorAll('[data-key]').forEach(input => {
                     if (input.type === 'hidden') return; 
                     const key = input.dataset.key;
@@ -715,7 +742,6 @@
 
             const updatedData = JSON.parse(JSON.stringify(globalConfig));
 
-            // 1. Pega os Multi-Selects
             document.querySelectorAll('[data-multi="true"]').forEach(input => {
                 const key = input.dataset.key;
                 const fieldId = key.replace(/\./g, '_');
@@ -724,7 +750,6 @@
                 setVal(updatedData, key, values);
             });
 
-            // 2. Pega os Inputs normais
             document.querySelectorAll('[data-key]').forEach(input => {
                 if (input.dataset.multi) return;
                 const key = input.dataset.key;
@@ -764,7 +789,6 @@
             btn.classList.add('active');
         }
 
-        // Inicializa tudo
         try {
             loadUser();
             construirPainel();
