@@ -26,276 +26,161 @@
             overflow: hidden;
         }
 
-        /* Efeitos de fundo */
+        /* Luz de fundo suave */
         body::before {
             content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: 
-                radial-gradient(circle at 15% 30%, rgba(138,79,255,0.08) 0%, transparent 40%),
+                radial-gradient(circle at 15% 30%, rgba(138,79,255,0.1) 0%, transparent 40%),
                 radial-gradient(circle at 85% 70%, rgba(138,79,255,0.05) 0%, transparent 40%);
             z-index: -1;
             pointer-events: none;
         }
 
-        /* Layout Principal (Duas Colunas) */
-        .layout {
-            display: flex;
-            width: 100%;
-            height: 100%;
+        .layout { display: flex; width: 100%; height: 100%; }
+
+        /* --- PAINEL ESQUERDO --- */
+        .left-panel {
+            flex: 1; padding: 60px 80px; display: flex; flex-direction: column;
+            justify-content: space-between; position: relative;
         }
 
-        /* --- COLUNA ESQUERDA (Texto e Visual) --- */
-        .left-panel {
+        .brand-header { display: flex; align-items: center; gap: 12px; }
+        .brand-header img { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; border: 1px solid var(--border); }
+        
+        /* Brilho no PXK */
+        .brand-header span { 
+            font-family: 'Archivo Black', sans-serif; 
+            font-size: 22px; 
+            letter-spacing: 2px; 
+            text-shadow: 0 0 15px rgba(138, 79, 255, 0.8), 0 0 30px rgba(138, 79, 255, 0.4);
+        }
+
+        /* Centraliza o texto na tela */
+        .hero-text { 
             flex: 1;
-            padding: 60px 80px;
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
-            position: relative;
-        }
-
-        .brand-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .brand-header img {
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
-            object-fit: cover;
-            border: 1px solid var(--border);
-        }
-
-        .brand-header span {
-            font-family: 'Archivo Black', sans-serif;
-            font-size: 20px;
-            letter-spacing: 1px;
-        }
-
-        .hero-text {
-            max-width: 600px;
-            margin-top: -40px;
-        }
-
-        .hero-tag {
-            display: inline-block;
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--text-muted);
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            margin-bottom: 20px;
-            border-left: 2px solid var(--purple);
-            padding-left: 10px;
+            justify-content: center;
+            max-width: 650px; 
+            margin-top: -60px;
         }
 
         .hero-text h1 {
-            font-size: clamp(3rem, 5vw, 4.5rem);
+            font-size: clamp(3.5rem, 5.5vw, 5rem); 
             font-family: 'Archivo Black', sans-serif;
-            line-height: 1.05;
-            margin-bottom: 24px;
+            line-height: 1.05; 
+            margin-bottom: 24px; 
             letter-spacing: -1px;
+            /* Brilho sutil no texto branco */
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.15);
         }
 
-        .hero-text h1 span {
-            color: var(--purple);
+        /* Brilho forte na palavra "precisão" */
+        .hero-text h1 span { 
+            color: var(--purple); 
+            text-shadow: 0 0 30px rgba(138, 79, 255, 0.9), 0 0 15px rgba(138, 79, 255, 0.6);
         }
 
-        .hero-text p {
-            font-size: 16px;
-            color: var(--text-muted);
-            line-height: 1.6;
-            max-width: 400px;
+        .hero-text p { 
+            font-size: 16px; 
+            color: var(--text-muted); 
+            line-height: 1.6; 
+            max-width: 450px; 
         }
 
-        /* Elemento 3D (Recriado com CSS para substituir a imagem) */
-        .hero-visual {
-            position: absolute;
-            bottom: 10%;
-            left: 80px;
-            width: 200px;
-            height: 200px;
-        }
-
-        .glowing-ring {
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            background: radial-gradient(circle, transparent 40%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.8) 55%, transparent 60%);
-            box-shadow: 
-                0 0 40px rgba(255,255,255,0.2),
-                inset 0 0 20px rgba(255,255,255,0.5);
-            transform: rotateX(70deg) rotateY(20deg);
-            animation: float 6s ease-in-out infinite;
-            position: relative;
-        }
-
-        .glowing-ring::after {
-            content: '';
-            position: absolute;
-            top: 10%; left: 10%; width: 80%; height: 80%;
-            border-radius: 50%;
-            background: radial-gradient(circle, transparent, rgba(138,79,255,0.2));
-            filter: blur(10px);
-        }
-
-        @keyframes float {
-            0% { transform: rotateX(70deg) rotateY(20deg) translateY(0); }
-            50% { transform: rotateX(70deg) rotateY(20deg) translateY(-15px); }
-            100% { transform: rotateX(70deg) rotateY(20deg) translateY(0); }
-        }
-
-        .left-footer {
-            font-size: 12px;
-            color: var(--text-muted);
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .left-footer::before {
-            content: '';
-            width: 30px;
-            height: 1px;
-            background: var(--text-muted);
-        }
-
-        /* --- COLUNA DIREITA (Login Card) --- */
+        /* --- PAINEL DIREITO (Card de Login) --- */
         .right-panel {
-            flex: 0 0 550px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 40px;
-            background: rgba(0,0,0,0.2);
-            border-left: 1px solid var(--border);
+            flex: 0 0 550px; display: flex; align-items: center; justify-content: center;
+            padding: 40px; background: rgba(0,0,0,0.1); border-left: 1px solid rgba(255,255,255,0.02);
         }
 
         .login-card {
-            background: rgba(20, 15, 25, 0.6);
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 24px;
+            /* Fundo de vidro translúcido igual a referência */
+            background: rgba(22, 16, 30, 0.4); 
+            backdrop-filter: blur(30px); 
+            -webkit-backdrop-filter: blur(30px);
+            border: 1px solid rgba(255,255,255,0.08); 
+            border-top: 1px solid rgba(255,255,255,0.15);
+            border-radius: 24px; 
             padding: 48px;
-            width: 100%;
+            width: 100%; 
             max-width: 420px;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.05);
+            /* Sombra interna e externa simulando iluminação */
+            box-shadow: 
+                0 30px 60px rgba(0,0,0,0.6), 
+                inset 0 0 20px rgba(138,79,255,0.05);
             position: relative;
         }
 
         .card-icon {
-            width: 48px;
-            height: 48px;
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 24px;
+            width: 48px; height: 48px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 24px;
         }
-
         .card-icon img { width: 28px; height: 28px; border-radius: 4px; object-fit: cover; }
 
-        .login-card h2 {
-            font-size: 28px;
-            margin-bottom: 8px;
-            font-weight: 600;
-            letter-spacing: -0.5px;
-        }
+        .login-card h2 { font-size: 28px; margin-bottom: 8px; font-weight: 600; letter-spacing: -0.5px; }
+        .login-card p { font-size: 14px; color: var(--text-muted); margin-bottom: 32px; line-height: 1.5; }
 
-        .login-card p {
-            font-size: 14px;
-            color: var(--text-muted);
-            margin-bottom: 32px;
-            line-height: 1.5;
-        }
-
-        /* Botão do Discord Estilizado (Pill-shape) */
+        /* Botão do Discord com a iluminação igual a referência */
         .btn-discord {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            width: 100%;
-            padding: 18px;
-            background: linear-gradient(135deg, #8A4FFF, #6B2EE0);
-            color: #fff;
-            text-decoration: none;
-            border-radius: 99px;
-            font-weight: 700;
-            font-size: 15px;
-            transition: all 0.3s ease;
-            box-shadow: 0 10px 20px rgba(138,79,255,0.3);
+            display: flex; align-items: center; justify-content: center; gap: 12px;
+            width: 100%; padding: 18px; 
+            background: linear-gradient(135deg, #9A5CFF, #7B3FF2);
+            color: #fff; text-decoration: none; border-radius: 99px; font-weight: 700; font-size: 15px;
+            transition: all 0.3s ease; 
+            /* Brilho externo e interno no botão */
+            box-shadow: 
+                0 0 20px rgba(138,79,255,0.4), 
+                0 10px 20px rgba(0,0,0,0.4),
+                inset 0 1px 1px rgba(255,255,255,0.3);
             border: 1px solid rgba(255,255,255,0.1);
         }
-
+        
         .btn-discord:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 15px 30px rgba(138,79,255,0.5);
-            background: linear-gradient(135deg, #A370FF, #8A4FFF);
+            transform: translateY(-2px); 
+            box-shadow: 
+                0 0 30px rgba(138,79,255,0.7), 
+                0 15px 30px rgba(0,0,0,0.5),
+                inset 0 1px 1px rgba(255,255,255,0.4);
+            background: linear-gradient(135deg, #B07FFF, #9A5CFF);
         }
+        
+        .btn-discord svg { width: 22px; height: 22px; fill: currentColor; }
 
-        .btn-discord svg {
-            width: 22px;
-            height: 22px;
-            fill: currentColor;
-        }
-
-        /* Rodapé do Card */
         .card-footer {
-            margin-top: 32px;
-            padding-top: 24px;
-            border-top: 1px solid rgba(255,255,255,0.05);
-            display: flex;
-            justify-content: space-between;
-            font-size: 12px;
-            color: var(--text-muted);
+            margin-top: 32px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.05);
+            display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted);
         }
-
-        .card-footer a { color: var(--text-muted); text-decoration: none; transition: 0.2s; }
-        .card-footer a:hover { color: #fff; }
 
         /* Responsividade */
         @media (max-width: 1024px) {
             body { overflow-y: auto; }
             .layout { flex-direction: column; }
             .left-panel { padding: 40px; align-items: center; text-align: center; }
-            .hero-text { margin-top: 40px; }
+            .hero-text { margin-top: 20px; align-items: center; }
             .hero-text p { margin: 0 auto; }
-            .hero-visual { display: none; }
-            .left-footer { justify-content: center; margin-top: 40px; }
             .right-panel { flex: 1; border-left: none; border-top: 1px solid var(--border); padding: 40px 20px; }
         }
     </style>
 </head>
 <body>
     <div class="layout">
-        <!-- Coluna Esquerda -->
+        <!-- Painel Esquerdo -->
         <div class="left-panel">
             <div class="brand-header">
                 <img src="/logo.gif" alt="Logo" onerror="this.style.display='none'">
-                <span>PXK SYSTEM</span>
+                <span>PXK</span>
             </div>
 
             <div class="hero-text">
-                <span class="hero-tag">A little clarity. A little magic.</span>
                 <h1>Gerencie seu<br>servidor com<br><span>precisão.</span></h1>
                 <p>Toda a configuração do seu bot em um painel único, seguro e intuitivo. Controle tickets, verificação, níveis e muito mais.</p>
             </div>
-
-            <div class="hero-visual">
-                <div class="glowing-ring"></div>
-            </div>
-
-            <div class="left-footer">
-                Menos ruído. Mais possibilidade.
-            </div>
+            
+            <!-- Elementos removidos (A little clarity e Menos ruido) -->
         </div>
 
-        <!-- Coluna Direita (Card de Login) -->
+        <!-- Painel Direito -->
         <div class="right-panel">
             <div class="login-card">
                 <div class="card-icon">
@@ -312,7 +197,7 @@
 
                 <div class="card-footer">
                     <span>&copy; 2026 PXK</span>
-                    <a href="/login">Suporte</a>
+                    <a href="/login" style="color: var(--text-muted); text-decoration: none;">Suporte</a>
                 </div>
             </div>
         </div>
