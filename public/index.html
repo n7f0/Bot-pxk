@@ -232,7 +232,7 @@
         });
 
         // =========================================================================
-        // SCHEMA MESTRE
+        // SCHEMA MESTRE (Atualizado com Presenças)
         // =========================================================================
         const SCHEMA = {
             identidade: {
@@ -487,8 +487,35 @@
                         { key: 'per_page', label: 'Itens por Página', type: 'number' },
                         { key: 'rank_max', label: 'Máx. Membros no Ranking', type: 'number' },
                     ]},
-                    { title: 'Status do Bot', fields: [
+                    { title: 'Status e Presenças do Bot', fields: [
                         { key: 'bot_status', label: 'Status no Discord', type: 'select', options: [{v:'online',l:'🟢 Online'},{v:'idle',l:'🌙 Ausente'},{v:'dnd',l:'⛔ Não Perturbe'},{v:'invisible',l:'⚫ Invisível'}] },
+                        { key: 'presence_rotation', label: 'Rotação de Status?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'presence_interval', label: 'Tempo de Rotação (Segundos)', type: 'number' },
+                        
+                        // PRESET 1
+                        { key: 'presences.0.type', label: 'Preset 1 - Tipo', type: 'select', options: [{v:'PLAYING',l:'Jogando'},{v:'WATCHING',l:'Assistindo'},{v:'LISTENING',l:'Ouvindo'},{v:'COMPETING',l:'Competindo'},{v:'STREAMING',l:'Transmitindo'}] },
+                        { key: 'presences.0.text', label: 'Preset 1 - Texto', type: 'text', help: 'Aceita emojis ou <:nome:id>' },
+                        { key: 'presences.0.url', label: 'Preset 1 - URL (Twitch)', type: 'text', help: 'Só p/ Transmitindo' },
+                        
+                        // PRESET 2
+                        { key: 'presences.1.type', label: 'Preset 2 - Tipo', type: 'select', options: [{v:'PLAYING',l:'Jogando'},{v:'WATCHING',l:'Assistindo'},{v:'LISTENING',l:'Ouvindo'},{v:'COMPETING',l:'Competindo'},{v:'STREAMING',l:'Transmitindo'}] },
+                        { key: 'presences.1.text', label: 'Preset 2 - Texto', type: 'text' },
+                        { key: 'presences.1.url', label: 'Preset 2 - URL', type: 'text' },
+                        
+                        // PRESET 3
+                        { key: 'presences.2.type', label: 'Preset 3 - Tipo', type: 'select', options: [{v:'PLAYING',l:'Jogando'},{v:'WATCHING',l:'Assistindo'},{v:'LISTENING',l:'Ouvindo'},{v:'COMPETING',l:'Competindo'},{v:'STREAMING',l:'Transmitindo'}] },
+                        { key: 'presences.2.text', label: 'Preset 3 - Texto', type: 'text' },
+                        { key: 'presences.2.url', label: 'Preset 3 - URL', type: 'text' },
+                        
+                        // PRESET 4
+                        { key: 'presences.3.type', label: 'Preset 4 - Tipo', type: 'select', options: [{v:'PLAYING',l:'Jogando'},{v:'WATCHING',l:'Assistindo'},{v:'LISTENING',l:'Ouvindo'},{v:'COMPETING',l:'Competindo'},{v:'STREAMING',l:'Transmitindo'}] },
+                        { key: 'presences.3.text', label: 'Preset 4 - Texto', type: 'text' },
+                        { key: 'presences.3.url', label: 'Preset 4 - URL', type: 'text' },
+                        
+                        // PRESET 5
+                        { key: 'presences.4.type', label: 'Preset 5 - Tipo', type: 'select', options: [{v:'PLAYING',l:'Jogando'},{v:'WATCHING',l:'Assistindo'},{v:'LISTENING',l:'Ouvindo'},{v:'COMPETING',l:'Competindo'},{v:'STREAMING',l:'Transmitindo'}] },
+                        { key: 'presences.4.text', label: 'Preset 5 - Texto', type: 'text' },
+                        { key: 'presences.4.url', label: 'Preset 5 - URL', type: 'text' },
                     ]}
                 ]
             }
@@ -496,12 +523,17 @@
 
         const getVal = (obj, path) => path.split('.').reduce((o, k) => (o ? o[k] : undefined), obj);
         
+        // ATUALIZADO: Agora detecta se a próxima chave é um número para criar um Array em vez de Object
         function setVal(obj, path, value) {
             const keys = path.split('.');
             let curr = obj;
             for (let i = 0; i < keys.length - 1; i++) {
-                if (!curr[keys[i]]) curr[keys[i]] = {};
-                curr = curr[keys[i]];
+                const key = keys[i];
+                const nextKey = keys[i + 1];
+                if (!curr[key]) {
+                    curr[key] = /^\d+$/.test(nextKey) ? [] : {};
+                }
+                curr = curr[key];
             }
             curr[keys[keys.length - 1]] = value;
         }
@@ -637,7 +669,7 @@
 
                 // Preenche os inputs normais
                 document.querySelectorAll('[data-key]').forEach(input => {
-                    if (input.type === 'hidden') return; // handled above
+                    if (input.type === 'hidden') return; 
                     const key = input.dataset.key;
                     let val = getVal(globalConfig, key);
                     
@@ -714,7 +746,7 @@
                     globalConfig = updatedData;
                     btn.innerText = 'Salvo!';
                     btn.style.background = '#2ecc71';
-                    document.getElementById('saveBar').style.display = 'none'; // Esconde a barra
+                    document.getElementById('saveBar').style.display = 'none'; 
                     setTimeout(() => { btn.innerText = 'Salvar Tudo'; btn.style.background = 'var(--purple)'; }, 2000);
                 } else {
                     throw new Error('Erro no servidor ao salvar');
