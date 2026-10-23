@@ -40,12 +40,12 @@
         input:focus, select:focus, textarea:focus { border-color: var(--purple); box-shadow: 0 0 0 3px rgba(138,79,255,0.2); }
         select[multiple] { height: 100px; }
         textarea { resize: vertical; min-height: 80px; }
-        .tutorial { background: rgba(138,79,255,0.1); border-left: 3px solid var(--purple); padding: 12px 16px; border-radius: 6px; font-size: 12px; color: #B8B8C2; margin-top: 8px; display: flex; gap: 10px; line-height: 1.5; }
         
         .save-bar { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #0a0810; padding: 12px 24px; border-radius: 99px; border: 1px solid var(--purple); display: flex; gap: 20px; align-items: center; box-shadow: 0 10px 40px rgba(0,0,0,0.9); z-index: 100; }
         .btn-save { background: var(--purple); color: #fff; border: none; padding: 12px 32px; border-radius: 99px; font-weight: 800; cursor: pointer; transition: 0.2s; text-transform: uppercase; }
         .btn-save:hover { background: var(--purple-hi); transform: scale(1.05); }
         .loading { text-align: center; color: var(--purple); font-weight: bold; margin-top: 50px; font-size: 18px; }
+        .error-box { background: rgba(255,51,102,0.1); border: 1px solid #FF3366; padding: 20px; border-radius: 12px; color: #FF3366; text-align: center; margin-top: 20px; }
     </style>
 </head>
 <body>
@@ -72,16 +72,16 @@
         let globalConfig = {};
         let discordData = { ch: [], vc: [], cat: [], role: [] };
 
-        // =========================================================================================
-        // SCHEMA MESTRE — ABSOLUTAMENTE TUDO (1ª, 2ª e 3ª LEVAS consolidadas)
-        // =========================================================================================
+        // =========================================================================
+        // SCHEMA MESTRE: TUDO DO PXK, MOV CALL, RECRUTAMENTO E BATE-PONTO
+        // =========================================================================
         const SCHEMA = {
             identidade: {
                 icon: '🎨', name: 'Identidade Visual',
                 groups: [
                     { title: 'Painel de Tickets', fields: [
-                        { key: 'tickets.panel.title', label: 'Título', type: 'text', help: 'Título do painel de candidatura.' },
-                        { key: 'tickets.panel.desc1', label: 'Descrição 1', type: 'textarea', help: 'Texto principal do embed.' },
+                        { key: 'tickets.panel.title', label: 'Título', type: 'text' },
+                        { key: 'tickets.panel.desc1', label: 'Descrição 1', type: 'textarea' },
                         { key: 'tickets.panel.desc2', label: 'Descrição 2 (V2)', type: 'textarea' },
                         { key: 'tickets.panel.desc3', label: 'Descrição 3 (V2)', type: 'textarea' },
                         { key: 'tickets.panel.desc4', label: 'Descrição 4 (V2)', type: 'textarea' },
@@ -178,7 +178,7 @@
                         { key: 'tickets.useThread', label: 'Usar Tópicos?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
                         { key: 'tickets.categoryId', label: 'Categoria dos Tickets', type: 'discord_cat' },
                         { key: 'tickets.threadChannelId', label: 'Canal dos Tópicos', type: 'discord_ch' },
-                        { key: 'tickets.nameTemplate', label: 'Formato do Nome', type: 'text', help: 'Ex: {tipo}-{usuario}' },
+                        { key: 'tickets.nameTemplate', label: 'Formato do Nome', type: 'text' },
                         { key: 'tickets.requireShiftToClaim', label: 'Exigir Plantão para Assumir?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
                         { key: 'tickets.hierarchyMax', label: 'Máx. Cargos de Hierarquia', type: 'number' },
                     ]},
@@ -521,8 +521,13 @@
                 isFirst = false;
 
                 tabData.groups.forEach(group => {
-                    tabDiv.innerHTML += `<h3>${group.title}</h3><div class="grid" id="grid-${tabId}-${group.title.replace(/\s/g, '')}"></div>`;
-                    const grid = tabDiv.querySelector(`#grid-${tabId}-${group.title.replace(/\s/g, '')}`);
+                    const h3 = document.createElement('h3');
+                    h3.innerText = group.title;
+                    tabDiv.appendChild(h3);
+
+                    const grid = document.createElement('div');
+                    grid.className = 'grid';
+                    tabDiv.appendChild(grid);
 
                     group.fields.forEach(field => {
                         const wrapper = document.createElement('div');
@@ -558,39 +563,47 @@
         }
 
         async function carregarDados() {
-            const res = await fetch('/api/config');
-            globalConfig = await res.json();
-            
-            discordData = await fetch('/api/discord-data').then(r => r.json());
+            try {
+                const res = await fetch('/api/config');
+                if (!res.ok) throw new Error('Falha ao buscar configurações');
+                globalConfig = await res.json() || {};
 
-            document.querySelectorAll('.discord-data').forEach(sel => {
-                const type = sel.dataset.type;
-                const list = discordData[type] || [];
-                sel.innerHTML = list.map(item => `<option value="${item.id}">${item.name}</option>`).join('');
-            });
+                const ddRes = await fetch('/api/discord-data');
+                if (!ddRes.ok) throw new Error('Falha ao buscar dados do Discord');
+                discordData = await ddRes.json() || { ch: [], vc: [], cat: [], role: [] };
 
-            document.querySelectorAll('[data-key]').forEach(input => {
-                const key = input.dataset.key;
-                let val = getVal(globalConfig, key);
-                
-                if (val === undefined || val === null) {
-                    if (input.type === 'checkbox') val = false;
-                    else if (input.tagName === 'SELECT' && !input.multiple) val = '';
-                    else return;
-                }
+                document.querySelectorAll('.discord-data').forEach(sel => {
+                    const type = sel.dataset.type;
+                    const list = discordData[type] || [];
+                    sel.innerHTML = list.map(item => `<option value="${item.id}">${item.name}</option>`).join('');
+                });
 
-                if (input.multiple && Array.isArray(val)) {
-                    Array.from(input.options).forEach(opt => opt.selected = val.includes(opt.value));
-                } else if (input.type === 'checkbox') {
-                    input.checked = Boolean(val);
-                } else {
-                    input.value = val;
-                }
-            });
+                document.querySelectorAll('[data-key]').forEach(input => {
+                    const key = input.dataset.key;
+                    let val = getVal(globalConfig, key);
+                    
+                    if (val === undefined || val === null) {
+                        if (input.type === 'checkbox') val = false;
+                        else if (input.tagName === 'SELECT' && !input.multiple) val = '';
+                        else return;
+                    }
 
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('mainForm').style.display = 'block';
-            document.getElementById('saveBar').style.display = 'flex';
+                    if (input.multiple && Array.isArray(val)) {
+                        Array.from(input.options).forEach(opt => opt.selected = val.includes(opt.value));
+                    } else if (input.type === 'checkbox') {
+                        input.checked = Boolean(val);
+                    } else {
+                        input.value = val;
+                    }
+                });
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('mainForm').style.display = 'block';
+                document.getElementById('saveBar').style.display = 'flex';
+            } catch (e) {
+                console.error(e);
+                document.getElementById('loading').innerHTML = `<div class="error-box"><h3>Erro ao Carregar</h3><p>${e.message}</p><p>Verifique se o bot está online e o token do Discord está correto no arquivo .env</p></div>`;
+            }
         }
 
         async function salvarTudo(e) {
@@ -622,17 +635,24 @@
                 setVal(updatedData, key, val);
             });
 
-            const res = await fetch('/api/config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedData)
-            });
+            try {
+                const res = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updatedData)
+                });
 
-            if (res.ok) {
-                globalConfig = updatedData;
-                btn.innerText = 'Salvo com Sucesso!';
-                btn.style.background = '#2ecc71';
-                setTimeout(() => { btn.innerText = 'Salvar Tudo'; btn.style.background = '#8A4FFF'; }, 2000);
+                if (res.ok) {
+                    globalConfig = updatedData;
+                    btn.innerText = 'Salvo com Sucesso!';
+                    btn.style.background = '#2ecc71';
+                    setTimeout(() => { btn.innerText = 'Salvar Tudo'; btn.style.background = '#8A4FFF'; }, 2000);
+                } else {
+                    throw new Error('Erro no servidor ao salvar');
+                }
+            } catch (e) {
+                alert('Erro ao salvar: ' + e.message);
+                btn.innerText = 'Salvar Tudo';
             }
         }
 
@@ -643,8 +663,13 @@
             btn.classList.add('active');
         }
 
-        construirPainel();
-        carregarDados();
+        // Inicializa
+        try {
+            construirPainel();
+            carregarDados();
+        } catch (e) {
+            document.getElementById('loading').innerHTML = `<div class="error-box"><h3>Erro Crítico</h3><p>${e.message}</p></div>`;
+        }
     </script>
 </body>
 </html>
