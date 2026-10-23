@@ -5,66 +5,175 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PXK - Painel de Controle Total</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap');
-        :root { --purple: #8A4FFF; --purple-hi: #A370FF; --bg: rgba(15, 12, 20, 0.85); --border: rgba(255,255,255,0.08); --input-bg: rgba(0,0,0,0.5); }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
-        body { background: radial-gradient(circle at 10% 20%, rgba(138,79,255,0.2) 0%, transparent 40%), #050308; color: #fff; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@800;900&family=Inter:wght@400;500;600;700;800&display=swap');
         
-        .header { padding: 16px 40px; background: rgba(10,8,15,0.8); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; z-index: 10; }
-        .header img { width: 40px; height: 40px; border-radius: 8px; }
-        .header h1 { font-family: 'Archivo Black'; font-size: 20px; text-transform: uppercase; }
-        .header .logout { margin-left: auto; color: #f87171; text-decoration: none; font-weight: 700; font-size: 14px; padding: 8px 16px; border-radius: 8px; background: rgba(248,113,113,0.1); transition: 0.2s; }
-        .header .logout:hover { background: #f87171; color: #fff; }
+        :root { 
+            /* Paleta Fosca */
+            --bg-dark: #1c202c;
+            --card-bg: #31323e;
+            --purple: #60519b;
+            --purple-hover: #7160b5;
+            --text-main: #bfc0d1;
+            --text-muted: #8a8b9e;
+            --border: rgba(255,255,255,0.05);
+            --input-bg: rgba(0,0,0,0.2);
+        }
 
-        .container { display: flex; flex: 1; padding: 24px; gap: 24px; max-width: 1600px; margin: 0 auto; width: 100%; overflow: hidden; }
-        .sidebar { width: 290px; background: var(--bg); border: 1px solid var(--border); border-radius: 24px; padding: 20px; overflow-y: auto; flex-shrink: 0; }
-        .nav-btn { display: block; width: 100%; padding: 10px 16px; margin-bottom: 4px; background: transparent; color: #B8B8C2; border: 1px solid transparent; border-radius: 10px; text-align: left; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; }
-        .nav-btn:hover { background: rgba(255,255,255,0.05); color: #fff; }
-        .nav-btn.active { background: rgba(138,79,255,0.15); color: #fff; border-color: var(--purple); }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
         
-        .content { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 24px; padding: 40px; overflow-y: auto; scroll-behavior: smooth; }
+        body { 
+            background-color: var(--bg-dark); 
+            color: var(--text-main); 
+            height: 100vh; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+        }
+
+        /* FUNDO COM IMAGEM E OVERLAY FOSCO */
+        body::before {
+            content: ''; position: fixed; inset: 0;
+            background-image: 
+                linear-gradient(to bottom, rgba(28, 32, 44, 0.8), rgba(28, 32, 44, 0.95)),
+                url('/fundo.png');
+            background-size: cover; background-position: center; z-index: -1; pointer-events: none;
+        }
+        
+        /* HEADER */
+        .header { 
+            padding: 16px 40px; 
+            background: rgba(28, 32, 44, 0.8); 
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border); 
+            display: flex; 
+            align-items: center; 
+            z-index: 100; 
+        }
+        
+        .header .brand { 
+            font-family: 'Montserrat', sans-serif; 
+            font-weight: 900; 
+            font-size: 24px; 
+            color: #fff; 
+            letter-spacing: 1px;
+        }
+
+        /* MENU DO USUÁRIO */
+        .user-menu-container { position: relative; margin-left: auto; }
+        .user-info { 
+            display: flex; align-items: center; gap: 10px; cursor: pointer; 
+            background: var(--card-bg); padding: 8px 16px; border-radius: 99px; 
+            border: 1px solid var(--border); transition: 0.2s; 
+        }
+        .user-info:hover { background: rgba(255,255,255,0.05); }
+        .user-info img { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--purple); }
+        .user-info span { font-size: 14px; font-weight: 600; color: #fff; }
+        .user-dropdown { 
+            display: none; position: absolute; top: calc(100% + 10px); right: 0; 
+            background: var(--card-bg); border: 1px solid var(--border); 
+            border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
+            overflow: hidden; z-index: 100; min-width: 180px;
+        }
+        .user-dropdown.active { display: block; }
+        .logout-btn { 
+            display: block; padding: 14px 20px; color: #f87171; 
+            text-decoration: none; font-weight: 700; font-size: 14px; transition: 0.2s; 
+        }
+        .logout-btn:hover { background: rgba(248,113,113,0.1); }
+
+        /* CONTAINER PRINCIPAL */
+        .container { display: flex; flex: 1; padding: 24px; gap: 24px; max-width: 1600px; margin: 0 auto; width: 100%; overflow: hidden; }
+        
+        /* SIDEBAR */
+        .sidebar { 
+            width: 290px; background: var(--card-bg); 
+            border: 1px solid var(--border); border-radius: 20px; 
+            padding: 20px; overflow-y: auto; flex-shrink: 0; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .nav-btn { 
+            display: block; width: 100%; padding: 10px 16px; margin-bottom: 4px; 
+            background: transparent; color: var(--text-muted); border: 1px solid transparent; 
+            border-radius: 10px; text-align: left; font-size: 13px; font-weight: 600; 
+            cursor: pointer; transition: 0.2s; 
+        }
+        .nav-btn:hover { background: rgba(255,255,255,0.03); color: #fff; }
+        .nav-btn.active { background: var(--purple); color: #fff; border-color: var(--purple-hover); }
+        
+        /* ÁREA DE CONTEÚDO */
+        .content { 
+            flex: 1; background: var(--card-bg); 
+            border: 1px solid var(--border); border-radius: 20px; 
+            padding: 40px; overflow-y: auto; scroll-behavior: smooth; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
         .tab-content { display: none; animation: fadeIn 0.3s; }
         .tab-content.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
         
-        h2 { font-family: 'Archivo Black'; text-transform: uppercase; margin-bottom: 20px; font-size: 24px; }
-        h3 { font-size: 13px; color: var(--purple-hi); margin: 30px 0 15px; border-bottom: 1px solid var(--border); padding-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+        /* FORMULÁRIOS */
+        h2 { font-family: 'Montserrat', sans-serif; font-weight: 800; text-transform: uppercase; margin-bottom: 20px; font-size: 24px; color: #fff; letter-spacing: -0.5px; }
+        h3 { font-size: 12px; color: var(--purple-hover); margin: 30px 0 15px; border-bottom: 1px solid var(--border); padding-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
         
         .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
         @media(max-width: 1200px) { .grid { grid-template-columns: 1fr 1fr; } }
         @media(max-width: 800px) { .grid { grid-template-columns: 1fr; } }
         
         .full { grid-column: 1 / -1; }
-        label { display: block; font-size: 11px; font-weight: 800; color: #B8B8C2; text-transform: uppercase; margin-bottom: 6px; }
-        input, select, textarea { width: 100%; padding: 12px 16px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 10px; color: #fff; font-size: 13px; outline: none; transition: 0.2s; }
-        input:focus, select:focus, textarea:focus { border-color: var(--purple); box-shadow: 0 0 0 3px rgba(138,79,255,0.2); }
+        label { display: block; font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; }
+        input, select, textarea { 
+            width: 100%; padding: 12px 16px; 
+            background: var(--input-bg); border: 1px solid var(--border); 
+            border-radius: 10px; color: #fff; font-size: 13px; outline: none; transition: 0.2s; 
+        }
+        input:focus, select:focus, textarea:focus { border-color: var(--purple); box-shadow: 0 0 0 3px rgba(96,81,155,0.2); }
         select[multiple] { height: 100px; }
         textarea { resize: vertical; min-height: 80px; }
+        .tutorial { background: rgba(96,81,155,0.1); border-left: 3px solid var(--purple); padding: 12px 16px; border-radius: 6px; font-size: 12px; color: var(--text-main); margin-top: 8px; display: flex; gap: 10px; line-height: 1.5; }
         
-        .save-bar { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #0a0810; padding: 12px 24px; border-radius: 99px; border: 1px solid var(--purple); display: flex; gap: 20px; align-items: center; box-shadow: 0 10px 40px rgba(0,0,0,0.9); z-index: 100; }
-        .btn-save { background: var(--purple); color: #fff; border: none; padding: 12px 32px; border-radius: 99px; font-weight: 800; cursor: pointer; transition: 0.2s; text-transform: uppercase; }
-        .btn-save:hover { background: var(--purple-hi); transform: scale(1.05); }
-        .loading { text-align: center; color: var(--purple); font-weight: bold; margin-top: 50px; font-size: 18px; }
+        /* BARRA DE SALVAR */
+        .save-bar { 
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); 
+            background: rgba(28, 32, 44, 0.95); backdrop-filter: blur(10px); padding: 12px 24px; 
+            border-radius: 99px; border: 1px solid var(--purple); display: flex; gap: 20px; 
+            align-items: center; box-shadow: 0 10px 40px rgba(0,0,0,0.9); z-index: 100; 
+        }
+        .btn-save { 
+            background: var(--purple); color: #fff; border: none; padding: 12px 32px; 
+            border-radius: 99px; font-weight: 800; cursor: pointer; transition: 0.2s; text-transform: uppercase; 
+        }
+        .btn-save:hover { background: var(--purple-hover); transform: scale(1.05); }
+        .loading { text-align: center; color: var(--purple-hover); font-weight: bold; margin-top: 50px; font-size: 18px; }
         .error-box { background: rgba(255,51,102,0.1); border: 1px solid #FF3366; padding: 20px; border-radius: 12px; color: #FF3366; text-align: center; margin-top: 20px; }
     </style>
 </head>
 <body>
     <header class="header">
-        <img src="/logo.gif" onerror="this.style.display='none'">
-        <h1>PXK SYSTEM - PAINEL TOTAL</h1>
-        <a href="/logout" class="logout">Sair da Conta</a>
+        <div class="brand">PXK</div>
+        
+        <!-- MENU DO USUÁRIO -->
+        <div class="user-menu-container">
+            <div class="user-info" onclick="toggleUserMenu()">
+                <img id="user-avatar" src="https://cdn.discordapp.com/embed/avatars/0.png" alt="Avatar">
+                <span id="user-name">Carregando...</span>
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24" style="color: var(--text-muted);"><path d="M7 10l5 5 5-5z"/></svg>
+            </div>
+            <div class="user-dropdown" id="user-dropdown">
+                <a href="/logout" class="logout-btn">🚪 Sair da Conta</a>
+            </div>
+        </div>
     </header>
 
     <div class="container">
         <aside class="sidebar" id="sidebar"></aside>
         <main class="content">
-            <div id="loading" class="loading">⏳ Carregando configurações do MongoDB...</div>
+            <div id="loading" class="loading">⏳ Carregando configurações...</div>
             <form id="mainForm" onsubmit="salvarTudo(event)" style="display: none;"></form>
         </main>
     </div>
 
     <div class="save-bar" id="saveBar" style="display: none;">
-        <span style="color: #7A7A88; font-size: 12px;">As alterações vão direto para o bot.</span>
+        <span style="color: var(--text-muted); font-size: 12px;">As alterações vão direto para o bot.</span>
         <button type="submit" form="mainForm" class="btn-save">Salvar Tudo</button>
     </div>
 
@@ -73,7 +182,37 @@
         let discordData = { ch: [], vc: [], cat: [], role: [] };
 
         // =========================================================================
-        // SCHEMA MESTRE: TUDO DO PXK, MOV CALL, RECRUTAMENTO E BATE-PONTO
+        // CARREGAR USUÁRIO
+        // =========================================================================
+        async function loadUser() {
+            try {
+                const res = await fetch('/api/me');
+                const user = await res.json();
+                if (user && user.id) {
+                    document.getElementById('user-name').innerText = user.username;
+                    const avatarUrl = user.avatar 
+                        ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png` 
+                        : `https://cdn.discordapp.com/embed/avatars/0.png`;
+                    document.getElementById('user-avatar').src = avatarUrl;
+                }
+            } catch (e) { 
+                document.getElementById('user-name').innerText = 'Admin';
+            }
+        }
+
+        function toggleUserMenu() {
+            document.getElementById('user-dropdown').classList.toggle('active');
+        }
+
+        // Fecha o menu ao clicar fora
+        window.onclick = function(event) {
+            if (!event.target.closest('.user-menu-container')) {
+                document.getElementById('user-dropdown').classList.remove('active');
+            }
+        }
+
+        // =========================================================================
+        // SCHEMA MESTRE (Mantido igual ao anterior)
         // =========================================================================
         const SCHEMA = {
             identidade: {
@@ -646,7 +785,7 @@
                     globalConfig = updatedData;
                     btn.innerText = 'Salvo com Sucesso!';
                     btn.style.background = '#2ecc71';
-                    setTimeout(() => { btn.innerText = 'Salvar Tudo'; btn.style.background = '#8A4FFF'; }, 2000);
+                    setTimeout(() => { btn.innerText = 'Salvar Tudo'; btn.style.background = 'var(--purple)'; }, 2000);
                 } else {
                     throw new Error('Erro no servidor ao salvar');
                 }
@@ -663,8 +802,9 @@
             btn.classList.add('active');
         }
 
-        // Inicializa
+        // Inicializa tudo
         try {
+            loadUser();
             construirPainel();
             carregarDados();
         } catch (e) {
