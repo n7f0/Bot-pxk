@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PXK - Painel de Controle</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap');
+        :root { --purple: #8A4FFF; --purple-hi: #A370FF; --bg: rgba(15, 12, 20, 0.85); --border: rgba(255,255,255,0.08); }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body { background: radial-gradient(circle at 10% 20%, rgba(138,79,255,0.2) 0%, transparent 40%), #050308; color: #fff; min-height: 100vh; display: flex; flex-direction: column; }
+        
+        /* Header */
+        .header { padding: 16px 40px; background: rgba(10,8,15,0.8); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+        .header img { width: 40px; height: 40px; border-radius: 8px; }
+        .header h1 { font-family: 'Archivo Black'; font-size: 22px; text-transform: uppercase; }
+
+        /* Layout */
+        .container { display: flex; flex: 1; padding: 24px; gap: 24px; max-width: 1400px; margin: 0 auto; width: 100%; }
+        .sidebar { width: 260px; background: var(--bg); border: 1px solid var(--border); border-radius: 24px; padding: 20px; height: fit-content; }
+        .nav-btn { display: block; width: 100%; padding: 14px 20px; margin-bottom: 8px; background: transparent; color: #B8B8C2; border: 1px solid transparent; border-radius: 99px; text-align: left; font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .nav-btn:hover { background: rgba(255,255,255,0.05); color: #fff; }
+        .nav-btn.active { background: rgba(138,79,255,0.15); color: #fff; border-color: var(--purple); }
+        
+        .content { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 24px; padding: 40px; }
+        .tab { display: none; animation: fadeIn 0.3s; }
+        .tab.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        
+        /* Formulário */
+        h2 { font-family: 'Archivo Black'; text-transform: uppercase; margin-bottom: 20px; font-size: 28px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .full { grid-column: 1 / -1; }
+        label { display: block; font-size: 11px; font-weight: 800; color: #B8B8C2; text-transform: uppercase; margin-bottom: 8px; }
+        input, select, textarea { width: 100%; padding: 14px; background: rgba(0,0,0,0.5); border: 1px solid var(--border); border-radius: 12px; color: #fff; font-size: 14px; outline: none; transition: 0.2s; }
+        input:focus, select:focus { border-color: var(--purple); box-shadow: 0 0 0 3px rgba(138,79,255,0.2); }
+        select[multiple] { height: 120px; }
+        
+        /* Tutoriais */
+        .help { background: rgba(138,79,255,0.1); border-left: 3px solid var(--purple); padding: 12px 16px; border-radius: 6px; font-size: 12px; color: #B8B8C2; margin-top: 8px; display: flex; gap: 10px; }
+
+        /* Salvar */
+        .save-bar { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #0a0810; padding: 16px 32px; border-radius: 99px; border: 1px solid var(--purple); display: flex; gap: 20px; align-items: center; box-shadow: 0 10px 40px rgba(0,0,0,0.9); z-index: 100; }
+        .btn-save { background: var(--purple); color: #fff; border: none; padding: 14px 32px; border-radius: 99px; font-weight: 800; cursor: pointer; transition: 0.2s; text-transform: uppercase; }
+        .btn-save:hover { background: var(--purple-hi); transform: scale(1.05); }
+        
+        /* Switch Toggle */
+        .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #4A4A55; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--purple); }
+        input:checked + .slider:before { transform: translateX(24px); }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <img src="/logo.gif" onerror="this.style.display='none'">
+        <h1>PXK System</h1>
+        <div style="margin-left: auto; display: flex; gap: 20px; align-items: center;">
+            <a href="/logout" style="color: #f87171; text-decoration: none; font-weight: 600;">Sair</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <aside class="sidebar">
+            <button class="nav-btn active" onclick="changeTab('identidade')">🎨 Identidade</button>
+            <button class="nav-btn" onclick="changeTab('tickets')">🎫 Tickets</button>
+            <button class="nav-btn" onclick="changeTab('bateponto')">⏱️ Bate-Ponto</button>
+            <button class="nav-btn" onclick="changeTab('status')">🔊 Voz e Status</button>
+            <button class="nav-btn" onclick="changeTab('filtros')">🛡️ Proteções</button>
+        </aside>
+
+        <main class="content">
+            <form id="mainForm" onsubmit="salvarTudo(event)">
+                
+                <!-- ABA IDENTIDADE -->
+                <div id="identidade" class="tab active">
+                    <h2>Identidade Visual</h2>
+                    <div class="grid">
+                        <div>
+                            <label>Nome da Marca</label>
+                            <input type="text" name="brand_name" placeholder="PXK">
+                        </div>
+                        <div>
+                            <label>Emoji</label>
+                            <input type="text" name="brand_emoji" placeholder="🖤">
+                        </div>
+                        <div class="full">
+                            <label>URL do Avatar (Banner)</label>
+                            <input type="text" name="avatar_url" placeholder="https://...">
+                            <div class="help">💡 Cole o link direto de uma imagem hospedada (Imgur, Discord, etc).</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ABA TICKETS -->
+                <div id="tickets" class="tab">
+                    <h2>Configuração de Tickets</h2>
+                    <div class="grid">
+                        <div>
+                            <label>Canal do Painel de Tickets</label>
+                            <select name="ticket_panel_channel_id" class="discord-ch"></select>
+                        </div>
+                        <div>
+                            <label>Canal de Logs (Staff)</label>
+                            <select name="ticket_logs_channel_id" class="discord-ch"></select>
+                        </div>
+                        <div class="full">
+                            <label>Cargos da Staff (Ver tickets)</label>
+                            <select name="ticket_support_role_ids" class="discord-role" multiple></select>
+                            <div class="help">💡 Segure Ctrl/Cmd para selecionar vários cargos.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ABA BATE-PONTO -->
+                <div id="bateponto" class="tab">
+                    <h2>Bate-Ponto</h2>
+                    <div class="grid">
+                        <div>
+                            <label>Ativar Sistema?</label>
+                            <select name="bp_enabled">
+                                <option value="true">Sim, ativado</option>
+                                <option value="false">Não, desativado</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Canal de Contagem (Chat)</label>
+                            <select name="bp_channel_id" class="discord-ch"></select>
+                        </div>
+                        <div>
+                            <label>Meta de Mensagens</label>
+                            <input type="number" name="bp_goal" placeholder="100">
+                        </div>
+                        <div>
+                            <label>Recompensa (Pontos)</label>
+                            <input type="number" name="bp_reward" placeholder="15">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ABA VOZ E STATUS -->
+                <div id="status" class="tab">
+                    <h2>Voz e Status do Bot</h2>
+                    <div class="grid">
+                        <div>
+                            <label>Canal de Voz 24h (Bot fica mudo)</label>
+                            <select name="voice_channel_id" class="discord-vc"></select>
+                        </div>
+                        <div>
+                            <label>Status do Bot (Discord)</label>
+                            <select name="bot_status">
+                                <option value="online">🟢 Online (Disponível)</option>
+                                <option value="idle">🌙 Ausente (Idle)</option>
+                                <option value="dnd">⛔ Não Perturbe (DND)</option>
+                                <option value="invisible">⚫ Invisível</option>
+                            </select>
+                            <div class="help">💡 O bot muda de status no Discord em tempo real.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ABA FILTROS -->
+                <div id="filtros" class="tab">
+                    <h2>Proteções & AntiBot</h2>
+                    <div class="grid">
+                        <div>
+                            <label>Ativar Filtro de Palavras?</label>
+                            <select name="filters_enabled">
+                                <option value="true">Sim</option>
+                                <option value="false">Não</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Canal Armadilha (AntiBot)</label>
+                            <select name="antibot_channel_id" class="discord-ch"></select>
+                            <div class="help">💡 Se um bot mandar mensagem aqui, ele é banido na hora.</div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </main>
+    </div>
+
+    <div class="save-bar">
+        <span style="color: #7A7A88; font-size: 13px;">Tudo é salvo direto no banco MongoDB.</span>
+        <button type="submit" form="mainForm" class="btn-save">Salvar Alterações</button>
+    </div>
+
+    <script>
+        // 1. CARREGA OS DADOS DO BANCO (API) E PREENCHE O FORMULÁRIO
+        async function carregarDados() {
+            const res = await fetch('/api/config');
+            const data = await res.json();
+            
+            // Busca canais e cargos do Discord
+            const dd = await fetch('/api/discord-data').then(r => r.json());
+            
+            // Popula os selects do Discord
+            document.querySelectorAll('.discord-ch').forEach(el => {
+                el.innerHTML = '<option value="">— nenhum —</option>' + dd.ch.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            });
+            document.querySelectorAll('.discord-vc').forEach(el => {
+                el.innerHTML = '<option value="">— nenhum —</option>' + dd.vc.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            });
+            document.querySelectorAll('.discord-role').forEach(el => {
+                el.innerHTML = dd.role.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            });
+
+            // Preenche os valores salvos
+            for (const key in data) {
+                const el = document.querySelector(`[name="${key}"]`);
+                if (el) {
+                    if (el.multiple && Array.isArray(data[key])) {
+                        Array.from(el.options).forEach(opt => opt.selected = data[key].includes(opt.value));
+                    } else {
+                        el.value = data[key];
+                    }
+                }
+            }
+        }
+
+        // 2. SALVA TUDO NO BANCO E ENVIA VIA WEBSOCKET PRO BOT
+        async function salvarTudo(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('.btn-save') || document.querySelector('.btn-save');
+            btn.innerText = 'Salvando...';
+
+            const formData = new FormData(document.getElementById('mainForm'));
+            const data = {};
+            
+            // Pega os valores múltiplos (Arrays) e converte booleanos
+            for (const [key, value] of formData.entries()) {
+                if (key === 'bp_enabled' || key === 'filters_enabled') {
+                    data[key] = value === 'true';
+                } else if (!data[key]) {
+                    data[key] = value;
+                } else {
+                    if (!Array.isArray(data[key])) data[key] = [data[key]];
+                    data[key].push(value);
+                }
+            }
+
+            const res = await fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                btn.innerText = 'Salvo com Sucesso!';
+                btn.style.background = '#2ecc71';
+                setTimeout(() => {
+                    btn.innerText = 'Salvar Alterações';
+                    btn.style.background = '#8A4FFF';
+                }, 2000);
+            }
+        }
+
+        // 3. CONTROLE DE ABAS
+        function changeTab(id) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Inicia carregando os dados
+        carregarDados();
+    </script>
+</body>
+</html>
