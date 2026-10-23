@@ -10,15 +10,17 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
         body { background: radial-gradient(circle at 10% 20%, rgba(138,79,255,0.2) 0%, transparent 40%), #050308; color: #fff; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
+        /* Header */
         .header { padding: 16px 40px; background: rgba(10,8,15,0.8); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; z-index: 10; }
         .header img { width: 40px; height: 40px; border-radius: 8px; }
         .header h1 { font-family: 'Archivo Black'; font-size: 20px; text-transform: uppercase; }
         .header .logout { margin-left: auto; color: #f87171; text-decoration: none; font-weight: 700; font-size: 14px; padding: 8px 16px; border-radius: 8px; background: rgba(248,113,113,0.1); transition: 0.2s; }
         .header .logout:hover { background: #f87171; color: #fff; }
 
+        /* Layout */
         .container { display: flex; flex: 1; padding: 24px; gap: 24px; max-width: 1600px; margin: 0 auto; width: 100%; overflow: hidden; }
         .sidebar { width: 280px; background: var(--bg); border: 1px solid var(--border); border-radius: 24px; padding: 20px; overflow-y: auto; flex-shrink: 0; }
-        .nav-btn { display: block; width: 100%; padding: 12px 20px; margin-bottom: 6px; background: transparent; color: #B8B8C2; border: 1px solid transparent; border-radius: 10px; text-align: left; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .nav-btn { display: block; width: 100%; padding: 10px 16px; margin-bottom: 4px; background: transparent; color: #B8B8C2; border: 1px solid transparent; border-radius: 10px; text-align: left; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; }
         .nav-btn:hover { background: rgba(255,255,255,0.05); color: #fff; }
         .nav-btn.active { background: rgba(138,79,255,0.15); color: #fff; border-color: var(--purple); }
         
@@ -27,6 +29,7 @@
         .tab-content.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
         
+        /* Formulário */
         h2 { font-family: 'Archivo Black'; text-transform: uppercase; margin-bottom: 20px; font-size: 24px; }
         h3 { font-size: 13px; color: var(--purple-hi); margin: 30px 0 15px; border-bottom: 1px solid var(--border); padding-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
         
@@ -40,7 +43,9 @@
         input:focus, select:focus, textarea:focus { border-color: var(--purple); box-shadow: 0 0 0 3px rgba(138,79,255,0.2); }
         select[multiple] { height: 100px; }
         textarea { resize: vertical; min-height: 80px; }
+        .tutorial { background: rgba(138,79,255,0.1); border-left: 3px solid var(--purple); padding: 12px 16px; border-radius: 6px; font-size: 12px; color: #B8B8C2; margin-top: 8px; display: flex; gap: 10px; line-height: 1.5; }
         
+        /* Save Bar */
         .save-bar { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #0a0810; padding: 12px 24px; border-radius: 99px; border: 1px solid var(--purple); display: flex; gap: 20px; align-items: center; box-shadow: 0 10px 40px rgba(0,0,0,0.9); z-index: 100; }
         .btn-save { background: var(--purple); color: #fff; border: none; padding: 12px 32px; border-radius: 99px; font-weight: 800; cursor: pointer; transition: 0.2s; text-transform: uppercase; }
         .btn-save:hover { background: var(--purple-hi); transform: scale(1.05); }
@@ -57,13 +62,13 @@
     <div class="container">
         <aside class="sidebar" id="sidebar"></aside>
         <main class="content">
-            <div id="loading" class="loading">⏳ Lendo o Banco de Dados MongoDB...</div>
+            <div id="loading" class="loading">⏳ Carregando configurações do MongoDB...</div>
             <form id="mainForm" onsubmit="salvarTudo(event)" style="display: none;"></form>
         </main>
     </div>
 
     <div class="save-bar" id="saveBar" style="display: none;">
-        <span style="color: #7A7A88; font-size: 12px;">Alterações salvas direto no MongoDB.</span>
+        <span style="color: #7A7A88; font-size: 12px;">As alterações vão direto para o bot.</span>
         <button type="submit" form="mainForm" class="btn-save">Salvar Tudo</button>
     </div>
 
@@ -72,26 +77,19 @@
         let discordData = { ch: [], vc: [], cat: [], role: [] };
 
         // =========================================================================
-        // O MAPA COMPLETO DO BOT (Tudo que existe no db.js e db(1).js mapeado aqui)
+        // SCHEMA MESTRE: TUDO DO PXK, MOV CALL, RECRUTAMENTO E BATE-PONTO
         // =========================================================================
         const SCHEMA = {
             identidade: {
-                icon: '🎨', name: 'Identidade Visual',
+                icon: '🎨', name: 'Identidade',
                 groups: [
-                    { title: 'Aparência Global', fields: [
-                        { key: 'tickets.panel.title', label: 'Título do Painel (Tickets)', type: 'text' },
+                    { title: 'Aparência do Painel de Tickets', fields: [
+                        { key: 'tickets.panel.title', label: 'Título do Painel', type: 'text' },
                         { key: 'tickets.panel.desc1', label: 'Descrição Principal', type: 'textarea' },
-                        { key: 'tickets.panel.color', label: 'Cor do Painel (Hex)', type: 'color' },
+                        { key: 'tickets.panel.color', label: 'Cor do Painel', type: 'color' },
                         { key: 'tickets.panel.banner', label: 'URL do Banner', type: 'text' },
-                    ]}
-                ]
-            },
-            servidores: {
-                icon: '🌐', name: 'Servidores',
-                groups: [
-                    { title: 'IDs Principais', fields: [
-                        { key: 'servers.mainId', label: 'ID do Servidor Principal', type: 'text' },
-                        { key: 'servers.internalId', label: 'ID do Servidor Interno (Staff)', type: 'text' },
+                        { key: 'tickets.panel.labelStaff', label: 'Texto do Botão Staff', type: 'text' },
+                        { key: 'tickets.panel.labelMig', label: 'Texto do Botão Migração', type: 'text' },
                     ]}
                 ]
             },
@@ -108,95 +106,156 @@
                         { key: 'logs.internal.plantao', label: 'Log de Plantão', type: 'discord_ch' },
                         { key: 'logs.internal.admin', label: 'Log Administrativo', type: 'discord_ch' },
                     ]},
-                    { title: 'Canais do MOV Call', fields: [
+                    { title: 'Canais de Sistemas', fields: [
                         { key: 'movCall.panelChannelId', label: 'Canal do Painel MOV', type: 'discord_ch' },
-                        { key: 'listaMov.channelId', label: 'Canal da Lista de MOV', type: 'discord_ch' },
-                        { key: 'voice.channelIds', label: 'Calls Válidas (Horas Gerais)', type: 'discord_vc_multi' },
-                        { key: 'voice.categoryIds', label: 'Categorias Válidas (Horas Gerais)', type: 'discord_cat_multi' },
+                        { key: 'listaMov.channelId', label: 'Canal Chat-Lista', type: 'discord_ch' },
+                        { key: 'ranking.channelId', label: 'Canal do Ranking', type: 'discord_ch' },
+                        { key: 'voice.main', label: 'Call 24h Principal', type: 'discord_vc' },
+                        { key: 'voice.internal', label: 'Call 24h Interna', type: 'discord_vc' },
                     ]}
                 ]
             },
             permissoes: {
-                icon: '🔐', name: 'Permissões e Cargos',
+                icon: '🔐', name: 'Permissões',
                 groups: [
-                    { title: 'Servidor Principal', fields: [
-                        { key: 'perms.main.admin', label: 'Cargos Admin', type: 'discord_role_multi' },
-                        { key: 'perms.main.leader', label: 'Cargos Liderança', type: 'discord_role_multi' },
-                        { key: 'perms.main.recruiter', label: 'Cargos Recrutador', type: 'discord_role_multi' },
-                        { key: 'perms.main.migrator', label: 'Cargos Migração', type: 'discord_role_multi' },
+                    { title: 'Cargos do Servidor Principal', fields: [
+                        { key: 'perms.main.admin', label: 'Administradores', type: 'discord_role_multi' },
+                        { key: 'perms.main.leader', label: 'Liderança', type: 'discord_role_multi' },
+                        { key: 'perms.main.recruiter', label: 'Recrutadores', type: 'discord_role_multi' },
+                        { key: 'perms.main.migrator', label: 'Habilitados à Migração', type: 'discord_role_multi' },
                     ]},
-                    { title: 'Servidor Interno', fields: [
-                        { key: 'perms.internal.admin', label: 'Cargos Admin (Interno)', type: 'discord_role_multi' },
-                        { key: 'perms.internal.leader', label: 'Cargos Liderança (Interno)', type: 'discord_role_multi' },
+                    { title: 'Cargos do Servidor Interno', fields: [
+                        { key: 'perms.internal.admin', label: 'Administradores', type: 'discord_role_multi' },
+                        { key: 'perms.internal.leader', label: 'Liderança', type: 'discord_role_multi' },
                         { key: 'perms.internal.shift', label: 'Quem inicia Plantão', type: 'discord_role_multi' },
                     ]},
                     { title: 'Cargos do MOV Call', fields: [
-                        { key: 'perms.monitor', label: 'Cargos Monitor', type: 'discord_role_multi' },
-                        { key: 'perms.starter', label: 'Quem inicia MOV', type: 'discord_role_multi' },
-                        { key: 'perms.points', label: 'Quem ajusta Pontos', type: 'discord_role_multi' },
-                    ]}
-                ]
-            },
-            pontos: {
-                icon: '💎', name: 'Pontuação',
-                groups: [
-                    { title: 'Regras de Pontos', fields: [
-                        { key: 'points.perHour', label: 'Pontos por Hora em Call', type: 'number' },
-                        { key: 'points.dailyCap', label: 'Limite Diário (0 = Sem Limite)', type: 'number' },
-                        { key: 'points.recruitment', label: 'Pontos por Recrutamento', type: 'number' },
-                        { key: 'points.migration', label: 'Pontos por Migração', type: 'number' },
-                        { key: 'points.shiftFlat', label: 'Pontos Fixos por Plantão', type: 'number' },
-                        { key: 'points.shiftPerHour', label: 'Pontos por Hora de Plantão', type: 'number' },
-                    ]}
-                ]
-            },
-            movcall: {
-                icon: '📢', name: 'MOV Call',
-                groups: [
-                    { title: 'Regras do MOV', fields: [
-                        { key: 'movCall.durationMin', label: 'Duração Padrão (Minutos)', type: 'number' },
-                        { key: 'movCall.minPresencePct', label: 'Presença Mínima (%)', type: 'number' },
-                        { key: 'movCall.leaveGraceSec', label: 'Tolerância ao Sair (Segundos)', type: 'number' },
-                        { key: 'movCall.pointsMin', label: 'Pontos Mínimos por MOV', type: 'number' },
-                        { key: 'movCall.pointsMax', label: 'Pontos Máximos por MOV', type: 'number' },
-                        { key: 'movCall.autoPoints', label: 'Pontos Automáticos (Sem Monitor)', type: 'number' },
-                    ]},
-                    { title: 'Prefixos do Chat', fields: [
-                        { key: 'prefixes.start', label: 'Prefixo Iniciar MOV', type: 'text' },
-                        { key: 'prefixes.lista', label: 'Prefixo Lista de MOV', type: 'text' },
-                        { key: 'prefixes.cancel', label: 'Prefixo Cancelar', type: 'text' },
+                        { key: 'perms.monitor', label: 'Monitores', type: 'discord_role_multi' },
+                        { key: 'perms.starter', label: 'Iniciar MOV', type: 'discord_role_multi' },
+                        { key: 'perms.points', label: 'Gerenciar Pontos', type: 'discord_role_multi' },
                     ]}
                 ]
             },
             tickets: {
                 icon: '🎫', name: 'Tickets',
                 groups: [
-                    { title: 'Sistema de Tickets', fields: [
-                        { key: 'tickets.style', label: 'Layout Visual', type: 'select', options: [{v:'V1',l:'V1 Embed'},{v:'V2',l:'V2 Blocos'},{v:'V3',l:'V3 Moderno'}] },
-                        { key: 'tickets.useThread', label: 'Usar Tópicos?', type: 'select', options: [{v:true,l:'Sim (Tópico)'},{v:false,l:'Não (Canal)'}] },
+                    { title: 'Funcionamento', fields: [
+                        { key: 'tickets.style', label: 'Modelo Visual', type: 'select', options: [{v:'V1',l:'V1 Clássico'},{v:'V2',l:'V2 Blocos'},{v:'V3',l:'V3 Moderno'}] },
+                        { key: 'tickets.useThread', label: 'Usar Tópicos?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
                         { key: 'tickets.categoryId', label: 'Categoria dos Tickets', type: 'discord_cat' },
-                        { key: 'tickets.threadChannelId', label: 'Canal de Criação de Tópicos', type: 'discord_ch' },
+                        { key: 'tickets.threadChannelId', label: 'Canal dos Tópicos', type: 'discord_ch' },
                         { key: 'tickets.nameTemplate', label: 'Formato do Nome', type: 'text' },
-                        { key: 'tickets.panel.labelStaff', label: 'Texto do Botão Staff', type: 'text' },
-                        { key: 'tickets.panel.labelMig', label: 'Texto do Botão Migração', type: 'text' },
                     ]},
                     { title: 'Cargos de Tickets', fields: [
-                        { key: 'tickets.accessRoleIds', label: 'Cargos com Acesso', type: 'discord_role_multi' },
+                        { key: 'tickets.accessRoleIds', label: 'Cargos com Acesso (Staff)', type: 'discord_role_multi' },
                         { key: 'tickets.assignableRoleIds', label: 'Cargos Atribuíveis', type: 'discord_role_multi' },
                         { key: 'tickets.inicianteRoleIds', label: 'Cargos Iniciais', type: 'discord_role_multi' },
+                        { key: 'tickets.hierarchyRoleIds', label: 'Hierarquia (Migração)', type: 'discord_role_multi' },
+                    ]}
+                ]
+            },
+            formularios: {
+                icon: '📝', name: 'Formulários',
+                groups: [
+                    { title: 'Perguntas de Staff (Uma por linha: Pergunta | Exemplo | Longa? | Obrigatória?)', fields: [
+                        { key: 'tickets.questions.staff', label: 'Perguntas (Staff)', type: 'textarea', help: 'Máximo de 5. Ex: Qual sua idade? | 18 | não | sim' }
+                    ]},
+                    { title: 'Perguntas de Migração', fields: [
+                        { key: 'tickets.questions.migracao', label: 'Perguntas (Migração)', type: 'textarea' }
                     ]}
                 ]
             },
             plantao: {
                 icon: '🕐', name: 'Plantão',
                 groups: [
-                    { title: 'Configurações de Plantão', fields: [
-                        { key: 'shift.enabled', label: 'Sistema Ativado?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
-                        { key: 'shift.plannedMinutes', label: 'Duração do Plantão (Min)', type: 'number' },
-                        { key: 'shift.minMinutes', label: 'Tempo Mínimo (Min)', type: 'number' },
-                        { key: 'shift.returnMinutes', label: 'Tolerância para Voltar (Min)', type: 'number' },
-                        { key: 'shift.categoryId', label: 'ID da Categoria de Calls', type: 'text' },
+                    { title: 'Regras do Plantão', fields: [
+                        { key: 'shift.enabled', label: 'Ativado?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'shift.plannedMinutes', label: 'Duração (Minutos)', type: 'number' },
+                        { key: 'shift.minMinutes', label: 'Tempo Mínimo (Minutos)', type: 'number' },
+                        { key: 'shift.returnMinutes', label: 'Tolerância Voltar (Minutos)', type: 'number' },
+                        { key: 'shift.maxHours', label: 'Limite Esquecido (Horas)', type: 'number' },
+                        { key: 'shift.categoryId', label: 'ID Categoria Calls', type: 'text' },
+                        { key: 'shift.allowedChannelIds', label: 'Canais Permitidos', type: 'discord_ch_multi' },
                         { key: 'shift.rules', label: 'Regras do Plantão', type: 'textarea' },
+                    ]}
+                ]
+            },
+            movcall: {
+                icon: '📢', name: 'MOV Call',
+                groups: [
+                    { title: 'Regras da MOV', fields: [
+                        { key: 'movCall.durationMin', label: 'Duração (Min)', type: 'number' },
+                        { key: 'movCall.minPresencePct', label: 'Presença Mínima (%)', type: 'number' },
+                        { key: 'movCall.leaveGraceSec', label: 'Tolerância ao Sair (Seg)', type: 'number' },
+                        { key: 'movCall.pointsMin', label: 'Pontos Mínimos', type: 'number' },
+                        { key: 'movCall.pointsMax', label: 'Pontos Máximos', type: 'number' },
+                        { key: 'movCall.autoPoints', label: 'Pontos Automáticos', type: 'number' },
+                    ]}
+                ]
+            },
+            prefixos: {
+                icon: '💬', name: 'Prefixos e Lista',
+                groups: [
+                    { title: 'Prefixos de Mensagem', fields: [
+                        { key: 'prefixes.start', label: 'Prefixo Iniciar MOV', type: 'text', help: 'Ex: unionmov' },
+                        { key: 'prefixes.lista', label: 'Prefixo Lista', type: 'text', help: 'Ex: unionlista' },
+                        { key: 'prefixes.cancel', label: 'Prefixo Cancelar', type: 'text', help: 'Ex: unionmovcancel' },
+                    ]},
+                    { title: 'Regras da Lista', fields: [
+                        { key: 'listaMov.collectMode', label: 'Modo de Coleta', type: 'select', options: [{v:'all',l:'Todos da call'},{v:'roles',l:'Só cargos de Mov Call'}] },
+                        { key: 'listaMov.durationMin', label: 'Duração em Call Pública (Min)', type: 'number' },
+                        { key: 'listaMov.minPresencePct', label: 'Presença Mínima (%)', type: 'number' },
+                        { key: 'listaMov.roleIds', label: 'Cargos de Mov Call', type: 'discord_role_multi' },
+                    ]}
+                ]
+            },
+            mensagens_mov: {
+                icon: '🤖', name: 'Msgs do MOV',
+                groups: [
+                    { title: 'Textos e DMs Automáticas', fields: [
+                        { key: 'movCall.notifyEnabled', label: 'Enviar Mensagens?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'movCall.msgStart', label: 'Msg de Início (DM)', type: 'textarea' },
+                        { key: 'movCall.msgLeave', label: 'Msg ao Sair da Call (DM)', type: 'textarea' },
+                        { key: 'movCall.msgFinish', label: 'Msg de Conclusão (DM)', type: 'textarea' },
+                        { key: 'movCall.msgCancel', label: 'Msg de Cancelamento (DM)', type: 'textarea' },
+                    ]}
+                ]
+            },
+            monitoria: {
+                icon: '🛡️', name: 'Monitoria',
+                groups: [
+                    { title: 'Regras de Monitoria', fields: [
+                        { key: 'monitor.durationMin', label: 'Duração (Min)', type: 'number' },
+                        { key: 'monitor.minPresencePct', label: 'Presença Mínima (%)', type: 'number' },
+                        { key: 'monitor.allowSelf', label: 'Permitir Auto-Monitoria?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'monitor.requireAllCriteria', label: 'Exigir Todos os Critérios?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                    ]}
+                ]
+            },
+            pontos: {
+                icon: '💎', name: 'Pontos',
+                groups: [
+                    { title: 'Regras de Pontuação', fields: [
+                        { key: 'points.perHour', label: 'Pontos/Hora em Call', type: 'number' },
+                        { key: 'points.recruitment', label: 'Pontos por Recrutamento', type: 'number' },
+                        { key: 'points.migration', label: 'Pontos por Migração', type: 'number' },
+                        { key: 'points.shiftFlat', label: 'Pontos Fixo por Plantão', type: 'number' },
+                        { key: 'points.shiftPerHour', label: 'Pontos/Hora Plantão', type: 'number' },
+                        { key: 'points.reject', label: 'Pontos por Reprovação', type: 'number' },
+                        { key: 'points.unit', label: 'Nome da Moeda', type: 'text', help: 'Ex: cristais' },
+                    ]}
+                ]
+            },
+            ranking: {
+                icon: '🏆', name: 'Ranking',
+                groups: [
+                    { title: 'Configuração do Ranking', fields: [
+                        { key: 'ranking.enabled', label: 'Ranking Ativo?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'ranking.auto', label: 'Atualização Automática?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'ranking.topSize', label: 'Tamanho do Top', type: 'number' },
+                        { key: 'ranking.view.title', label: 'Título do Ranking', type: 'text' },
+                        { key: 'ranking.view.color', label: 'Cor (Hex)', type: 'color' },
+                        { key: 'ranking.view.style', label: 'Estilo', type: 'select', options: [{v:'embed',l:'Embed Clássico'},{v:'v3',l:'Container V3'}] },
                     ]}
                 ]
             },
@@ -206,19 +265,29 @@
                     { title: 'Regras do Bate-Ponto', fields: [
                         { key: 'bp_enabled', label: 'Sistema Ativado?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
                         { key: 'bp_goal', label: 'Meta de Mensagens', type: 'number' },
-                        { key: 'bp_channel_id', label: 'Canal de Contagem', type: 'discord_ch' },
                         { key: 'bp_duration_min', label: 'Duração (Minutos)', type: 'number' },
                         { key: 'bp_reward', label: 'Recompensa (Pontos)', type: 'number' },
+                        { key: 'bp_channel_id', label: 'Canal de Contagem', type: 'discord_ch' },
+                    ]}
+                ]
+            },
+            emojis: {
+                icon: '😀', name: 'Emojis',
+                groups: [
+                    { title: 'Emojis do Sistema (Deixe vazio para usar o padrão)', fields: [
+                        { key: 'emojis.rank1', label: '1º Lugar', type: 'text' },
+                        { key: 'emojis.rank2', label: '2º Lugar', type: 'text' },
+                        { key: 'emojis.rank3', label: '3º Lugar', type: 'text' },
+                        { key: 'emojis.ok', label: 'Sucesso / Check', type: 'text' },
+                        { key: 'emojis.bad', label: 'Erro / Xis', type: 'text' },
                     ]}
                 ]
             },
             status: {
-                icon: '🔊', name: 'Voz e Status',
+                icon: '🔊', name: 'Status do Bot',
                 groups: [
-                    { title: 'Presença do Bot', fields: [
-                        { key: 'bot_status', label: 'Status no Discord', type: 'select', options: [{v:'online',l:'🟢 Online'},{v:'idle',l:'🌙 Ausente'},{v:'dnd',l:'⛔ Não Perturbe'},{v:'invisible',l:'⚫ Invisível'}] },
-                        { key: 'voice.main', label: 'Canal de Voz Principal', type: 'discord_vc' },
-                        { key: 'voice.internal', label: 'Canal de Voz Interno', type: 'discord_vc' },
+                    { title: 'Presença no Discord', fields: [
+                        { key: 'bot_status', label: 'Status', type: 'select', options: [{v:'online',l:'🟢 Online'},{v:'idle',l:'🌙 Ausente'},{v:'dnd',l:'⛔ Não Perturbe'},{v:'invisible',l:'⚫ Invisível'}] },
                     ]}
                 ]
             }
@@ -236,24 +305,25 @@
             curr[keys[keys.length - 1]] = value;
         }
 
-        // 1. Constrói o HTML baseado no SCHEMA
         function construirPainel() {
             const sidebar = document.getElementById('sidebar');
             const form = document.getElementById('mainForm');
             sidebar.innerHTML = '';
             form.innerHTML = '';
+            let isFirst = true;
 
             for (const [tabId, tabData] of Object.entries(SCHEMA)) {
                 const btn = document.createElement('button');
-                btn.className = `nav-btn ${tabId === 'identidade' ? 'active' : ''}`;
+                btn.className = `nav-btn ${isFirst ? 'active' : ''}`;
                 btn.innerHTML = `${tabData.icon} ${tabData.name}`;
-                btn.onclick = () => mudarAba(tabId);
+                btn.onclick = (e) => mudarAba(tabId, e.target);
                 sidebar.appendChild(btn);
 
                 const tabDiv = document.createElement('div');
                 tabDiv.id = `tab-${tabId}`;
-                tabDiv.className = `tab-content ${tabId === 'identidade' ? 'active' : ''}`;
+                tabDiv.className = `tab-content ${isFirst ? 'active' : ''}`;
                 tabDiv.innerHTML = `<h2>${tabData.name}</h2>`;
+                isFirst = false;
 
                 tabData.groups.forEach(group => {
                     tabDiv.innerHTML += `<h3>${group.title}</h3><div class="grid" id="grid-${tabId}-${group.title.replace(/\s/g, '')}"></div>`;
@@ -277,10 +347,12 @@
                         }
                         else if (field.type.startsWith('discord_')) {
                             const isMulti = field.type.includes('multi');
-                            const typeMap = { discord_ch: 'ch', discord_ch_multi: 'ch', discord_cat: 'cat', discord_cat_multi: 'cat', discord_vc: 'vc', discord_vc_multi: 'vc', discord_role_multi: 'role' };
+                            const typeMap = { discord_ch: 'ch', discord_ch_multi: 'ch', discord_cat: 'cat', discord_vc: 'vc', discord_role_multi: 'role' };
                             const dataType = typeMap[field.type];
                             inputHtml += `<select id="${fieldId}" data-key="${field.key}" class="discord-data" data-type="${dataType}" ${isMulti ? 'multiple' : ''}></select>`;
                         }
+
+                        if(field.help) inputHtml += `<div class="tutorial">💡 ${field.help}</div>`;
 
                         wrapper.innerHTML = inputHtml;
                         grid.appendChild(wrapper);
@@ -290,7 +362,6 @@
             }
         }
 
-        // 2. Carrega os dados do banco e preenche
         async function carregarDados() {
             const res = await fetch('/api/config');
             globalConfig = await res.json();
@@ -308,9 +379,8 @@
                 let val = getVal(globalConfig, key);
                 
                 if (val === undefined || val === null) {
-                    // Tenta pegar valores padrão se não existirem
                     if (input.type === 'checkbox') val = false;
-                    else if (input.tagName === 'SELECT') val = '';
+                    else if (input.tagName === 'SELECT' && !input.multiple) val = '';
                     else return;
                 }
 
@@ -328,7 +398,6 @@
             document.getElementById('saveBar').style.display = 'flex';
         }
 
-        // 3. Salva tudo
         async function salvarTudo(e) {
             e.preventDefault();
             const btn = document.querySelector('.btn-save');
@@ -372,11 +441,11 @@
             }
         }
 
-        function mudarAba(id) {
+        function mudarAba(id, btn) {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(`tab-${id}`).classList.add('active');
-            event.target.classList.add('active');
+            btn.classList.add('active');
         }
 
         construirPainel();
