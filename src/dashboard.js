@@ -61,7 +61,6 @@ app.get('/api/discord-data', async (req, res) => {
 });
 
 // ================= AUTENTICAÇÃO =================
-// Rota de login: serve a tela bonita de login
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, '../public/login.html')));
 
 app.get('/auth', (req, res) => {
@@ -79,26 +78,81 @@ app.get('/callback', async (req, res) => {
         const token = await axios.post('https://discord.com/api/oauth2/token', new URLSearchParams({ client_id: process.env.DISCORD_CLIENT_ID, client_secret: process.env.DISCORD_CLIENT_SECRET, grant_type: 'authorization_code', code: req.query.code, redirect_uri: `${baseUrl}/callback` }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
         const user = await axios.get('https://discord.com/api/users/@me', { headers: { Authorization: `Bearer ${token.data.access_token}` } });
         
+        // CORREÇÃO AQUI: Lendo OWNER_IDS e DEV_IDS
         const owners = (process.env.OWNER_IDS || '').split(',').map(i => i.trim()).filter(i => i);
-        if (!owners.includes(user.data.id)) {
-            return res.status(403).send(`<body style="background:#050308; color:#fff; text-align:center; padding-top:20vh; font-family:sans-serif;"><h1>Acesso Negado 🚫</h1><p>Seu ID é: <b style="color:#8A4FFF;">${user.data.id}</b></p><p>Adicione este ID na variável OWNER_IDS no seu .env</p></body>`);
+        const devs = (process.env.DEV_IDS || '').split(',').map(i => i.trim()).filter(i => i);
+        const allowedIds = [...new Set([...owners, ...devs])]; // Junta os dois e remove duplicados
+
+        if (!allowedIds.includes(user.data.id)) {
+            // TELA DE ACESSO NEGADO BONITA
+            return res.status(403).send(`
+                <!DOCTYPE html>
+                <html lang="pt-BR">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Acesso Negado - PXK</title>
+                    <style>
+                        @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;600&display=swap');
+                        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+                        body { 
+                            background: radial-gradient(circle at 50% 50%, rgba(255, 51, 102, 0.15) 0%, transparent 50%), #050308; 
+                            color: #fff; height: 100vh; display: flex; align-items: center; justify-content: center; 
+                        }
+                        .card { 
+                            background: rgba(20, 10, 15, 0.7); backdrop-filter: blur(20px); 
+                            border: 1px solid rgba(255, 51, 102, 0.3); border-top: 3px solid #FF3366; 
+                            padding: 50px; border-radius: 24px; text-align: center; max-width: 500px; width: 100%;
+                            box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 20px rgba(255,51,102,0.2);
+                        }
+                        h1 { font-family: 'Archivo Black'; font-size: 32px; color: #FF3366; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; }
+                        p { color: #B8B8C2; font-size: 15px; margin-bottom: 10px; line-height: 1.6; }
+                        .id-box { 
+                            background: rgba(0,0,0,0.5); border: 1px dashed rgba(255, 51, 102, 0.5); 
+                            padding: 15px; border-radius: 12px; font-family: monospace; font-size: 18px; color: #fff; 
+                            margin: 20px 0; user-select: all; cursor: pointer; transition: 0.2s;
+                        }
+                        .id-box:hover { background: rgba(255, 51, 102, 0.1); border-color: #FF3366; }
+                        .btn { 
+                            display: inline-block; margin-top: 20px; padding: 14px 32px; background: rgba(255,255,255,0.05); 
+                            border: 1px solid rgba(255,255,255,0.1); color: #fff; text-decoration: none; border-radius: 99px; 
+                            font-weight: 600; transition: 0.2s; 
+                        }
+                        .btn:hover { background: #fff; color: #000; transform: translateY(-2px); }
+                        .hint { font-size: 12px; color: #7A7A88; margin-top: 20px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <h1>Acesso Negado 🚫</h1>
+                        <p>Você não tem permissão para acessar este painel.</p>
+                        <p>Seu ID do Discord é:</p>
+                        <div class="id-box" title="Clique para selecionar">${user.data.id}</div>
+                        <p>Copie o ID acima e adicione-o à variável <b>DEV_IDS</b> ou <b>OWNER_IDS</b> no seu arquivo <code>.env</code>.</p>
+                        <a href="/login" class="btn">Tentar Novamente</a>
+                        <div class="hint">Após adicionar, reinicie o bot para aplicar as mudanças.</div>
+                    </div>
+                </body>
+                </html>
+            `);
         }
+        
         req.session.user = user.data; 
         req.session.save(() => res.redirect('/'));
-    } catch (e) { res.status(400).send("Falha na autenticação."); }
+    } catch (e) { 
+        console.error('Erro OAuth:', e.message);
+        res.status(400).send("Falha na autenticação."); 
+    }
 });
 
-// Rota de logout corrigida
 app.get('/logout', (req, res) => { 
-    req.session.destroy((err) => {
-        res.clearCookie('connect.sid'); // Limpa o cookie do navegador
+    req.session.destroy(() => {
+        res.clearCookie('connect.sid');
         res.redirect('/login'); 
     });
 });
 
 const requireAuth = (req, res, next) => { if (!req.session.user) return res.redirect('/login'); next(); };
 
-// A raiz do site entrega o painel completo
 app.get('/', requireAuth, (req, res) => {
     res.sendFile(path.join(__dirname, '../public/index.html'));
 });
