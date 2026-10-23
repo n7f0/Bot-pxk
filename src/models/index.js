@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const { Schema, model } = mongoose;
 const { Mixed, ObjectId } = Schema.Types;
 
-// Importa os emojis para não quebrar o txtmod (ajuste o caminho se necessário)
+// Importa os emojis para não quebrar o txtmod
 let setOverrides = () => {};
 try { setOverrides = require('../txtmod/emojis').setOverrides || (() => {}); } catch (e) {}
 
@@ -22,7 +22,7 @@ function merge(base, extra) {
 const getPath = (obj, path) => path.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
 
 // ==========================================
-// 2. CONFIGURAÇÕES PADRÃO (TUDO AQUI)
+// 2. CONFIGURAÇÕES PADRÃO
 // ==========================================
 const DEFAULT_DESCRIPTION = [
   'Gostou do servidor e quer se juntar à nossa staff?',
@@ -48,7 +48,6 @@ const DEFAULT_QUESTIONS = {
 };
 
 const DEFAULTS = {
-  // --- Configurações do MOV Call (bot) ---
   servers: { mainId: '', internalId: '', extraGuildIds: [] },
   voice: { 
     channelIds: [], categoryIds: [], movChannelIds: [], movCategoryIds: [], 
@@ -79,8 +78,6 @@ const DEFAULTS = {
   listaMov: {
     channelId: null, collectMode: 'all', launchRoleIds: [], requireStartButton: true, roleIds: [], staffRoleIds: [], durationMin: 60, minPresencePct: 80, waitMin: 30, pointsDefault: 5, pointsMax: 20, notify: true, msgStart: '...', msgEnd: '...'
   },
-  
-  // --- Configurações de Tickets (txtmod) ---
   tickets: {
     style: 'V1', categoryId: null, useThread: false, threadChannelId: null, panelChannelId: null, panelMessageId: null, panelKind: null, accessRoleIds: [], assignableRoleIds: [], hierarchyRoleIds: [], hierarchyMax: 1, inicianteRoleId: null, inicianteRoleIds: [], nameTemplate: '{tipo}-{usuario}', requireShiftToClaim: false,
     panel: { title: 'União — Seja Staff', desc1: DEFAULT_DESCRIPTION, desc2: '', desc3: '', desc4: '', color: '#D4AF37', banner: '', thumbnail: '', footer: '', labelStaff: 'Quero ser staff', labelMig: 'Quero ser migrado', v3Accent: false, selectPlaceholder: 'Selecione uma opção...', optLabelStaff: 'Recrutamento', optLabelMig: 'Migração', optDescStaff: 'Para ser recrutado.', optDescMig: 'Para ser migrado.' },
@@ -130,29 +127,27 @@ const AdminLog = model('AdminLog', new Schema({ at: { type: Date, default: Date.
 // 4. FUNÇÕES DE CONFIGURAÇÃO E CACHE
 // ==========================================
 let cfgCache = null;
+
+// CORREÇÃO AQUI: Tornando síncronos para o bot não quebrar
 const cfgNow = () => cfgCache ?? merge(clone(DEFAULTS), {});
+const getCfg = () => cfgCache || merge(clone(DEFAULTS), {});
 
 async function loadCfg() {
   const doc = await Config.findOne({ key: 'main' }).lean();
   const cfg = merge(clone(DEFAULTS), doc?.data ?? {});
   
-  // Compatibilidade com configurações antigas
   const saved = doc?.data?.tickets;
   if (saved?.mode === 'thread' && saved.useThread === undefined) cfg.tickets.useThread = true;
   if (!cfg.tickets.inicianteRoleIds?.length && cfg.tickets.inicianteRoleId) {
     cfg.tickets.inicianteRoleIds = [cfg.tickets.inicianteRoleId];
   }
-  
   for (const [id, p] of Object.entries(cfg.presets || {})) {
     cfg.presets[id] = merge(presetDefaults(p?.name), clone(p || {}));
   }
-  
   if (typeof setOverrides === 'function') setOverrides(cfg.emojis);
   cfgCache = cfg;
   return cfg;
 }
-
-const getCfg = async () => cfgCache || loadCfg();
 
 async function setCfg(path, value) {
   await Config.updateOne({ key: 'main' }, { $set: { [`data.${path}`]: value } }, { upsert: true });
