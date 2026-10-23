@@ -10,16 +10,14 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
         body { background: radial-gradient(circle at 10% 20%, rgba(138,79,255,0.2) 0%, transparent 40%), #050308; color: #fff; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
-        /* Header */
         .header { padding: 16px 40px; background: rgba(10,8,15,0.8); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; z-index: 10; }
         .header img { width: 40px; height: 40px; border-radius: 8px; }
         .header h1 { font-family: 'Archivo Black'; font-size: 20px; text-transform: uppercase; }
         .header .logout { margin-left: auto; color: #f87171; text-decoration: none; font-weight: 700; font-size: 14px; padding: 8px 16px; border-radius: 8px; background: rgba(248,113,113,0.1); transition: 0.2s; }
         .header .logout:hover { background: #f87171; color: #fff; }
 
-        /* Layout */
         .container { display: flex; flex: 1; padding: 24px; gap: 24px; max-width: 1600px; margin: 0 auto; width: 100%; overflow: hidden; }
-        .sidebar { width: 280px; background: var(--bg); border: 1px solid var(--border); border-radius: 24px; padding: 20px; overflow-y: auto; flex-shrink: 0; }
+        .sidebar { width: 290px; background: var(--bg); border: 1px solid var(--border); border-radius: 24px; padding: 20px; overflow-y: auto; flex-shrink: 0; }
         .nav-btn { display: block; width: 100%; padding: 10px 16px; margin-bottom: 4px; background: transparent; color: #B8B8C2; border: 1px solid transparent; border-radius: 10px; text-align: left; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; }
         .nav-btn:hover { background: rgba(255,255,255,0.05); color: #fff; }
         .nav-btn.active { background: rgba(138,79,255,0.15); color: #fff; border-color: var(--purple); }
@@ -29,7 +27,6 @@
         .tab-content.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
         
-        /* Formulário */
         h2 { font-family: 'Archivo Black'; text-transform: uppercase; margin-bottom: 20px; font-size: 24px; }
         h3 { font-size: 13px; color: var(--purple-hi); margin: 30px 0 15px; border-bottom: 1px solid var(--border); padding-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
         
@@ -45,7 +42,6 @@
         textarea { resize: vertical; min-height: 80px; }
         .tutorial { background: rgba(138,79,255,0.1); border-left: 3px solid var(--purple); padding: 12px 16px; border-radius: 6px; font-size: 12px; color: #B8B8C2; margin-top: 8px; display: flex; gap: 10px; line-height: 1.5; }
         
-        /* Save Bar */
         .save-bar { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #0a0810; padding: 12px 24px; border-radius: 99px; border: 1px solid var(--purple); display: flex; gap: 20px; align-items: center; box-shadow: 0 10px 40px rgba(0,0,0,0.9); z-index: 100; }
         .btn-save { background: var(--purple); color: #fff; border: none; padding: 12px 32px; border-radius: 99px; font-weight: 800; cursor: pointer; transition: 0.2s; text-transform: uppercase; }
         .btn-save:hover { background: var(--purple-hi); transform: scale(1.05); }
@@ -55,7 +51,7 @@
 <body>
     <header class="header">
         <img src="/logo.gif" onerror="this.style.display='none'">
-        <h1>PXK SYSTEM</h1>
+        <h1>PXK SYSTEM - PAINEL TOTAL</h1>
         <a href="/logout" class="logout">Sair da Conta</a>
     </header>
 
@@ -76,20 +72,40 @@
         let globalConfig = {};
         let discordData = { ch: [], vc: [], cat: [], role: [] };
 
-        // =========================================================================
-        // SCHEMA MESTRE: TUDO DO PXK, MOV CALL, RECRUTAMENTO E BATE-PONTO
-        // =========================================================================
+        // =========================================================================================
+        // SCHEMA MESTRE — ABSOLUTAMENTE TUDO (1ª, 2ª e 3ª LEVAS consolidadas)
+        // =========================================================================================
         const SCHEMA = {
             identidade: {
-                icon: '🎨', name: 'Identidade',
+                icon: '🎨', name: 'Identidade Visual',
                 groups: [
-                    { title: 'Aparência do Painel de Tickets', fields: [
-                        { key: 'tickets.panel.title', label: 'Título do Painel', type: 'text' },
-                        { key: 'tickets.panel.desc1', label: 'Descrição Principal', type: 'textarea' },
-                        { key: 'tickets.panel.color', label: 'Cor do Painel', type: 'color' },
+                    { title: 'Painel de Tickets', fields: [
+                        { key: 'tickets.panel.title', label: 'Título', type: 'text', help: 'Título do painel de candidatura.' },
+                        { key: 'tickets.panel.desc1', label: 'Descrição 1', type: 'textarea', help: 'Texto principal do embed.' },
+                        { key: 'tickets.panel.desc2', label: 'Descrição 2 (V2)', type: 'textarea' },
+                        { key: 'tickets.panel.desc3', label: 'Descrição 3 (V2)', type: 'textarea' },
+                        { key: 'tickets.panel.desc4', label: 'Descrição 4 (V2)', type: 'textarea' },
+                        { key: 'tickets.panel.color', label: 'Cor (Hex)', type: 'color' },
                         { key: 'tickets.panel.banner', label: 'URL do Banner', type: 'text' },
-                        { key: 'tickets.panel.labelStaff', label: 'Texto do Botão Staff', type: 'text' },
-                        { key: 'tickets.panel.labelMig', label: 'Texto do Botão Migração', type: 'text' },
+                        { key: 'tickets.panel.thumbnail', label: 'URL da Miniatura', type: 'text' },
+                        { key: 'tickets.panel.footer', label: 'Rodapé', type: 'text' },
+                        { key: 'tickets.panel.labelStaff', label: 'Botão Staff', type: 'text' },
+                        { key: 'tickets.panel.labelMig', label: 'Botão Migração', type: 'text' },
+                        { key: 'tickets.panel.selectPlaceholder', label: 'Placeholder do Menu (V3)', type: 'text' },
+                        { key: 'tickets.panel.optLabelStaff', label: 'Opção Staff (V3)', type: 'text' },
+                        { key: 'tickets.panel.optLabelMig', label: 'Opção Migração (V3)', type: 'text' },
+                        { key: 'tickets.panel.optDescStaff', label: 'Descrição Staff (V3)', type: 'text' },
+                        { key: 'tickets.panel.optDescMig', label: 'Descrição Migração (V3)', type: 'text' },
+                        { key: 'tickets.panel.v3Accent', label: 'Barra de Cor V3?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                    ]}
+                ]
+            },
+            servidores: {
+                icon: '🌐', name: 'Servidores',
+                groups: [
+                    { title: 'IDs dos Servidores (Vazio = usa .env)', fields: [
+                        { key: 'servers.mainId', label: 'ID Servidor Principal', type: 'text' },
+                        { key: 'servers.internalId', label: 'ID Servidor Interno (Staff)', type: 'text' },
                     ]}
                 ]
             },
@@ -98,41 +114,59 @@
                 groups: [
                     { title: 'Logs do Servidor Principal', fields: [
                         { key: 'logs.main.geral', label: 'Log Geral', type: 'discord_ch' },
-                        { key: 'logs.main.tickets', label: 'Log de Tickets', type: 'discord_ch' },
-                        { key: 'logs.main.recrutamento', label: 'Log de Recrutamento', type: 'discord_ch' },
+                        { key: 'logs.main.tickets', label: 'Log Tickets', type: 'discord_ch' },
+                        { key: 'logs.main.recrutamento', label: 'Log Recrutamento', type: 'discord_ch' },
                     ]},
                     { title: 'Logs do Servidor Interno', fields: [
-                        { key: 'logs.internal.geral', label: 'Log Geral (Interno)', type: 'discord_ch' },
-                        { key: 'logs.internal.plantao', label: 'Log de Plantão', type: 'discord_ch' },
-                        { key: 'logs.internal.admin', label: 'Log Administrativo', type: 'discord_ch' },
+                        { key: 'logs.internal.geral', label: 'Log Geral Interno', type: 'discord_ch' },
+                        { key: 'logs.internal.plantao', label: 'Log Plantão', type: 'discord_ch' },
+                        { key: 'logs.internal.admin', label: 'Log Admin', type: 'discord_ch' },
+                        { key: 'logs.movcall', label: 'Log do MOV Call', type: 'discord_ch' },
+                        { key: 'logs.sessoes', label: 'Log de Sessões', type: 'discord_ch' },
+                        { key: 'logs.movs', label: 'Log de MOVs Oficiais', type: 'discord_ch' },
+                        { key: 'logs.monitoria', label: 'Log de Monitorias', type: 'discord_ch' },
+                        { key: 'logs.pontos', label: 'Log de Pontos', type: 'discord_ch' },
                     ]},
                     { title: 'Canais de Sistemas', fields: [
                         { key: 'movCall.panelChannelId', label: 'Canal do Painel MOV', type: 'discord_ch' },
+                        { key: 'movCall.commandChannelId', label: 'Canal do Comando /iniciarmov', type: 'discord_ch' },
+                        { key: 'movCall.notifyChannelId', label: 'Canal das Mensagens MOV', type: 'discord_ch' },
                         { key: 'listaMov.channelId', label: 'Canal Chat-Lista', type: 'discord_ch' },
                         { key: 'ranking.channelId', label: 'Canal do Ranking', type: 'discord_ch' },
+                        { key: 'panels.monitor.channelId', label: 'Canal do Painel de Monitoria', type: 'discord_ch' },
+                        { key: 'shift.panelChannelId', label: 'Canal do Painel de Plantão', type: 'discord_ch' },
+                    ]},
+                    { title: 'Canais de Voz', fields: [
                         { key: 'voice.main', label: 'Call 24h Principal', type: 'discord_vc' },
                         { key: 'voice.internal', label: 'Call 24h Interna', type: 'discord_vc' },
+                        { key: 'voice.channelIds', label: 'Calls de Horas Gerais', type: 'discord_vc_multi' },
+                        { key: 'voice.categoryIds', label: 'Categorias de Horas Gerais', type: 'discord_cat_multi' },
+                        { key: 'voice.movChannelIds', label: 'Calls Válidas para MOV', type: 'discord_vc_multi' },
+                        { key: 'voice.movCategoryIds', label: 'Categorias Válidas para MOV', type: 'discord_cat_multi' },
                     ]}
                 ]
             },
             permissoes: {
                 icon: '🔐', name: 'Permissões',
                 groups: [
-                    { title: 'Cargos do Servidor Principal', fields: [
-                        { key: 'perms.main.admin', label: 'Administradores', type: 'discord_role_multi' },
+                    { title: 'Servidor Principal', fields: [
+                        { key: 'perms.main.admin', label: 'Admin', type: 'discord_role_multi' },
                         { key: 'perms.main.leader', label: 'Liderança', type: 'discord_role_multi' },
-                        { key: 'perms.main.recruiter', label: 'Recrutadores', type: 'discord_role_multi' },
-                        { key: 'perms.main.migrator', label: 'Habilitados à Migração', type: 'discord_role_multi' },
+                        { key: 'perms.main.recruiter', label: 'Recrutador', type: 'discord_role_multi' },
+                        { key: 'perms.main.migrator', label: 'Migração', type: 'discord_role_multi' },
                     ]},
-                    { title: 'Cargos do Servidor Interno', fields: [
-                        { key: 'perms.internal.admin', label: 'Administradores', type: 'discord_role_multi' },
+                    { title: 'Servidor Interno', fields: [
+                        { key: 'perms.internal.admin', label: 'Admin', type: 'discord_role_multi' },
                         { key: 'perms.internal.leader', label: 'Liderança', type: 'discord_role_multi' },
+                        { key: 'perms.internal.recruiter', label: 'Recrutador', type: 'discord_role_multi' },
                         { key: 'perms.internal.shift', label: 'Quem inicia Plantão', type: 'discord_role_multi' },
                     ]},
-                    { title: 'Cargos do MOV Call', fields: [
+                    { title: 'MOV Call e Pontos', fields: [
                         { key: 'perms.monitor', label: 'Monitores', type: 'discord_role_multi' },
-                        { key: 'perms.starter', label: 'Iniciar MOV', type: 'discord_role_multi' },
                         { key: 'perms.points', label: 'Gerenciar Pontos', type: 'discord_role_multi' },
+                        { key: 'perms.starter', label: 'Iniciar MOV', type: 'discord_role_multi' },
+                        { key: 'perms.selfMonitor', label: 'Auto-Monitoria', type: 'discord_role_multi' },
+                        { key: 'perms.discordAdmin', label: 'Admin do Discord = Admin do Bot?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
                     ]}
                 ]
             },
@@ -144,24 +178,33 @@
                         { key: 'tickets.useThread', label: 'Usar Tópicos?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
                         { key: 'tickets.categoryId', label: 'Categoria dos Tickets', type: 'discord_cat' },
                         { key: 'tickets.threadChannelId', label: 'Canal dos Tópicos', type: 'discord_ch' },
-                        { key: 'tickets.nameTemplate', label: 'Formato do Nome', type: 'text' },
+                        { key: 'tickets.nameTemplate', label: 'Formato do Nome', type: 'text', help: 'Ex: {tipo}-{usuario}' },
+                        { key: 'tickets.requireShiftToClaim', label: 'Exigir Plantão para Assumir?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'tickets.hierarchyMax', label: 'Máx. Cargos de Hierarquia', type: 'number' },
                     ]},
                     { title: 'Cargos de Tickets', fields: [
                         { key: 'tickets.accessRoleIds', label: 'Cargos com Acesso (Staff)', type: 'discord_role_multi' },
                         { key: 'tickets.assignableRoleIds', label: 'Cargos Atribuíveis', type: 'discord_role_multi' },
                         { key: 'tickets.inicianteRoleIds', label: 'Cargos Iniciais', type: 'discord_role_multi' },
                         { key: 'tickets.hierarchyRoleIds', label: 'Hierarquia (Migração)', type: 'discord_role_multi' },
+                    ]},
+                    { title: 'Mensagens do Ticket', fields: [
+                        { key: 'tickets.messages.open', label: 'Ao Abrir', type: 'textarea' },
+                        { key: 'tickets.messages.claim', label: 'Ao Assumir', type: 'textarea' },
+                        { key: 'tickets.messages.finish', label: 'Ao Concluir', type: 'textarea' },
+                        { key: 'tickets.messages.reject', label: 'Ao Reprovar', type: 'textarea' },
+                        { key: 'tickets.messages.close', label: 'Ao Fechar', type: 'textarea' },
                     ]}
                 ]
             },
             formularios: {
                 icon: '📝', name: 'Formulários',
                 groups: [
-                    { title: 'Perguntas de Staff (Uma por linha: Pergunta | Exemplo | Longa? | Obrigatória?)', fields: [
-                        { key: 'tickets.questions.staff', label: 'Perguntas (Staff)', type: 'textarea', help: 'Máximo de 5. Ex: Qual sua idade? | 18 | não | sim' }
+                    { title: 'Perguntas de Staff (1 por linha: Pergunta | Exemplo | Longa? | Obrigatória?)', fields: [
+                        { key: 'tickets.questions.staff', label: 'Formulário Staff', type: 'textarea', help: 'Máximo 5. Ex: Qual sua idade? | 18 | não | sim' }
                     ]},
                     { title: 'Perguntas de Migração', fields: [
-                        { key: 'tickets.questions.migracao', label: 'Perguntas (Migração)', type: 'textarea' }
+                        { key: 'tickets.questions.migracao', label: 'Formulário Migração', type: 'textarea' }
                     ]}
                 ]
             },
@@ -170,13 +213,21 @@
                 groups: [
                     { title: 'Regras do Plantão', fields: [
                         { key: 'shift.enabled', label: 'Ativado?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
-                        { key: 'shift.plannedMinutes', label: 'Duração (Minutos)', type: 'number' },
-                        { key: 'shift.minMinutes', label: 'Tempo Mínimo (Minutos)', type: 'number' },
-                        { key: 'shift.returnMinutes', label: 'Tolerância Voltar (Minutos)', type: 'number' },
-                        { key: 'shift.maxHours', label: 'Limite Esquecido (Horas)', type: 'number' },
-                        { key: 'shift.categoryId', label: 'ID Categoria Calls', type: 'text' },
+                        { key: 'shift.requireVoice', label: 'Exigir Call para Iniciar?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'shift.plannedMinutes', label: 'Duração (Min)', type: 'number' },
+                        { key: 'shift.minMinutes', label: 'Tempo Mínimo (Min)', type: 'number' },
+                        { key: 'shift.returnMinutes', label: 'Tolerância Voltar (Min)', type: 'number' },
+                        { key: 'shift.maxHours', label: 'Limite Esquecido (Hrs)', type: 'number' },
+                        { key: 'shift.categoryId', label: 'ID Categoria de Calls', type: 'text' },
                         { key: 'shift.allowedChannelIds', label: 'Canais Permitidos', type: 'discord_ch_multi' },
                         { key: 'shift.rules', label: 'Regras do Plantão', type: 'textarea' },
+                    ]},
+                    { title: 'Mensagens de Plantão (DM)', fields: [
+                        { key: 'shift.messages.start', label: 'Ao Iniciar', type: 'textarea' },
+                        { key: 'shift.messages.leave', label: 'Ao Sair da Call', type: 'textarea' },
+                        { key: 'shift.messages.cancel', label: 'Ao Cancelar', type: 'textarea' },
+                        { key: 'shift.messages.incomplete', label: 'Incompleto', type: 'textarea' },
+                        { key: 'shift.messages.done', label: 'Ao Concluir', type: 'textarea' },
                     ]}
                 ]
             },
@@ -189,7 +240,29 @@
                         { key: 'movCall.leaveGraceSec', label: 'Tolerância ao Sair (Seg)', type: 'number' },
                         { key: 'movCall.pointsMin', label: 'Pontos Mínimos', type: 'number' },
                         { key: 'movCall.pointsMax', label: 'Pontos Máximos', type: 'number' },
+                        { key: 'movCall.pointsDefault', label: 'Pontos Sugeridos', type: 'number' },
                         { key: 'movCall.autoPoints', label: 'Pontos Automáticos', type: 'number' },
+                        { key: 'movCall.allowDuplicateMonitoring', label: 'Monitorias Simultâneas?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'movCall.requireMonitorInCall', label: 'Exigir Monitor na Call?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'movCall.onLeave', label: 'Se Sair Durante Monitoria', type: 'select', options: [{v:'review',l:'Marcar para Análise'},{v:'reject',l:'Reprovar Automaticamente'}] },
+                        { key: 'movCall.allowEarlyApproval', label: 'Permitir Aprovação Antecipada?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'movCall.autoPointsEnabled', label: 'Pontuação Automática sem Monitor?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'movCall.autoMoveMonitor', label: 'Mover Monitor para Call?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'movCall.restartToleranceSec', label: 'Tolerância Reinício (Seg)', type: 'number' },
+                        { key: 'movCall.title', label: 'Título do Painel MOV', type: 'text' },
+                    ]},
+                    { title: 'Mensagens da MOV (DM)', fields: [
+                        { key: 'movCall.notifyEnabled', label: 'Enviar Mensagens?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'movCall.notifyDm', label: 'Enviar na DM?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'movCall.notifyChannel', label: 'Publicar no Canal?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'movCall.notifyFallback', label: 'Fallback se DM Falhar?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'movCall.msgStart', label: 'Msg de Início', type: 'textarea' },
+                        { key: 'movCall.msgLeave', label: 'Msg ao Sair da Call', type: 'textarea' },
+                        { key: 'movCall.msgReturn', label: 'Msg ao Voltar', type: 'textarea' },
+                        { key: 'movCall.msgCancel', label: 'Msg de Cancelamento', type: 'textarea' },
+                        { key: 'movCall.msgFinish', label: 'Msg de Conclusão', type: 'textarea' },
+                        { key: 'movCall.msgFail', label: 'Msg de Falha', type: 'textarea' },
+                        { key: 'movCall.msgAuto', label: 'Msg de Pontuação Automática', type: 'textarea' },
                     ]}
                 ]
             },
@@ -202,22 +275,17 @@
                         { key: 'prefixes.cancel', label: 'Prefixo Cancelar', type: 'text', help: 'Ex: unionmovcancel' },
                     ]},
                     { title: 'Regras da Lista', fields: [
-                        { key: 'listaMov.collectMode', label: 'Modo de Coleta', type: 'select', options: [{v:'all',l:'Todos da call'},{v:'roles',l:'Só cargos de Mov Call'}] },
-                        { key: 'listaMov.durationMin', label: 'Duração em Call Pública (Min)', type: 'number' },
+                        { key: 'listaMov.collectMode', label: 'Modo de Coleta', type: 'select', options: [{v:'all',l:'Todos da Call'},{v:'roles',l:'Só Cargos'}] },
+                        { key: 'listaMov.requireStartButton', label: 'Exigir Botão Iniciar?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'listaMov.durationMin', label: 'Duração (Min)', type: 'number' },
                         { key: 'listaMov.minPresencePct', label: 'Presença Mínima (%)', type: 'number' },
+                        { key: 'listaMov.waitMin', label: 'Prazo p/ Descer (Min)', type: 'number' },
+                        { key: 'listaMov.pointsDefault', label: 'Pontos Sugeridos', type: 'number' },
+                        { key: 'listaMov.pointsMax', label: 'Pontos Máximos', type: 'number' },
+                        { key: 'listaMov.notify', label: 'Enviar DMs?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'listaMov.launchRoleIds', label: 'Cargos que Lançam Lista', type: 'discord_role_multi' },
                         { key: 'listaMov.roleIds', label: 'Cargos de Mov Call', type: 'discord_role_multi' },
-                    ]}
-                ]
-            },
-            mensagens_mov: {
-                icon: '🤖', name: 'Msgs do MOV',
-                groups: [
-                    { title: 'Textos e DMs Automáticas', fields: [
-                        { key: 'movCall.notifyEnabled', label: 'Enviar Mensagens?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
-                        { key: 'movCall.msgStart', label: 'Msg de Início (DM)', type: 'textarea' },
-                        { key: 'movCall.msgLeave', label: 'Msg ao Sair da Call (DM)', type: 'textarea' },
-                        { key: 'movCall.msgFinish', label: 'Msg de Conclusão (DM)', type: 'textarea' },
-                        { key: 'movCall.msgCancel', label: 'Msg de Cancelamento (DM)', type: 'textarea' },
+                        { key: 'listaMov.staffRoleIds', label: 'Cargos de Staff', type: 'discord_role_multi' },
                     ]}
                 ]
             },
@@ -227,35 +295,77 @@
                     { title: 'Regras de Monitoria', fields: [
                         { key: 'monitor.durationMin', label: 'Duração (Min)', type: 'number' },
                         { key: 'monitor.minPresencePct', label: 'Presença Mínima (%)', type: 'number' },
+                        { key: 'monitor.requireAllCriteria', label: 'Exigir Todos Critérios?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
                         { key: 'monitor.allowSelf', label: 'Permitir Auto-Monitoria?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
-                        { key: 'monitor.requireAllCriteria', label: 'Exigir Todos os Critérios?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'monitor.maxPerTargetPerDay', label: 'Bônus por Membro/Dia (0=Sem Limite)', type: 'number' },
+                        { key: 'monitor.maxPerMonitorPerDay', label: 'Aprovações/Monitor/Dia (0=Sem Limite)', type: 'number' },
+                        { key: 'appearance.monitorTitle', label: 'Título do Painel', type: 'text' },
+                        { key: 'appearance.monitorText', label: 'Texto do Painel', type: 'textarea' },
                     ]}
                 ]
             },
             pontos: {
-                icon: '💎', name: 'Pontos',
+                icon: '💎', name: 'Pontuação',
                 groups: [
                     { title: 'Regras de Pontuação', fields: [
                         { key: 'points.perHour', label: 'Pontos/Hora em Call', type: 'number' },
+                        { key: 'points.rounding', label: 'Arredondamento', type: 'select', options: [{v:'floor',l:'Para Baixo'},{v:'round',l:'Mais Próximo'},{v:'ceil',l:'Para Cima'},{v:'exact',l:'Exato'}] },
+                        { key: 'points.dailyCap', label: 'Limite Diário (0=Sem Limite)', type: 'number' },
                         { key: 'points.recruitment', label: 'Pontos por Recrutamento', type: 'number' },
                         { key: 'points.migration', label: 'Pontos por Migração', type: 'number' },
                         { key: 'points.shiftFlat', label: 'Pontos Fixo por Plantão', type: 'number' },
                         { key: 'points.shiftPerHour', label: 'Pontos/Hora Plantão', type: 'number' },
                         { key: 'points.reject', label: 'Pontos por Reprovação', type: 'number' },
                         { key: 'points.unit', label: 'Nome da Moeda', type: 'text', help: 'Ex: cristais' },
+                    ]},
+                    { title: 'Contagem Automática', fields: [
+                        { key: 'voice.countMuted', label: 'Contar Mutado?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'voice.countDeafened', label: 'Contar Ensurdecido?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'voice.minSessionSec', label: 'Tempo Mín. Sessão (Seg)', type: 'number' },
+                        { key: 'voice.maxSessionHours', label: 'Duração Máx. Sessão (Hrs)', type: 'number' },
+                        { key: 'mov.points', label: 'Pontos Padrão de Novo MOV', type: 'number' },
+                        { key: 'mov.minMinutes', label: 'Participação Mín. Padrão (Min)', type: 'number' },
                     ]}
                 ]
             },
             ranking: {
                 icon: '🏆', name: 'Ranking',
                 groups: [
-                    { title: 'Configuração do Ranking', fields: [
+                    { title: 'Configuração', fields: [
                         { key: 'ranking.enabled', label: 'Ranking Ativo?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
                         { key: 'ranking.auto', label: 'Atualização Automática?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'ranking.intervalMin', label: 'Intervalo (Min)', type: 'number' },
                         { key: 'ranking.topSize', label: 'Tamanho do Top', type: 'number' },
-                        { key: 'ranking.view.title', label: 'Título do Ranking', type: 'text' },
+                        { key: 'ranking.pageSize', label: 'Itens por Página', type: 'number' },
+                        { key: 'ranking.sortBy', label: 'Ordenar Por', type: 'select', options: [{v:'crystals',l:'Pontos'},{v:'recruitments',l:'Recrutamentos'},{v:'shifts',l:'Plantões'},{v:'time',l:'Tempo'}] },
+                    ]},
+                    { title: 'Visual do Ranking', fields: [
+                        { key: 'ranking.view.title', label: 'Título', type: 'text' },
                         { key: 'ranking.view.color', label: 'Cor (Hex)', type: 'color' },
                         { key: 'ranking.view.style', label: 'Estilo', type: 'select', options: [{v:'embed',l:'Embed Clássico'},{v:'v3',l:'Container V3'}] },
+                        { key: 'ranking.view.banner', label: 'URL do Banner', type: 'text' },
+                        { key: 'ranking.view.thumbnail', label: 'URL da Miniatura', type: 'text' },
+                        { key: 'ranking.view.footer', label: 'Rodapé', type: 'text' },
+                        { key: 'ranking.view.unit', label: 'Nome da Unidade', type: 'text' },
+                        { key: 'ranking.view.emptyText', label: 'Texto Vazio', type: 'text' },
+                        { key: 'ranking.view.description', label: 'Descrição Acima da Lista', type: 'textarea' },
+                        { key: 'ranking.view.lineTemplate', label: 'Template da Linha', type: 'textarea', help: 'Ex: {emoji} {usuario} — **{pontos}** {unidade}' },
+                        { key: 'ranking.view.podiumCount', label: 'Quantos no Pódio (0=Desligado)', type: 'number' },
+                        { key: 'ranking.view.podiumTemplate', label: 'Template do Pódio', type: 'textarea' },
+                        { key: 'ranking.view.totalsTemplate', label: 'Template de Totais', type: 'textarea' },
+                        { key: 'ranking.view.spacing', label: 'Espaço entre Posições', type: 'select', options: [{v:'auto',l:'Automático'},{v:'compact',l:'Compacto'},{v:'airy',l:'Arejado'}] },
+                        { key: 'ranking.view.showTimestamp', label: 'Mostrar Data?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'ranking.view.v3Accent', label: 'Barra Colorida V3?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                    ]}
+                ]
+            },
+            temporadas: {
+                icon: '📅', name: 'Temporadas',
+                groups: [
+                    { title: 'Reset de Temporada', fields: [
+                        { key: 'seasons.weeklyReset', label: 'Reset Semanal?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'seasons.weekday', label: 'Dia da Semana (0=Dom, 6=Sáb)', type: 'number' },
+                        { key: 'seasons.hour', label: 'Hora do Reset (0-23)', type: 'number' },
                     ]}
                 ]
             },
@@ -267,27 +377,112 @@
                         { key: 'bp_goal', label: 'Meta de Mensagens', type: 'number' },
                         { key: 'bp_duration_min', label: 'Duração (Minutos)', type: 'number' },
                         { key: 'bp_reward', label: 'Recompensa (Pontos)', type: 'number' },
+                        { key: 'bp_cooldown_sec', label: 'Anti-Flood (Segundos)', type: 'number' },
                         { key: 'bp_channel_id', label: 'Canal de Contagem', type: 'discord_ch' },
+                        { key: 'bp_area', label: 'Nome da Área', type: 'text' },
+                        { key: 'bp_in_ranking', label: 'Aparecer no Ranking?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'bpv_dm_enabled', label: 'Enviar DM ao Finalizar?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'bpv_dm_on_start', label: 'Enviar DM ao Iniciar?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'bpv_dm_on_goal', label: 'Enviar DM ao Atingir Meta?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                    ]},
+                    { title: 'Visual do Bate-Ponto', fields: [
+                        { key: 'bpv_title', label: 'Título', type: 'text' },
+                        { key: 'bpv_intro', label: 'Introdução', type: 'textarea' },
+                        { key: 'bpv_rules_title', label: 'Título das Regras', type: 'text' },
+                        { key: 'bpv_rules', label: 'Regras', type: 'textarea' },
+                        { key: 'bpv_footer', label: 'Rodapé', type: 'text' },
+                        { key: 'bpv_layout', label: 'Layout do Painel', type: 'select', options: [{v:'fields',l:'Colunas'},{v:'list',l:'Lista'}] },
+                        { key: 'bpv_image', label: 'URL do Banner', type: 'text' },
+                        { key: 'bpv_thumb', label: 'URL da Miniatura', type: 'text' },
+                        { key: 'bpv_btn_start_label', label: 'Texto do Botão Iniciar', type: 'text' },
+                        { key: 'bpv_btn_start_emoji', label: 'Emoji do Botão Iniciar', type: 'text' },
+                        { key: 'bpv_btn_view_label', label: 'Texto do Botão "Meu Bate-Ponto"', type: 'text' },
+                        { key: 'bpv_btn_view_emoji', label: 'Emoji do Botão "Meu Bate-Ponto"', type: 'text' },
+                    ]},
+                    { title: 'Mensagens de Resultado', fields: [
+                        { key: 'bpv_t_active', label: 'Título: Ativo', type: 'text' },
+                        { key: 'bpv_t_started', label: 'Título: Iniciado', type: 'text' },
+                        { key: 'bpv_active_footer', label: 'Rodapé: Ativo', type: 'text' },
+                        { key: 'bpv_active_labels', label: 'Rótulos (tempo, msgs, progresso)', type: 'text' },
+                        { key: 'bpv_t_approved', label: 'Título: Aprovado', type: 'text' },
+                        { key: 'bpv_t_rejected', label: 'Título: Reprovado', type: 'text' },
+                        { key: 'bpv_t_cancelled', label: 'Título: Cancelado', type: 'text' },
+                        { key: 'bpv_t_goal', label: 'Título: Meta Concluída', type: 'text' },
+                        { key: 'bpv_t_log', label: 'Título do Log', type: 'text' },
+                    ]},
+                    { title: 'Mensagens DM', fields: [
+                        { key: 'bpv_dm_started', label: 'Ao Iniciar', type: 'textarea' },
+                        { key: 'bpv_dm_goal_reached', label: 'Ao Atingir Meta', type: 'textarea' },
+                        { key: 'bpv_dm_approved', label: 'Aprovado', type: 'textarea' },
+                        { key: 'bpv_dm_rejected', label: 'Reprovado', type: 'textarea' },
+                        { key: 'bpv_dm_cancelled', label: 'Cancelado', type: 'textarea' },
+                    ]}
+                ]
+            },
+            tema: {
+                icon: '🎨', name: 'Tema Global',
+                groups: [
+                    { title: 'Cores e Linhas', fields: [
+                        { key: 'ui_color', label: 'Cor da Faixa (Hex)', type: 'color' },
+                        { key: 'ui_status_colors', label: 'Cores de Status?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'ui_sep_char', label: 'Caractere da Linha', type: 'text', help: 'Ex: ─' },
+                        { key: 'ui_sep_len', label: 'Tamanho da Linha', type: 'number' },
+                        { key: 'ui_timestamp', label: 'Mostrar Hora no Rodapé?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'ui_footer', label: 'Rodapé Global (- = Ocultar)', type: 'text' },
+                        { key: 'ui_bar_full', label: 'Barra Cheia', type: 'text', help: 'Ex: ▰' },
+                        { key: 'ui_bar_empty', label: 'Barra Vazia', type: 'text', help: 'Ex: ▱' },
+                    ]}
+                ]
+            },
+            cargos: {
+                icon: '🎖️', name: 'Cargos Automáticos',
+                groups: [
+                    { title: 'Cargos por Pontuação', fields: [
+                        { key: 'roles_enabled', label: 'Sistema Ativado?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'roles_clear_on_reset', label: 'Limpar Cargos no Reset?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
                     ]}
                 ]
             },
             emojis: {
                 icon: '😀', name: 'Emojis',
                 groups: [
-                    { title: 'Emojis do Sistema (Deixe vazio para usar o padrão)', fields: [
+                    { title: 'Emojis do Sistema (Vazio = Padrão)', fields: [
                         { key: 'emojis.rank1', label: '1º Lugar', type: 'text' },
                         { key: 'emojis.rank2', label: '2º Lugar', type: 'text' },
                         { key: 'emojis.rank3', label: '3º Lugar', type: 'text' },
+                        { key: 'emojis.rankOther', label: 'Demais Posições', type: 'text' },
                         { key: 'emojis.ok', label: 'Sucesso / Check', type: 'text' },
                         { key: 'emojis.bad', label: 'Erro / Xis', type: 'text' },
+                        { key: 'emojis.warn', label: 'Aviso', type: 'text' },
+                        { key: 'emojis.crystal', label: 'Cristal / Pontos', type: 'text' },
+                        { key: 'emojis.mov', label: 'MOV', type: 'text' },
+                        { key: 'emojis.monitor', label: 'Monitoria', type: 'text' },
+                        { key: 'emojis.goal', label: 'Metas', type: 'text' },
+                        { key: 'emojis.season', label: 'Temporada', type: 'text' },
                     ]}
                 ]
             },
-            status: {
-                icon: '🔊', name: 'Status do Bot',
+            geral: {
+                icon: '⚙️', name: 'Sistema',
                 groups: [
-                    { title: 'Presença no Discord', fields: [
-                        { key: 'bot_status', label: 'Status', type: 'select', options: [{v:'online',l:'🟢 Online'},{v:'idle',l:'🌙 Ausente'},{v:'dnd',l:'⛔ Não Perturbe'},{v:'invisible',l:'⚫ Invisível'}] },
+                    { title: 'Configurações Globais', fields: [
+                        { key: 'timezone', label: 'Fuso Horário', type: 'text', help: 'Ex: America/Sao_Paulo' },
+                        { key: 'per_page', label: 'Itens por Página', type: 'number' },
+                        { key: 'rank_max', label: 'Máx. Membros no Ranking', type: 'number' },
+                        { key: 'reset_enabled', label: 'Reset Semanal?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'reset_day', label: 'Dia do Reset (0=Dom)', type: 'number' },
+                        { key: 'reset_time', label: 'Hora do Reset (HH:MM)', type: 'text' },
+                    ]},
+                    { title: 'Status do Bot', fields: [
+                        { key: 'bot_status', label: 'Status no Discord', type: 'select', options: [{v:'online',l:'🟢 Online'},{v:'idle',l:'🌙 Ausente'},{v:'dnd',l:'⛔ Não Perturbe'},{v:'invisible',l:'⚫ Invisível'}] },
+                    ]},
+                    { title: 'Canais de Logs (Sistema SQLite)', fields: [
+                        { key: 'log_channel_points', label: 'Log de Pontos', type: 'discord_ch' },
+                        { key: 'log_channel_ranking', label: 'Log de Ranking', type: 'discord_ch' },
+                        { key: 'log_channel_bateponto', label: 'Log de Bate-Ponto', type: 'discord_ch' },
+                        { key: 'log_channel_admin', label: 'Log Administrativo', type: 'discord_ch' },
+                        { key: 'log_channel_messages', label: 'Log de Mensagens', type: 'discord_ch' },
+                        { key: 'log_channel_members', label: 'Log de Membros', type: 'discord_ch' },
                     ]}
                 ]
             }
