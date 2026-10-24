@@ -3,13 +3,9 @@ const mongoose = require('mongoose');
 const { Schema, model } = mongoose;
 const { Mixed, ObjectId } = Schema.Types;
 
-// Importa os emojis para não quebrar o txtmod
 let setOverrides = () => {};
 try { setOverrides = require('../txtmod/emojis').setOverrides || (() => {}); } catch (e) {}
 
-// ==========================================
-// 1. UTILITÁRIOS
-// ==========================================
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 function merge(base, extra) {
@@ -21,9 +17,6 @@ function merge(base, extra) {
 }
 const getPath = (obj, path) => path.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
 
-// ==========================================
-// 2. CONFIGURAÇÕES PADRÃO
-// ==========================================
 const DEFAULT_DESCRIPTION = [
   'Gostou do servidor e quer se juntar à nossa staff?',
   'Clique no botão abaixo e preencha o formulário.',
@@ -72,6 +65,7 @@ const DEFAULTS = {
   seasons: { weeklyReset: true, weekday: 1, hour: 0, lastKey: '' },
   appearance: { monitorTitle: 'Painel de Monitoria', monitorText: 'Use o botão abaixo para monitorar um membro...' },
   movCall: {
+    enabled: true, // <--- ADICIONADO AQUI (para o site controlar se o Bate-Ponto/Mov Call está ligado)
     panelChannelId: null, commandChannelId: null, durationMin: 30, minPresencePct: 80, leaveGraceSec: 300, pointsMin: 1, pointsMax: 20, pointsDefault: 5, allowDuplicateMonitoring: false, onLeave: 'review', requireMonitorInCall: true, autoPointsEnabled: true, autoPoints: 5, notifyEnabled: true, notifyDm: true, notifyChannel: false, notifyFallback: false, notifyChannelId: null, msgStart: '...', msgLeave: '...', msgReturn: '...', msgCancel: '...', msgFinish: '...', msgFail: '...', msgAuto: '...', allowEarlyApproval: true, autoMoveMonitor: false, restartToleranceSec: 600, title: 'MOV CALL - UNION'
   },
   prefixes: { start: 'unionmov', lista: 'unionlista', cancel: 'unionmovcancel' },
@@ -88,16 +82,18 @@ const DEFAULTS = {
     enabled: true, plannedMinutes: 60, minMinutes: 10, maxHours: 12, requireVoice: false, allowedChannelIds: [], rules: 'Fique disponível...', panelChannelId: null, panelMessageId: null, categoryName: null, categoryId: null, returnMinutes: 5,
     messages: { start: '...', leave: '...', cancel: '...', incomplete: '...', done: '...' }
   },
-  logs: { main: { geral: null, tickets: null, recrutamento: null }, internal: { geral: null, tickets: null, recrutamento: null, plantao: null, admin: null }, sessoes: null, movs: null, monitoria: null, pontos: null, movcall: null },
+  logs: { 
+    main: { geral: null, tickets: null, recrutamento: null }, 
+    internal: { geral: null, tickets: null, recrutamento: null, plantao: null, admin: null }, 
+    sessoes: null, movs: null, monitoria: null, pontos: null, movcall: null,
+    ban: null, punish: null, joinLeave: null // <--- ADICIONADO AQUI (Novos Logs)
+  },
   perms: { main: { admin: [], leader: [], recruiter: [], migrator: [] }, internal: { admin: [], leader: [], recruiter: [], shift: [] }, monitor: [], points: [], starter: [], selfMonitor: [], discordAdmin: true },
   emojis: {},
   presets: {},
   panels: { monitor: { channelId: null, messageId: null } },
 };
 
-// ==========================================
-// 3. MODELOS DE BANCO (Mongoose)
-// ==========================================
 const Config = model('Config', new Schema({ key: { type: String, unique: true }, data: Mixed }, { minimize: false }));
 
 const Season = model('Season', new Schema({ number: { type: Number, index: true }, name: String, startsAt: { type: Date, default: Date.now }, endsAt: Date, endedAt: Date, status: { type: String, default: 'active', index: true }, snapshot: [Mixed] }));
@@ -123,12 +119,7 @@ const LogEntry = model('LogEntry', new Schema({ at: { type: Date, default: Date.
 const Counter = model('Counter', new Schema({ _id: String, n: { type: Number, default: 0 } }));
 const AdminLog = model('AdminLog', new Schema({ at: { type: Date, default: Date.now, index: true }, userId: String, userTag: String, guildId: String, action: String, label: String, path: String, value: String }));
 
-// ==========================================
-// 4. FUNÇÕES DE CONFIGURAÇÃO E CACHE
-// ==========================================
 let cfgCache = null;
-
-// CORREÇÃO AQUI: Tornando síncronos para o bot não quebrar
 const cfgNow = () => cfgCache ?? merge(clone(DEFAULTS), {});
 const getCfg = () => cfgCache || merge(clone(DEFAULTS), {});
 
@@ -160,9 +151,6 @@ async function delCfg(path) {
 }
 async function unsetCfg(path) { return delCfg(path); }
 
-// ==========================================
-// 5. PRESETS E SEASONS
-// ==========================================
 const PRESET_DESCRIPTION = 'Clique no botão abaixo para abrir um ticket.\n\nUm membro da equipe irá atender você o mais rápido possível.';
 function presetDefaults(name = 'Novo preset') {
   return {
