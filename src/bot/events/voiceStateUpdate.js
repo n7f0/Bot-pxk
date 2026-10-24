@@ -9,16 +9,23 @@ module.exports = (client) => {
 
     // 2. Log de entrada e saída de call
     const cfg = getCfg();
-    if (cfg.logs?.sessoes) {
-      const member = newState.member || oldState.member;
-      if (!member || member.user.bot) return;
+    const member = newState.member || oldState.member;
+    if (!member || member.user.bot) return;
 
-      if (!oldState.channelId && newState.channelId) {
-        sendLog(client, 'sessoes', logEmbed('🔊 Entrou na Call', `👤 <@${member.id}>\n📍 Canal: <#${newState.channelId}>`, COLORS.ok));
-      } else if (oldState.channelId && !newState.channelId) {
-        sendLog(client, 'sessoes', logEmbed('🔇 Saiu da Call', `👤 <@${member.id}>\n📍 Canal: <#${oldState.channelId}>`, COLORS.warn));
-      } else if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
-        sendLog(client, 'sessoes', logEmbed('🔄 Trocou de Call', `👤 <@${member.id}>\n📍 De: <#${oldState.channelId}>\n➡️ Para: <#${newState.channelId}>`, COLORS.neutral));
+    if (!oldState.channelId && newState.channelId) {
+      // Entrou na call
+      if (cfg.logs?.voiceJoin) {
+        sendLog(client, 'voiceJoin', logEmbed('🔊 Entrou na Call', `👤 <@${member.id}>\n📍 Canal: <#${newState.channelId}>`, COLORS.ok));
+      }
+    } else if (oldState.channelId && !newState.channelId) {
+      // Saiu da call
+      if (cfg.logs?.voiceLeave) {
+        sendLog(client, 'voiceLeave', logEmbed('🔇 Saiu da Call', `👤 <@${member.id}>\n📍 Canal: <#${oldState.channelId}>`, COLORS.warn));
+      }
+    } else if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
+      // Trocou de call (Manda pra voiceJoin para saber onde foi)
+      if (cfg.logs?.voiceJoin) {
+        sendLog(client, 'voiceJoin', logEmbed('🔄 Trocou de Call', `👤 <@${member.id}>\n📍 De: <#${oldState.channelId}>\n➡️ Para: <#${newState.channelId}>`, COLORS.neutral));
       }
     }
   });
