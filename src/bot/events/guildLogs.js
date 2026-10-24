@@ -3,23 +3,23 @@ const { sendLog, logEmbed, COLORS } = require('../core');
 const { getCfg } = require('../../models');
 
 module.exports = (client) => {
-  // Entrada de Membro
+  // Entrada de Membro no Servidor
   client.on(Events.GuildMemberAdd, (member) => {
     const cfg = getCfg();
-    if (!cfg.logs?.joinLeave) return;
-    sendLog(client, 'joinLeave', logEmbed('🟢 Membro Entrou', `👤 <@${member.id}> (\`${member.user.tag}\`)\n📅 Conta criada <t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`, COLORS.ok));
+    if (!cfg.logs?.join) return;
+    sendLog(client, 'join', logEmbed('🟢 Membro Entrou', `👤 <@${member.id}> (\`${member.user.tag}\`)\n📅 Conta criada <t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`, COLORS.ok));
   });
 
-  // Saída de Membro
+  // Saída de Membro do Servidor
   client.on(Events.GuildMemberRemove, async (member) => {
     const cfg = getCfg();
-    if (!cfg.logs?.joinLeave) return;
+    if (!cfg.logs?.leave) return;
     try {
       const logs = await member.guild.fetchAuditLogs({ limit: 1 });
       const entry = logs.entries.first();
       if (entry && (entry.action === AuditLogEvent.MemberBanAdd || entry.action === AuditLogEvent.MemberKick) && entry.target.id === member.id && Date.now() - entry.createdTimestamp < 5000) return;
     } catch {}
-    sendLog(client, 'joinLeave', logEmbed('🔴 Membro Saiu', `👤 <@${member.id}> (\`${member.user.tag}\`)`, COLORS.bad));
+    sendLog(client, 'leave', logEmbed('🔴 Membro Saiu', `👤 <@${member.id}> (\`${member.user.tag}\`)`, COLORS.bad));
   });
 
   // Banimento Aplicado e Removido
