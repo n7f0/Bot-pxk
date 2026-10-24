@@ -63,15 +63,15 @@ const DEFAULTS = {
   appearance: { monitorTitle: 'Painel de Monitoria', monitorText: 'Use o botão abaixo para monitorar um membro...' },
   movCall: {
     enabled: true,
-    panelChannelId: null, commandChannelId: null, durationMin: 30, minPresencePct: 80, leaveGraceSec: 300, pointsMin: 1, pointsMax: 20, pointsDefault: 5, allowDuplicateMonitoring: false, onLeave: 'review', requireMonitorInCall: true, autoPointsEnabled: true, autoPoints: 5, notifyEnabled: true, notifyDm: true, notifyChannel: false, notifyFallback: false, notifyChannelId: null, msgStart: '...', msgLeave: '...', msgReturn: '...', msgCancel: '...', msgFinish: '...', msgFail: '...', msgAuto: '...', allowEarlyApproval: true, autoMoveMonitor: false, restartToleranceSec: 600, title: 'MOV CALL - UNION'
+    panelChannelId: null, commandChannelId: null, durationMin: 30, minPresencePct: 80, leaveGraceSec: 300, pointsMin: 1, pointsMax: 20, pointsDefault: 5, allowDuplicateMonitoring: false, onLeave: 'review', requireMonitorInCall: true, autoPointsEnabled: true, autoPoints: 5, notifyEnabled: true, notifyDm: true, notifyChannel: false, notifyFallback: false, notifyChannelId: null, msgStart: '...', msgLeave: '...', msgReturn: '...', msgCancel: '...', msgFinish: '...', msgFail: '...', msgAuto: '...', allowEarlyApproval: true, autoMoveMonitor: false, restartToleranceSec: 600, title: 'MOV CALL - PXK'
   },
-  prefixes: { start: 'unionmov', lista: 'unionlista', cancel: 'unionmovcancel' },
+  prefixes: { start: 'pxkmov', lista: 'pxklista', cancel: 'pxkmovcancel' },
   listaMov: {
     channelId: null, collectMode: 'all', launchRoleIds: [], requireStartButton: true, roleIds: [], staffRoleIds: [], durationMin: 60, minPresencePct: 80, waitMin: 30, pointsDefault: 5, pointsMax: 20, notify: true, msgStart: '...', msgEnd: '...'
   },
   tickets: {
     style: 'V1', categoryId: null, useThread: false, threadChannelId: null, panelChannelId: null, panelMessageId: null, panelKind: null, accessRoleIds: [], assignableRoleIds: [], hierarchyRoleIds: [], hierarchyMax: 1, inicianteRoleId: null, inicianteRoleIds: [], nameTemplate: '{tipo}-{usuario}', requireShiftToClaim: false,
-    panel: { title: 'União — Seja Staff', desc1: DEFAULT_DESCRIPTION, desc2: '', desc3: '', desc4: '', color: '#D4AF37', banner: '', thumbnail: '', footer: '', labelStaff: 'Quero ser staff', labelMig: 'Quero ser migrado', v3Accent: false, selectPlaceholder: 'Selecione uma opção...', optLabelStaff: 'Recrutamento', optLabelMig: 'Migração', optDescStaff: 'Para ser recrutado.', optDescMig: 'Para ser migrado.' },
+    panel: { title: 'PXK — Seja Staff', desc1: DEFAULT_DESCRIPTION, desc2: '', desc3: '', desc4: '', color: '#D4AF37', banner: '', thumbnail: '', footer: '', labelStaff: 'Quero ser staff', labelMig: 'Quero ser migrado', v3Accent: false, selectPlaceholder: 'Selecione uma opção...', optLabelStaff: 'Recrutamento', optLabelMig: 'Migração', optDescStaff: 'Para ser recrutado.', optDescMig: 'Para ser migrado.' },
     messages: { open: 'Olá {usuario}...', claim: '✅ {recrutador} assumiu...', finish: '🎉 {usuario} foi recrutado(a)...', reject: '❌ A candidatura...', close: '🔒 Este ticket será fechado...' },
     questions: clone(DEFAULT_QUESTIONS)
   },
