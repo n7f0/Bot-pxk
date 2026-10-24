@@ -45,7 +45,9 @@ async function execute(interaction) {
     if (!(await requirePermission(interaction, PERM[sub]))) return;
     const amount = interaction.options.getInteger('pontos', true);
     const reason = interaction.options.getString('motivo')?.trim() || null;
-    await interaction.deferReply();
+    // CORREÇÃO: respostas administrativas devem ser ephemeral
+    // (deferReply sem flags deixava o "pensando..." público).
+    await interaction.deferReply({ flags: EPHEMERAL });
     try {
       const entry = await actions.changePoints({
         userId: target.id,
