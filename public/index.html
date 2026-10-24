@@ -1,463 +1,810 @@
 <!DOCTYPE html>
-<html lang="pt-BR" data-bs-theme="dark">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PXK System - Painel</title>
-    <!-- Bootstrap 5.3 -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- FontAwesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>PXK - Painel de Controle Total</title>
     <style>
-        :root {
-            --bg-main: #0f111a;
-            --bg-card: #181b24;
-            --accent: #6d28d9;
-            --accent-hover: #7c3aed;
-            --text-muted: #9ca3af;
-            --border-color: #2d3748;
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@800;900&family=Inter:wght@400;500;600;700;800&display=swap');
+        
+        :root { 
+            --bg-dark: #1c202c;
+            --card-bg: #31323e;
+            --purple: #60519b;
+            --purple-hover: #7160b5;
+            --text-main: #bfc0d1;
+            --text-muted: #8a8b9e;
+            --border: rgba(255,255,255,0.05);
+            --input-bg: rgba(0,0,0,0.2);
         }
-        body {
-            background-color: var(--bg-main);
-            color: #e2e8f0;
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        
+        body { 
+            background-color: var(--bg-dark); color: var(--text-main); height: 100vh; 
+            display: flex; flex-direction: column; overflow: hidden; 
         }
-        .sidebar {
-            background-color: var(--bg-card);
-            border-right: 1px solid var(--border-color);
-            min-height: 100vh;
-            padding-top: 20px;
+
+        body::before {
+            content: ''; position: fixed; inset: 0;
+            background-image: 
+                linear-gradient(to bottom, rgba(28, 32, 44, 0.8), rgba(28, 32, 44, 0.95)),
+                url('/fundo.png');
+            background-size: cover; background-position: center; z-index: -1; pointer-events: none;
         }
-        .nav-link {
-            color: var(--text-muted);
-            border-radius: 8px;
-            margin-bottom: 5px;
-            padding: 10px 15px;
-            font-weight: 500;
-            transition: all 0.2s;
+        
+        /* HEADER */
+        .header { 
+            padding: 16px 40px; background: rgba(28, 32, 44, 0.8); backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border); display: flex; align-items: center; z-index: 100; 
         }
-        .nav-link:hover, .nav-link.active {
-            background-color: rgba(109, 40, 217, 0.2);
-            color: #fff;
+        .header .brand { font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: 24px; color: #fff; letter-spacing: 1px; }
+
+        /* USER MENU */
+        .user-menu-container { position: relative; margin-left: auto; }
+        .user-info { 
+            display: flex; align-items: center; gap: 10px; cursor: pointer; 
+            background: var(--card-bg); padding: 8px 16px; border-radius: 99px; 
+            border: 1px solid var(--border); transition: 0.2s; 
         }
-        .nav-link.active {
-            border-left: 4px solid var(--accent);
-            background-color: rgba(109, 40, 217, 0.3);
+        .user-info:hover { background: rgba(255,255,255,0.05); }
+        .user-info img { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--purple); }
+        .user-info span { font-size: 14px; font-weight: 600; color: #fff; }
+        .user-dropdown { 
+            display: none; position: absolute; top: calc(100% + 10px); right: 0; 
+            background: var(--card-bg); border: 1px solid var(--border); 
+            border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow: hidden; z-index: 100; min-width: 180px;
         }
-        .card {
-            background-color: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        .user-dropdown.active { display: block; }
+        .logout-btn { display: block; padding: 14px 20px; color: #f87171; text-decoration: none; font-weight: 700; font-size: 14px; transition: 0.2s; }
+        .logout-btn:hover { background: rgba(248,113,113,0.1); }
+
+        /* CONTAINER */
+        .container { display: flex; flex: 1; padding: 24px; gap: 24px; max-width: 1600px; margin: 0 auto; width: 100%; overflow: hidden; }
+        
+        /* SIDEBAR */
+        .sidebar { 
+            width: 290px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 20px; 
+            padding: 20px; overflow-y: auto; flex-shrink: 0; box-shadow: 0 10px 30px rgba(0,0,0,0.3); 
         }
-        .card-header {
-            background-color: transparent;
-            border-bottom: 1px solid var(--border-color);
-            font-weight: 600;
-            color: #fff;
-            padding: 15px 20px;
+        .nav-btn { 
+            display: block; width: 100%; padding: 10px 16px; margin-bottom: 4px; background: transparent; 
+            color: var(--text-muted); border: 1px solid transparent; border-radius: 10px; text-align: left; 
+            font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; 
         }
-        .form-control, .form-select {
-            background-color: var(--bg-main);
-            border: 1px solid var(--border-color);
-            color: #fff;
+        .nav-btn:hover { background: rgba(255,255,255,0.03); color: #fff; }
+        .nav-btn.active { background: var(--purple); color: #fff; border-color: var(--purple-hover); }
+        
+        /* CONTENT */
+        .content { 
+            flex: 1; background: var(--card-bg); border: 1px solid var(--border); border-radius: 20px; 
+            padding: 40px; overflow-y: auto; scroll-behavior: smooth; box-shadow: 0 10px 30px rgba(0,0,0,0.3); 
         }
-        .form-control:focus, .form-select:focus {
-            background-color: var(--bg-main);
-            color: #fff;
-            border-color: var(--accent);
-            box-shadow: 0 0 0 0.25rem rgba(109, 40, 217, 0.25);
+        .tab-content { display: none; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        
+        /* FORM E INPUTS */
+        h2 { font-family: 'Montserrat', sans-serif; font-weight: 800; text-transform: uppercase; margin-bottom: 20px; font-size: 24px; color: #fff; letter-spacing: -0.5px; }
+        h3 { font-size: 12px; color: var(--purple-hover); margin: 30px 0 15px; border-bottom: 1px solid var(--border); padding-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+        
+        .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+        .full { grid-column: 1 / -1; }
+        label { display: block; font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; }
+        input, select, textarea { 
+            width: 100%; padding: 12px 16px; background: var(--input-bg); border: 1px solid var(--border); 
+            border-radius: 10px; color: #fff; font-size: 13px; outline: none; transition: 0.2s; 
         }
-        .btn-primary {
-            background-color: var(--accent);
-            border-color: var(--accent);
+        input:focus, select:focus, textarea:focus { border-color: var(--purple); box-shadow: 0 0 0 3px rgba(96,81,155,0.2); }
+        textarea { resize: vertical; min-height: 80px; }
+        .tutorial { background: rgba(96,81,155,0.1); border-left: 3px solid var(--purple); padding: 12px 16px; border-radius: 6px; font-size: 12px; color: var(--text-main); margin-top: 8px; display: flex; gap: 10px; line-height: 1.5; }
+        
+        /* CUSTOM MULTI-SELECT (Checkboxes) */
+        .custom-ms { position: relative; user-select: none; }
+        .ms-header { 
+            background: var(--input-bg); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); 
+            cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--text-muted);
         }
-        .btn-primary:hover {
-            background-color: var(--accent-hover);
-            border-color: var(--accent-hover);
+        .ms-header:hover { border-color: var(--purple); }
+        .ms-dropdown { 
+            display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--card-bg); 
+            border: 1px solid var(--border); border-radius: 10px; margin-top: 5px; max-height: 200px; 
+            overflow-y: auto; z-index: 50; padding: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); 
         }
-        .user-profile {
-            display: flex;
-            align-items: center;
-            padding: 15px;
-            border-bottom: 1px solid var(--border-color);
-            margin-bottom: 15px;
+        .custom-ms.open .ms-dropdown { display: block; }
+        .ms-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+        .ms-item:hover { background: rgba(255,255,255,0.05); }
+        .ms-item input[type="checkbox"] { width: auto; accent-color: var(--purple); cursor: pointer; }
+
+        /* CUSTOM COLOR PICKER */
+        .color-picker-wrapper {
+            display: flex; align-items: center; gap: 12px;
+            background: var(--input-bg); border: 1px solid var(--border);
+            border-radius: 10px; padding: 8px 16px; transition: 0.2s;
         }
-        .user-avatar {
-            width: 45px;
-            height: 45px;
-            border-radius: 50%;
-            margin-right: 15px;
-            background-color: var(--border-color);
+        .color-picker-wrapper:hover { border-color: var(--purple); }
+        .color-picker-wrapper input[type="color"] {
+            width: 32px; height: 32px; padding: 0; border: 2px solid rgba(255,255,255,0.2); 
+            background: none; border-radius: 50%; cursor: pointer; overflow: hidden;
         }
-        .form-switch .form-check-input:checked {
-            background-color: var(--accent);
-            border-color: var(--accent);
+        .color-picker-wrapper input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        .color-picker-wrapper input[type="color"]::-webkit-color-swatch { border: none; border-radius: 50%; }
+        .color-picker-wrapper span { font-family: monospace; font-size: 13px; color: #fff; }
+        
+        /* SAVE BAR */
+        .save-bar { 
+            display: none; position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); 
+            background: rgba(28, 32, 44, 0.95); backdrop-filter: blur(10px); padding: 12px 24px; 
+            border-radius: 99px; border: 1px solid var(--purple); gap: 20px; 
+            align-items: center; box-shadow: 0 10px 40px rgba(0,0,0,0.9); z-index: 100; animation: slideUp 0.3s;
+            width: max-content; max-width: 90vw;
         }
-        .section-title {
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--accent-hover);
-            margin-bottom: 15px;
-            margin-top: 10px;
-            font-weight: 700;
+        @keyframes slideUp { from { bottom: 0; opacity: 0; } to { bottom: 24px; opacity: 1; } }
+        .btn-save { 
+            background: var(--purple); color: #fff; border: none; padding: 12px 32px; 
+            border-radius: 99px; font-weight: 800; cursor: pointer; transition: 0.2s; text-transform: uppercase; 
         }
-        .content-area { padding: 30px; }
-        .tab-pane { display: none; }
-        .tab-pane.active { display: block; animation: fadeIn 0.3s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .btn-save:hover { background: var(--purple-hover); transform: scale(1.05); }
+        .loading { text-align: center; color: var(--purple-hover); font-weight: bold; margin-top: 50px; font-size: 18px; }
+        
+        /* SCROLLBAR */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--purple); border-radius: 4px; }
+
+        /* =========================================
+           CORREÇÃO PARA CELULAR (MOBILE) 
+           ========================================= */
+        @media(max-width: 900px) {
+            body { 
+                overflow: auto; /* Permite rolar a página inteira */
+                height: auto;
+                min-height: 100vh;
+            }
+            .header { padding: 16px 20px; }
+            .container { 
+                flex-direction: column; /* Empilha a sidebar em cima e o form embaixo */
+                overflow: visible; 
+                padding: 16px;
+                gap: 16px;
+            }
+            .sidebar { 
+                width: 100%; 
+                flex-shrink: 1;
+                max-height: 250px; /* Limita a altura do menu para não empurrar o form muito pra baixo */
+            }
+            .content { 
+                width: 100%;
+                padding: 20px;
+                overflow: visible; 
+            }
+            .grid { 
+                grid-template-columns: 1fr; /* Inputs ocupam 100% da largura no celular */
+            }
+            .save-bar {
+                padding: 10px 16px;
+                flex-direction: column;
+                border-radius: 16px;
+                gap: 10px;
+            }
+            .btn-save { width: 100%; padding: 10px; }
+        }
     </style>
 </head>
 <body>
-
-<div class="container-fluid">
-    <div class="row">
-        <!-- SIDEBAR -->
-        <div class="col-md-3 col-lg-2 sidebar d-flex flex-column">
-            <div class="user-profile">
-                <img id="user-avatar" class="user-avatar" src="" alt="Avatar">
-                <div>
-                    <h6 class="mb-0 text-white" id="user-name">Carregando...</h6>
-                    <small class="text-muted">Administrador</small>
-                </div>
+    <header class="header">
+        <div class="brand">PXK</div>
+        
+        <div class="user-menu-container">
+            <div class="user-info" onclick="toggleUserMenu(event)">
+                <img id="user-avatar" src="https://cdn.discordapp.com/embed/avatars/0.png" alt="Avatar">
+                <span id="user-name">Carregando...</span>
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24" style="color: var(--text-muted);"><path d="M7 10l5 5 5-5z"/></svg>
             </div>
-            
-            <nav class="nav flex-column px-2">
-                <a class="nav-link active" href="#" onclick="switchTab('tab-sistema', this)"><i class="fa-solid fa-gear me-2"></i> Sistema</a>
-                <a class="nav-link" href="#" onclick="switchTab('tab-bateponto', this)"><i class="fa-solid fa-clock me-2"></i> Bate-Ponto (Mov)</a>
-                <a class="nav-link" href="#" onclick="switchTab('tab-logs', this)"><i class="fa-solid fa-list-ul me-2"></i> Canais de Logs</a>
-                <a class="nav-link" href="#" onclick="switchTab('tab-ranking', this)"><i class="fa-solid fa-trophy me-2"></i> Ranking</a>
-            </nav>
-            
-            <div class="mt-auto p-3">
-                <a href="/logout" class="btn btn-outline-danger w-100"><i class="fa-solid fa-right-from-bracket me-2"></i> Sair</a>
+            <div class="user-dropdown" id="user-dropdown">
+                <a href="/logout" class="logout-btn">🚪 Sair da Conta</a>
             </div>
         </div>
+    </header>
 
-        <!-- CONTENT -->
-        <div class="col-md-9 col-lg-10 content-area">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2 class="h4 mb-0 text-white fw-bold">Configurações do Bot</h2>
-                <button class="btn btn-primary px-4" onclick="saveConfig()"><i class="fa-solid fa-floppy-disk me-2"></i> Salvar Alterações</button>
-            </div>
-
-            <!-- ABA: SISTEMA -->
-            <div id="tab-sistema" class="tab-pane active">
-                <div class="card">
-                    <div class="card-header"><i class="fa-solid fa-server me-2"></i> Sistema e Presença</div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label text-muted">Fuso Horário</label>
-                                <!-- Fixado no Brasil conforme pedido -->
-                                <select class="form-select" id="timezone">
-                                    <option value="America/Sao_Paulo" selected>Brasília (America/Sao_Paulo)</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label text-muted">Máx. Membros no Ranking</label>
-                                <input type="number" class="form-control" id="max-members" placeholder="Ex: 100">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label text-muted">Status no Discord</label>
-                                <select class="form-select" id="bot-status">
-                                    <option value="online">🟢 Online</option>
-                                    <option value="idle">🟡 Ausente</option>
-                                    <option value="dnd">🔴 Não Perturbe</option>
-                                    <option value="invisible">⚫ Invisível</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6 mb-3 d-flex align-items-center">
-                                <div class="form-check form-switch mt-4">
-                                    <input class="form-check-input" type="checkbox" id="presence-rotation">
-                                    <label class="form-check-label text-muted" for="presence-rotation">Rotação de Status (Presenças)</label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ABA: BATE-PONTO -->
-            <div id="tab-bateponto" class="tab-pane">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span><i class="fa-solid fa-clock me-2"></i> Bate-Ponto (Mov Call)</span>
-                        <div class="form-check form-switch mb-0">
-                            <input class="form-check-input" type="checkbox" id="toggle-movcall">
-                            <label class="form-check-label text-white fw-bold" for="toggle-movcall">Ativado</label>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <p class="text-muted small mb-4">O Bate-ponto é usado para monitorar o tempo e as mensagens dos membros durante a Mov Call.</p>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label text-muted">Canal do Painel da Mov Call</label>
-                                <select class="form-select chan-select" id="movcall-panel-channel"></select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label text-muted">Canal de Comando da Mov Call</label>
-                                <select class="form-select chan-select" id="movcall-command-channel"></select>
-                            </div>
-                            
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label text-muted">Duração Padrão (Minutos)</label>
-                                <input type="number" class="form-control" id="movcall-duration">
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label text-muted">Presença Mínima (%)</label>
-                                <input type="number" class="form-control" id="movcall-presence">
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label text-muted">Pontos (Mín / Máx)</label>
-                                <div class="input-group">
-                                    <input type="number" class="form-control" id="movcall-pts-min" placeholder="Min">
-                                    <input type="number" class="form-control" id="movcall-pts-max" placeholder="Max">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ABA: LOGS -->
-            <div id="tab-logs" class="tab-pane">
-                <div class="card">
-                    <div class="card-header"><i class="fa-solid fa-list-ul me-2"></i> Canais de Logs</div>
-                    <div class="card-body">
-                        <div class="section-title">Logs Principais</div>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label text-muted">Log Geral</label>
-                                <select class="form-select chan-select" id="log-geral"></select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label text-muted">Log de Sessões (Entrada/Saída de Call)</label>
-                                <select class="form-select chan-select" id="log-sessoes"></select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label text-muted">Log de Mov Call</label>
-                                <select class="form-select chan-select" id="log-movcall"></select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label text-muted">Log de Monitoria</label>
-                                <select class="form-select chan-select" id="log-monitoria"></select>
-                            </div>
-                        </div>
-
-                        <div class="section-title mt-4">Logs de Moderação e Membros</div>
-                        <div class="row">
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label text-muted">Log de Banimentos</label>
-                                <select class="form-select chan-select" id="log-ban"></select>
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label text-muted">Log de Castigos (Timeout)</label>
-                                <select class="form-select chan-select" id="log-punish"></select>
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label text-muted">Log de Entrada/Saída no Servidor</label>
-                                <select class="form-select chan-select" id="log-joinLeave"></select>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ABA: RANKING -->
-            <div id="tab-ranking" class="tab-pane">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span><i class="fa-solid fa-trophy me-2"></i> Configurações do Ranking</span>
-                        <div class="form-check form-switch mb-0">
-                            <input class="form-check-input" type="checkbox" id="ranking-enabled">
-                            <label class="form-check-label text-white fw-bold" for="ranking-enabled">Ativado</label>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label text-muted">Canal onde o Ranking é publicado</label>
-                                <select class="form-select chan-select" id="ranking-channel"></select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label text-muted">Título do Ranking</label>
-                                <input type="text" class="form-control" id="ranking-title">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-        </div>
+    <div class="container">
+        <aside class="sidebar" id="sidebar"></aside>
+        <main class="content">
+            <div id="loading" class="loading">⏳ Carregando configurações...</div>
+            <form id="mainForm" onsubmit="salvarTudo(event)" style="display: none;"></form>
+        </main>
     </div>
-</div>
 
-<!-- Bootstrap & Scripts -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    // Objeto global que vai armazenar toda a configuração do MongoDB
-    let config = {};
-    let discordData = { ch: [], vc: [], cat: [], role: [] };
+    <div class="save-bar" id="saveBar">
+        <span style="color: var(--text-muted); font-size: 13px;">Você tem alterações não salvas.</span>
+        <button type="submit" form="mainForm" class="btn-save">Salvar Tudo</button>
+    </div>
 
-    // Inicialização
-    document.addEventListener('DOMContentLoaded', async () => {
-        await loadUser();
-        await loadDiscordData();
-        await loadConfig();
-    });
+    <script>
+        let globalConfig = {};
+        let discordData = { ch: [], vc: [], cat: [], role: [] };
 
-    // 1. Carregar dados do Usuário Logado
-    async function loadUser() {
-        try {
-            const res = await fetch('/api/me');
-            if (res.ok) {
+        // =========================================================================
+        // CARREGAR USUÁRIO
+        // =========================================================================
+        async function loadUser() {
+            try {
+                const res = await fetch('/api/me');
+                if (!res.ok) throw new Error();
                 const user = await res.json();
-                document.getElementById('user-name').innerText = user.global_name || user.username;
-                if (user.avatar) {
-                    document.getElementById('user-avatar').src = `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`;
+                if (user && user.username) {
+                    document.getElementById('user-name').innerText = user.username;
+                    const avatarUrl = user.avatar 
+                        ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png` 
+                        : `https://cdn.discordapp.com/embed/avatars/0.png`;
+                    document.getElementById('user-avatar').src = avatarUrl;
+                } else {
+                    document.getElementById('user-name').innerText = 'Administrador';
                 }
+            } catch (e) { 
+                document.getElementById('user-name').innerText = 'Administrador';
             }
-        } catch (e) { console.error('Erro ao carregar usuário:', e); }
-    }
-
-    // 2. Carregar Canais do Discord para os Selects
-    async function loadDiscordData() {
-        try {
-            const res = await fetch('/api/discord-data');
-            discordData = await res.json();
-            
-            // Preencher todos os selects que tenham a classe 'chan-select'
-            document.querySelectorAll('.chan-select').forEach(select => {
-                select.innerHTML = '<option value="">Nenhum / Não configurado</option>';
-                discordData.ch.forEach(c => {
-                    select.innerHTML += `<option value="${c.id}">${c.name}</option>`;
-                });
-            });
-        } catch (e) { console.error('Erro ao carregar canais do Discord:', e); }
-    }
-
-    // 3. Carregar Configurações do MongoDB
-    async function loadConfig() {
-        try {
-            const res = await fetch('/api/config');
-            config = await res.json();
-            
-            // --- SISTEMA ---
-            if(config.ranking) document.getElementById('max-members').value = config.ranking.topSize || 100;
-            document.getElementById('bot-status').value = config.bot_status || 'online';
-            document.getElementById('presence-rotation').checked = config.presence_rotation || false;
-            document.getElementById('timezone').value = config.timezone || 'America/Sao_Paulo';
-
-            // --- BATE-PONTO (MOV CALL) ---
-            const mc = config.movCall || {};
-            document.getElementById('toggle-movcall').checked = mc.enabled !== false;
-            document.getElementById('movcall-panel-channel').value = mc.panelChannelId || '';
-            document.getElementById('movcall-command-channel').value = mc.commandChannelId || '';
-            document.getElementById('movcall-duration').value = mc.durationMin || 30;
-            document.getElementById('movcall-presence').value = mc.minPresencePct || 80;
-            document.getElementById('movcall-pts-min').value = mc.pointsMin || 1;
-            document.getElementById('movcall-pts-max').value = mc.pointsMax || 20;
-
-            // --- LOGS ---
-            const logs = config.logs || {};
-            document.getElementById('log-geral').value = logs.geral || '';
-            document.getElementById('log-sessoes').value = logs.sessoes || '';
-            document.getElementById('log-movcall').value = logs.movcall || '';
-            document.getElementById('log-monitoria').value = logs.monitoria || '';
-            
-            // Novos logs
-            document.getElementById('log-ban').value = logs.ban || '';
-            document.getElementById('log-punish').value = logs.punish || '';
-            document.getElementById('log-joinLeave').value = logs.joinLeave || '';
-
-            // --- RANKING ---
-            const rank = config.ranking || {};
-            document.getElementById('ranking-enabled').checked = rank.enabled !== false;
-            document.getElementById('ranking-channel').value = rank.channelId || '';
-            document.getElementById('ranking-title').value = rank.title || 'Ranking de Pontos';
-
-        } catch (e) { console.error('Erro ao carregar configurações:', e); }
-    }
-
-    // 4. Salvar Configurações
-    async function saveConfig() {
-        const btn = document.querySelector('button[onclick="saveConfig()"]');
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i> Salvando...';
-        btn.disabled = true;
-
-        // Atualizar o objeto config com os valores da tela
-        config.timezone = document.getElementById('timezone').value;
-        config.bot_status = document.getElementById('bot-status').value;
-        config.presence_rotation = document.getElementById('presence-rotation').checked;
-        
-        if(!config.ranking) config.ranking = {};
-        config.ranking.topSize = parseInt(document.getElementById('max-members').value) || 100;
-        config.ranking.enabled = document.getElementById('ranking-enabled').checked;
-        config.ranking.channelId = document.getElementById('ranking-channel').value || null;
-        config.ranking.title = document.getElementById('ranking-title').value;
-
-        // MovCall
-        if(!config.movCall) config.movCall = {};
-        config.movCall.enabled = document.getElementById('toggle-movcall').checked;
-        config.movCall.panelChannelId = document.getElementById('movcall-panel-channel').value || null;
-        config.movCall.commandChannelId = document.getElementById('movcall-command-channel').value || null;
-        config.movCall.durationMin = parseInt(document.getElementById('movcall-duration').value) || 30;
-        config.movCall.minPresencePct = parseInt(document.getElementById('movcall-presence').value) || 80;
-        config.movCall.pointsMin = parseInt(document.getElementById('movcall-pts-min').value) || 1;
-        config.movCall.pointsMax = parseInt(document.getElementById('movcall-pts-max').value) || 20;
-
-        // Logs
-        if(!config.logs) config.logs = {};
-        config.logs.geral = document.getElementById('log-geral').value || null;
-        config.logs.sessoes = document.getElementById('log-sessoes').value || null;
-        config.logs.movcall = document.getElementById('log-movcall').value || null;
-        config.logs.monitoria = document.getElementById('log-monitoria').value || null;
-        
-        config.logs.ban = document.getElementById('log-ban').value || null;
-        config.logs.punish = document.getElementById('log-punish').value || null;
-        config.logs.joinLeave = document.getElementById('log-joinLeave').value || null;
-
-        // Enviar para o Backend
-        try {
-            const res = await fetch('/api/config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(config)
-            });
-            if (res.ok) {
-                // Efeito visual de sucesso
-                btn.innerHTML = '<i class="fa-solid fa-check me-2"></i> Salvo!';
-                btn.classList.replace('btn-primary', 'btn-success');
-                setTimeout(() => {
-                    btn.innerHTML = originalText;
-                    btn.classList.replace('btn-success', 'btn-primary');
-                    btn.disabled = false;
-                }, 2500);
-            } else {
-                throw new Error('Erro ao salvar');
-            }
-        } catch (e) {
-            alert('Erro ao salvar as configurações no servidor.');
-            btn.innerHTML = originalText;
-            btn.disabled = false;
         }
-    }
 
-    // 5. Lógica de Navegação das Abas
-    function switchTab(tabId, el) {
-        // Remove active de todos os links e painéis
-        document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
-        document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+        function toggleUserMenu(e) {
+            e.stopPropagation();
+            document.getElementById('user-dropdown').classList.toggle('active');
+        }
+
+        window.onclick = function(event) {
+            if (!event.target.closest('.user-menu-container')) {
+                document.getElementById('user-dropdown').classList.remove('active');
+            }
+        }
+
+        // =========================================================================
+        // MÁSCARA DO "SALVAR" (Só aparece se alterar)
+        // =========================================================================
+        document.getElementById('mainForm').addEventListener('input', () => {
+            document.getElementById('saveBar').style.display = 'flex';
+        });
+        document.getElementById('mainForm').addEventListener('change', () => {
+            document.getElementById('saveBar').style.display = 'flex';
+        });
+
+        // =========================================================================
+        // SCHEMA MESTRE (Com as novas adições)
+        // =========================================================================
+        const SCHEMA = {
+            identidade: {
+                icon: '🎨', name: 'Identidade Visual',
+                groups: [
+                    { title: 'Painel de Tickets', fields: [
+                        { key: 'tickets.panel.title', label: 'Título', type: 'text' },
+                        { key: 'tickets.panel.desc1', label: 'Descrição 1', type: 'textarea' },
+                        { key: 'tickets.panel.desc2', label: 'Descrição 2 (V2)', type: 'textarea' },
+                        { key: 'tickets.panel.desc3', label: 'Descrição 3 (V2)', type: 'textarea' },
+                        { key: 'tickets.panel.desc4', label: 'Descrição 4 (V2)', type: 'textarea' },
+                        { key: 'tickets.panel.color', label: 'Cor (Hex)', type: 'color' },
+                        { key: 'tickets.panel.banner', label: 'URL do Banner', type: 'text' },
+                        { key: 'tickets.panel.thumbnail', label: 'URL da Miniatura', type: 'text' },
+                        { key: 'tickets.panel.footer', label: 'Rodapé', type: 'text' },
+                        { key: 'tickets.panel.labelStaff', label: 'Botão Staff', type: 'text' },
+                        { key: 'tickets.panel.labelMig', label: 'Botão Migração', type: 'text' },
+                    ]}
+                ]
+            },
+            servidores: {
+                icon: '🌐', name: 'Servidores',
+                groups: [
+                    { title: 'IDs dos Servidores (Vazio = usa .env)', fields: [
+                        { key: 'servers.mainId', label: 'ID Servidor Principal', type: 'text' },
+                        { key: 'servers.internalId', label: 'ID Servidor Interno (Staff)', type: 'text' },
+                    ]}
+                ]
+            },
+            canais: {
+                icon: '📡', name: 'Canais e Logs',
+                groups: [
+                    { title: 'Logs do Servidor Principal', fields: [
+                        { key: 'logs.main.geral', label: 'Log Geral', type: 'discord_ch' },
+                        { key: 'logs.main.tickets', label: 'Log Tickets', type: 'discord_ch' },
+                        { key: 'logs.main.recrutamento', label: 'Log Recrutamento', type: 'discord_ch' },
+                        // NOVOS LOGS AQUI:
+                        { key: 'logs.ban', label: 'Log de Banimentos', type: 'discord_ch' },
+                        { key: 'logs.punish', label: 'Log de Castigos (Timeout)', type: 'discord_ch' },
+                        { key: 'logs.joinLeave', label: 'Log de Entrada/Saída de Membros', type: 'discord_ch' },
+                    ]},
+                    { title: 'Logs do Servidor Interno', fields: [
+                        { key: 'logs.internal.geral', label: 'Log Geral Interno', type: 'discord_ch' },
+                        { key: 'logs.internal.plantao', label: 'Log Plantão', type: 'discord_ch' },
+                        { key: 'logs.internal.admin', label: 'Log Admin', type: 'discord_ch' },
+                    ]},
+                    { title: 'Canais de Sistemas', fields: [
+                        { key: 'movCall.panelChannelId', label: 'Canal do Painel MOV', type: 'discord_ch' },
+                        { key: 'movCall.commandChannelId', label: 'Canal do Comando /iniciarmov', type: 'discord_ch' },
+                        { key: 'listaMov.channelId', label: 'Canal Chat-Lista', type: 'discord_ch' },
+                        { key: 'ranking.channelId', label: 'Canal do Ranking', type: 'discord_ch' },
+                        { key: 'panels.monitor.channelId', label: 'Canal do Painel de Monitoria', type: 'discord_ch' },
+                        { key: 'shift.panelChannelId', label: 'Canal do Painel de Plantão', type: 'discord_ch' },
+                    ]},
+                    { title: 'Canais de Voz (Múltipla Seleção)', fields: [
+                        { key: 'voice.channelIds', label: 'Calls de Horas Gerais', type: 'discord_vc_multi' },
+                        { key: 'voice.categoryIds', label: 'Categorias de Horas Gerais', type: 'discord_cat_multi' },
+                        { key: 'voice.movChannelIds', label: 'Calls Válidas para MOV', type: 'discord_vc_multi' },
+                        { key: 'voice.movCategoryIds', label: 'Categorias Válidas para MOV', type: 'discord_cat_multi' },
+                    ]}
+                ]
+            },
+            permissoes: {
+                icon: '🔐', name: 'Permissões',
+                groups: [
+                    { title: 'Servidor Principal', fields: [
+                        { key: 'perms.main.admin', label: 'Admin', type: 'discord_role_multi' },
+                        { key: 'perms.main.leader', label: 'Liderança', type: 'discord_role_multi' },
+                        { key: 'perms.main.recruiter', label: 'Recrutador', type: 'discord_role_multi' },
+                        { key: 'perms.main.migrator', label: 'Migração', type: 'discord_role_multi' },
+                    ]},
+                    { title: 'Servidor Interno', fields: [
+                        { key: 'perms.internal.admin', label: 'Admin', type: 'discord_role_multi' },
+                        { key: 'perms.internal.leader', label: 'Liderança', type: 'discord_role_multi' },
+                        { key: 'perms.internal.recruiter', label: 'Recrutador', type: 'discord_role_multi' },
+                        { key: 'perms.internal.shift', label: 'Quem inicia Plantão', type: 'discord_role_multi' },
+                    ]},
+                    { title: 'MOV Call e Pontos', fields: [
+                        { key: 'perms.monitor', label: 'Monitores', type: 'discord_role_multi' },
+                        { key: 'perms.points', label: 'Gerenciar Pontos', type: 'discord_role_multi' },
+                        { key: 'perms.starter', label: 'Iniciar MOV', type: 'discord_role_multi' },
+                        { key: 'perms.selfMonitor', label: 'Auto-Monitoria', type: 'discord_role_multi' },
+                    ]}
+                ]
+            },
+            tickets: {
+                icon: '🎫', name: 'Tickets',
+                groups: [
+                    { title: 'Funcionamento', fields: [
+                        { key: 'tickets.style', label: 'Modelo Visual', type: 'select', options: [{v:'V1',l:'V1 Clássico'},{v:'V2',l:'V2 Blocos'},{v:'V3',l:'V3 Moderno'}] },
+                        { key: 'tickets.useThread', label: 'Usar Tópicos?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'tickets.categoryId', label: 'Categoria dos Tickets', type: 'discord_cat' },
+                        { key: 'tickets.threadChannelId', label: 'Canal dos Tópicos', type: 'discord_ch' },
+                        { key: 'tickets.nameTemplate', label: 'Formato do Nome', type: 'text' },
+                    ]},
+                    { title: 'Cargos de Tickets (Múltipla Seleção)', fields: [
+                        { key: 'tickets.accessRoleIds', label: 'Cargos com Acesso (Staff)', type: 'discord_role_multi' },
+                        { key: 'tickets.assignableRoleIds', label: 'Cargos Atribuíveis', type: 'discord_role_multi' },
+                        { key: 'tickets.inicianteRoleIds', label: 'Cargos Iniciais', type: 'discord_role_multi' },
+                        { key: 'tickets.hierarchyRoleIds', label: 'Hierarquia (Migração)', type: 'discord_role_multi' },
+                    ]},
+                    { title: 'Mensagens do Ticket', fields: [
+                        { key: 'tickets.messages.open', label: 'Ao Abrir', type: 'textarea' },
+                        { key: 'tickets.messages.claim', label: 'Ao Assumir', type: 'textarea' },
+                        { key: 'tickets.messages.finish', label: 'Ao Concluir', type: 'textarea' },
+                        { key: 'tickets.messages.reject', label: 'Ao Reprovar', type: 'textarea' },
+                        { key: 'tickets.messages.close', label: 'Ao Fechar', type: 'textarea' },
+                    ]}
+                ]
+            },
+            plantao: {
+                icon: '🕐', name: 'Plantão',
+                groups: [
+                    { title: 'Regras do Plantão', fields: [
+                        { key: 'shift.enabled', label: 'Ativado?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'shift.plannedMinutes', label: 'Duração (Min)', type: 'number' },
+                        { key: 'shift.minMinutes', label: 'Tempo Mínimo (Min)', type: 'number' },
+                        { key: 'shift.returnMinutes', label: 'Tolerância Voltar (Min)', type: 'number' },
+                        { key: 'shift.categoryId', label: 'ID Categoria de Calls', type: 'text' },
+                        { key: 'shift.allowedChannelIds', label: 'Canais Permitidos', type: 'discord_ch_multi' },
+                        { key: 'shift.rules', label: 'Regras do Plantão', type: 'textarea' },
+                    ]}
+                ]
+            },
+            movcall: {
+                icon: '📢', name: 'MOV Call',
+                groups: [
+                    // NOVO CAMPO AQUI: Ativar/Desativar
+                    { title: 'Status do Bate-Ponto (MOV Call)', fields: [
+                        { key: 'movCall.enabled', label: 'Sistema Ativado?', type: 'select', options: [{v:true,l:'✅ Sim, Ativado'},{v:false,l:'❌ Não, Desativado'}] },
+                    ]},
+                    { title: 'Regras da MOV', fields: [
+                        { key: 'movCall.durationMin', label: 'Duração (Min)', type: 'number' },
+                        { key: 'movCall.minPresencePct', label: 'Presença Mínima (%)', type: 'number' },
+                        { key: 'movCall.leaveGraceSec', label: 'Tolerância ao Sair (Seg)', type: 'number' },
+                        { key: 'movCall.pointsMin', label: 'Pontos Mínimos', type: 'number' },
+                        { key: 'movCall.pointsMax', label: 'Pontos Máximos', type: 'number' },
+                        { key: 'movCall.autoPoints', label: 'Pontos Automáticos', type: 'number' },
+                    ]}
+                ]
+            },
+            prefixos: {
+                icon: '💬', name: 'Prefixos e Lista',
+                groups: [
+                    { title: 'Prefixos de Mensagem', fields: [
+                        { key: 'prefixes.start', label: 'Prefixo Iniciar MOV', type: 'text', help: 'Ex: unionmov' },
+                        { key: 'prefixes.lista', label: 'Prefixo Lista', type: 'text', help: 'Ex: unionlista' },
+                        { key: 'prefixes.cancel', label: 'Prefixo Cancelar', type: 'text', help: 'Ex: unionmovcancel' },
+                    ]},
+                    { title: 'Regras da Lista', fields: [
+                        { key: 'listaMov.collectMode', label: 'Modo de Coleta', type: 'select', options: [{v:'all',l:'Todos da Call'},{v:'roles',l:'Só Cargos'}] },
+                        { key: 'listaMov.durationMin', label: 'Duração (Min)', type: 'number' },
+                        { key: 'listaMov.minPresencePct', label: 'Presença Mínima (%)', type: 'number' },
+                        { key: 'listaMov.roleIds', label: 'Cargos de Mov Call', type: 'discord_role_multi' },
+                    ]}
+                ]
+            },
+            monitoria: {
+                icon: '🛡️', name: 'Monitoria',
+                groups: [
+                    { title: 'Regras de Monitoria', fields: [
+                        { key: 'monitor.durationMin', label: 'Duração (Min)', type: 'number' },
+                        { key: 'monitor.minPresencePct', label: 'Presença Mínima (%)', type: 'number' },
+                        { key: 'monitor.allowSelf', label: 'Permitir Auto-Monitoria?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'monitor.requireAllCriteria', label: 'Exigir Todos Critérios?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                    ]}
+                ]
+            },
+            pontos: {
+                icon: '💎', name: 'Pontuação',
+                groups: [
+                    { title: 'Regras de Pontuação', fields: [
+                        { key: 'points.perHour', label: 'Pontos/Hora em Call', type: 'number' },
+                        { key: 'points.rounding', label: 'Arredondamento', type: 'select', options: [{v:'floor',l:'Para Baixo'},{v:'round',l:'Mais Próximo'},{v:'ceil',l:'Para Cima'},{v:'exact',l:'Exato'}] },
+                        { key: 'points.recruitment', label: 'Pontos por Recrutamento', type: 'number' },
+                        { key: 'points.migration', label: 'Pontos por Migração', type: 'number' },
+                        { key: 'points.shiftFlat', label: 'Pontos Fixo por Plantão', type: 'number' },
+                        { key: 'points.shiftPerHour', label: 'Pontos/Hora Plantão', type: 'number' },
+                        { key: 'points.unit', label: 'Nome da Moeda', type: 'text', help: 'Ex: cristais' },
+                    ]}
+                ]
+            },
+            ranking: {
+                icon: '🏆', name: 'Ranking',
+                groups: [
+                    { title: 'Configuração', fields: [
+                        { key: 'ranking.enabled', label: 'Ranking Ativo?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'ranking.auto', label: 'Atualização Automática?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'ranking.topSize', label: 'Tamanho do Top', type: 'number' },
+                        { key: 'ranking.view.title', label: 'Título do Ranking', type: 'text' },
+                        { key: 'ranking.view.color', label: 'Cor (Hex)', type: 'color' },
+                        { key: 'ranking.view.style', label: 'Estilo', type: 'select', options: [{v:'embed',l:'Embed Clássico'},{v:'v3',l:'Container V3'}] },
+                    ]}
+                ]
+            },
+            temporadas: {
+                icon: '📅', name: 'Temporadas',
+                groups: [
+                    { title: 'Reset de Temporada', fields: [
+                        { key: 'seasons.weeklyReset', label: 'Reset Semanal?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'seasons.weekday', label: 'Dia da Semana (0=Dom, 6=Sáb)', type: 'number' },
+                        { key: 'seasons.hour', label: 'Hora do Reset (0-23)', type: 'number' },
+                    ]}
+                ]
+            },
+            bateponto: {
+                icon: '⏱️', name: 'Bate-Ponto',
+                groups: [
+                    { title: 'Regras do Bate-Ponto', fields: [
+                        { key: 'bp_enabled', label: 'Sistema Ativado?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'bp_goal', label: 'Meta de Mensagens', type: 'number' },
+                        { key: 'bp_duration_min', label: 'Duração (Minutos)', type: 'number' },
+                        { key: 'bp_reward', label: 'Recompensa (Pontos)', type: 'number' },
+                        { key: 'bp_channel_id', label: 'Canal de Contagem', type: 'discord_ch' },
+                        { key: 'bp_area', label: 'Nome da Área', type: 'text' },
+                    ]}
+                ]
+            },
+            tema: {
+                icon: '🎨', name: 'Tema Global',
+                groups: [
+                    { title: 'Cores e Linhas', fields: [
+                        { key: 'ui_color', label: 'Cor da Faixa (Hex)', type: 'color' },
+                        { key: 'ui_sep_char', label: 'Caractere da Linha', type: 'text', help: 'Ex: ─' },
+                        { key: 'ui_sep_len', label: 'Tamanho da Linha', type: 'number' },
+                        { key: 'ui_bar_full', label: 'Barra Cheia', type: 'text', help: 'Ex: ▰' },
+                        { key: 'ui_bar_empty', label: 'Barra Vazia', type: 'text', help: 'Ex: ▱' },
+                    ]}
+                ]
+            },
+            cargos: {
+                icon: '🎖️', name: 'Cargos Automáticos',
+                groups: [
+                    { title: 'Cargos por Pontuação', fields: [
+                        { key: 'roles_enabled', label: 'Sistema Ativado?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'roles_clear_on_reset', label: 'Limpar Cargos no Reset?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                    ]}
+                ]
+            },
+            emojis: {
+                icon: '😀', name: 'Emojis',
+                groups: [
+                    { title: 'Emojis do Sistema (Vazio = Padrão)', fields: [
+                        { key: 'emojis.rank1', label: '1º Lugar', type: 'text', help: 'Pode ser 🥇 ou <:nome:id>' },
+                        { key: 'emojis.rank2', label: '2º Lugar', type: 'text' },
+                        { key: 'emojis.rank3', label: '3º Lugar', type: 'text' },
+                        { key: 'emojis.rankOther', label: 'Demais Posições', type: 'text' },
+                        { key: 'emojis.ok', label: 'Sucesso / Check', type: 'text' },
+                        { key: 'emojis.bad', label: 'Erro / Xis', type: 'text' },
+                        { key: 'emojis.warn', label: 'Aviso', type: 'text' },
+                        { key: 'emojis.crystal', label: 'Cristal / Pontos', type: 'text' },
+                    ]}
+                ]
+            },
+            geral: {
+                icon: '⚙️', name: 'Sistema',
+                groups: [
+                    { title: 'Configurações Globais', fields: [
+                        // FUSO HORÁRIO FIXADO PARA O BRASIL (Apenas uma opção)
+                        { key: 'timezone', label: 'Fuso Horário', type: 'select', options: [{v:'America/Sao_Paulo',l:'Brasília (America/Sao_Paulo)'}] },
+                        { key: 'per_page', label: 'Itens por Página', type: 'number' },
+                        { key: 'rank_max', label: 'Máx. Membros no Ranking', type: 'number' },
+                    ]},
+                    { title: 'Status e Presenças do Bot', fields: [
+                        { key: 'bot_status', label: 'Status no Discord', type: 'select', options: [{v:'online',l:'🟢 Online'},{v:'idle',l:'🌙 Ausente'},{v:'dnd',l:'⛔ Não Perturbe'},{v:'invisible',l:'⚫ Invisível'}] },
+                        { key: 'presence_rotation', label: 'Rotação de Status?', type: 'select', options: [{v:true,l:'Sim'},{v:false,l:'Não'}] },
+                        { key: 'presence_interval', label: 'Tempo de Rotação (Segundos)', type: 'number' },
+                        
+                        { key: 'presences.0.type', label: 'Preset 1 - Tipo', type: 'select', options: [{v:'PLAYING',l:'Jogando'},{v:'WATCHING',l:'Assistindo'},{v:'LISTENING',l:'Ouvindo'},{v:'COMPETING',l:'Competindo'},{v:'STREAMING',l:'Transmitindo'}] },
+                        { key: 'presences.0.text', label: 'Preset 1 - Texto', type: 'text', help: 'Aceita emojis ou <:nome:id>' },
+                        { key: 'presences.0.url', label: 'Preset 1 - URL (Twitch)', type: 'text', help: 'Só p/ Transmitindo' },
+                        
+                        { key: 'presences.1.type', label: 'Preset 2 - Tipo', type: 'select', options: [{v:'PLAYING',l:'Jogando'},{v:'WATCHING',l:'Assistindo'},{v:'LISTENING',l:'Ouvindo'},{v:'COMPETING',l:'Competindo'},{v:'STREAMING',l:'Transmitindo'}] },
+                        { key: 'presences.1.text', label: 'Preset 2 - Texto', type: 'text' },
+                        { key: 'presences.1.url', label: 'Preset 2 - URL', type: 'text' },
+                        
+                        { key: 'presences.2.type', label: 'Preset 3 - Tipo', type: 'select', options: [{v:'PLAYING',l:'Jogando'},{v:'WATCHING',l:'Assistindo'},{v:'LISTENING',l:'Ouvindo'},{v:'COMPETING',l:'Competindo'},{v:'STREAMING',l:'Transmitindo'}] },
+                        { key: 'presences.2.text', label: 'Preset 3 - Texto', type: 'text' },
+                        { key: 'presences.2.url', label: 'Preset 3 - URL', type: 'text' },
+                        
+                        { key: 'presences.3.type', label: 'Preset 4 - Tipo', type: 'select', options: [{v:'PLAYING',l:'Jogando'},{v:'WATCHING',l:'Assistindo'},{v:'LISTENING',l:'Ouvindo'},{v:'COMPETING',l:'Competindo'},{v:'STREAMING',l:'Transmitindo'}] },
+                        { key: 'presences.3.text', label: 'Preset 4 - Texto', type: 'text' },
+                        { key: 'presences.3.url', label: 'Preset 4 - URL', type: 'text' },
+                        
+                        { key: 'presences.4.type', label: 'Preset 5 - Tipo', type: 'select', options: [{v:'PLAYING',l:'Jogando'},{v:'WATCHING',l:'Assistindo'},{v:'LISTENING',l:'Ouvindo'},{v:'COMPETING',l:'Competindo'},{v:'STREAMING',l:'Transmitindo'}] },
+                        { key: 'presences.4.text', label: 'Preset 5 - Texto', type: 'text' },
+                        { key: 'presences.4.url', label: 'Preset 5 - URL', type: 'text' },
+                    ]}
+                ]
+            }
+        };
+
+        const getVal = (obj, path) => path.split('.').reduce((o, k) => (o ? o[k] : undefined), obj);
         
-        // Adiciona active no selecionado
-        el.classList.add('active');
-        document.getElementById(tabId).classList.add('active');
-    }
-</script>
+        function setVal(obj, path, value) {
+            const keys = path.split('.');
+            let curr = obj;
+            for (let i = 0; i < keys.length - 1; i++) {
+                const key = keys[i];
+                const nextKey = keys[i + 1];
+                if (!curr[key]) {
+                    curr[key] = /^\d+$/.test(nextKey) ? [] : {};
+                }
+                curr = curr[key];
+            }
+            curr[keys[keys.length - 1]] = value;
+        }
+
+        function construirPainel() {
+            const sidebar = document.getElementById('sidebar');
+            const form = document.getElementById('mainForm');
+            sidebar.innerHTML = '';
+            form.innerHTML = '';
+            let isFirst = true;
+
+            for (const [tabId, tabData] of Object.entries(SCHEMA)) {
+                const btn = document.createElement('button');
+                btn.className = `nav-btn ${isFirst ? 'active' : ''}`;
+                btn.innerHTML = `${tabData.icon} ${tabData.name}`;
+                btn.onclick = (e) => mudarAba(tabId, e.target);
+                sidebar.appendChild(btn);
+
+                const tabDiv = document.createElement('div');
+                tabDiv.id = `tab-${tabId}`;
+                tabDiv.className = `tab-content ${isFirst ? 'active' : ''}`;
+                tabDiv.innerHTML = `<h2>${tabData.name}</h2>`;
+                isFirst = false;
+
+                tabData.groups.forEach(group => {
+                    const h3 = document.createElement('h3');
+                    h3.innerText = group.title;
+                    tabDiv.appendChild(h3);
+
+                    const grid = document.createElement('div');
+                    grid.className = 'grid';
+                    tabDiv.appendChild(grid);
+
+                    group.fields.forEach(field => {
+                        const wrapper = document.createElement('div');
+                        wrapper.className = ['textarea', 'text', 'discord_ch', 'discord_cat', 'discord_vc', 'color'].includes(field.type) ? 'full' : '';
+                        
+                        let inputHtml = `<label>${field.label}</label>`;
+                        const fieldId = field.key.replace(/\./g, '_');
+                        
+                        if (field.type === 'text') {
+                            inputHtml += `<input type="text" id="${fieldId}" data-key="${field.key}" placeholder="Digite...">`;
+                        } else if (field.type === 'number') {
+                            inputHtml += `<input type="number" id="${fieldId}" data-key="${field.key}">`;
+                        } else if (field.type === 'color') {
+                            inputHtml += `<div class="color-picker-wrapper"><input type="color" id="${fieldId}" data-key="${field.key}"><span id="${fieldId}_text"></span></div>`;
+                        } else if (field.type === 'textarea') {
+                            inputHtml += `<textarea id="${fieldId}" data-key="${field.key}"></textarea>`;
+                        } else if (field.type === 'select') {
+                            inputHtml += `<select id="${fieldId}" data-key="${field.key}">`;
+                            field.options.forEach(o => inputHtml += `<option value="${o.v}">${o.l}</option>`);
+                            inputHtml += `</select>`;
+                        } else if (field.type.startsWith('discord_')) {
+                            const isMulti = field.type.includes('multi');
+                            const typeMap = { discord_ch: 'ch', discord_ch_multi: 'ch', discord_cat: 'cat', discord_cat_multi: 'cat', discord_vc: 'vc', discord_vc_multi: 'vc', discord_role_multi: 'role' };
+                            const dataType = typeMap[field.type];
+                            
+                            if (isMulti) {
+                                inputHtml += `
+                                <div class="custom-ms" id="${fieldId}_container">
+                                    <div class="ms-header" onclick="toggleMS('${fieldId}')">
+                                        <span id="${fieldId}_label">Selecione...</span>
+                                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+                                    </div>
+                                    <div class="ms-dropdown" id="${fieldId}_dropdown"></div>
+                                    <input type="hidden" id="${fieldId}" data-key="${field.key}" data-type="${dataType}" data-multi="true">
+                                </div>`;
+                            } else {
+                                inputHtml += `<select id="${fieldId}" data-key="${field.key}" class="discord-data" data-type="${dataType}"></select>`;
+                            }
+                        }
+
+                        if(field.help) inputHtml += `<div class="tutorial">💡 ${field.help}</div>`;
+
+                        wrapper.innerHTML = inputHtml;
+                        grid.appendChild(wrapper);
+                    });
+                });
+                form.appendChild(tabDiv);
+            }
+        }
+
+        function toggleMS(id) {
+            const el = document.getElementById(`${id}_container`);
+            document.querySelectorAll('.custom-ms').forEach(ms => { if(ms !== el) ms.classList.remove('open'); });
+            el.classList.toggle('open');
+        }
+
+        window.onclick = function(event) {
+            if (!event.target.closest('.user-menu-container')) {
+                document.getElementById('user-dropdown')?.classList.remove('active');
+            }
+            if (!event.target.closest('.custom-ms')) {
+                document.querySelectorAll('.custom-ms').forEach(ms => ms.classList.remove('open'));
+            }
+        }
+
+        async function carregarDados() {
+            try {
+                const res = await fetch('/api/config');
+                if (!res.ok) throw new Error('Falha ao buscar configurações');
+                globalConfig = await res.json() || {};
+
+                const ddRes = await fetch('/api/discord-data');
+                if (!ddRes.ok) throw new Error('Falha ao buscar dados do Discord');
+                discordData = await ddRes.json() || { ch: [], vc: [], cat: [], role: [] };
+
+                document.querySelectorAll('.discord-data').forEach(sel => {
+                    const type = sel.dataset.type;
+                    const list = discordData[type] || [];
+                    sel.innerHTML = `<option value="">— nenhum —</option>` + list.map(item => `<option value="${item.id}">${item.name}</option>`).join('');
+                });
+
+                document.querySelectorAll('[data-multi="true"]').forEach(input => {
+                    const key = input.dataset.key;
+                    const fieldId = key.replace(/\./g, '_');
+                    const type = input.dataset.type;
+                    const list = discordData[type] || [];
+                    const dropdown = document.getElementById(`${fieldId}_dropdown`);
+                    const selectedValues = getVal(globalConfig, key) || [];
+                    
+                    dropdown.innerHTML = list.map(item => `
+                        <label class="ms-item">
+                            <input type="checkbox" value="${item.id}" ${selectedValues.includes(item.id) ? 'checked' : ''} 
+                                onchange="updateMSLabel('${fieldId}')">
+                            ${item.name}
+                        </label>
+                    `).join('');
+                    updateMSLabel(fieldId);
+                });
+
+                document.querySelectorAll('[data-key]').forEach(input => {
+                    if (input.type === 'hidden') return; 
+                    const key = input.dataset.key;
+                    let val = getVal(globalConfig, key);
+                    
+                    if (val === undefined || val === null) {
+                        if (input.tagName === 'SELECT') val = '';
+                        else return;
+                    }
+
+                    if (input.type === 'color') {
+                        input.value = val || '#000000';
+                        document.getElementById(input.id + '_text').innerText = input.value;
+                        input.addEventListener('input', (e) => { document.getElementById(input.id + '_text').innerText = e.target.value; });
+                    } else {
+                        input.value = val;
+                    }
+                });
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('mainForm').style.display = 'block';
+            } catch (e) {
+                console.error(e);
+                document.getElementById('loading').innerHTML = `<div class="error-box"><h3>Erro ao Carregar</h3><p>${e.message}</p></div>`;
+            }
+        }
+
+        function updateMSLabel(fieldId) {
+            const container = document.getElementById(`${fieldId}_dropdown`);
+            const checked = container.querySelectorAll('input[type="checkbox"]:checked');
+            const label = document.getElementById(`${fieldId}_label`);
+            if (checked.length === 0) {
+                label.innerText = 'Selecione...';
+            } else if (checked.length === 1) {
+                label.innerText = checked[0].parentElement.innerText.trim();
+            } else {
+                label.innerText = `${checked.length} itens selecionados`;
+            }
+        }
+
+        async function salvarTudo(e) {
+            e.preventDefault();
+            const btn = document.querySelector('.btn-save');
+            btn.innerText = 'Salvando...';
+
+            const updatedData = JSON.parse(JSON.stringify(globalConfig));
+
+            document.querySelectorAll('[data-multi="true"]').forEach(input => {
+                const key = input.dataset.key;
+                const fieldId = key.replace(/\./g, '_');
+                const checked = document.getElementById(`${fieldId}_dropdown`).querySelectorAll('input[type="checkbox"]:checked');
+                const values = Array.from(checked).map(c => c.value);
+                setVal(updatedData, key, values);
+            });
+
+            document.querySelectorAll('[data-key]').forEach(input => {
+                if (input.dataset.multi) return;
+                const key = input.dataset.key;
+                let val = input.value;
+                if (input.type === 'number') val = Number(val);
+                if (val === 'true') val = true;
+                if (val === 'false') val = false;
+                setVal(updatedData, key, val);
+            });
+
+            try {
+                const res = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updatedData)
+                });
+
+                if (res.ok) {
+                    globalConfig = updatedData;
+                    btn.innerText = 'Salvo!';
+                    btn.style.background = '#2ecc71';
+                    document.getElementById('saveBar').style.display = 'none'; 
+                    setTimeout(() => { btn.innerText = 'Salvar Tudo'; btn.style.background = 'var(--purple)'; }, 2000);
+                } else {
+                    throw new Error('Erro no servidor ao salvar');
+                }
+            } catch (e) {
+                alert('Erro ao salvar: ' + e.message);
+                btn.innerText = 'Salvar Tudo';
+            }
+        }
+
+        function mudarAba(id, btn) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`tab-${id}`).classList.add('active');
+            btn.classList.add('active');
+        }
+
+        try {
+            loadUser();
+            construirPainel();
+            carregarDados();
+        } catch (e) {
+            document.getElementById('loading').innerHTML = `<div class="error-box"><h3>Erro Crítico</h3><p>${e.message}</p></div>`;
+        }
+    </script>
 </body>
 </html>
