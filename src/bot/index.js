@@ -6,7 +6,6 @@ const path = require('path');
 const { isKnownGuild } = require('./core');
 const { loadCfg } = require('../models');
 
-// 1) Validação de config
 try {
   require('../official/config').validate({ needToken: false });
   console.log('✅ Config oficial validada.');
@@ -25,7 +24,6 @@ const client = new Client({
   ],
 });
 
-// 2) Coleção e comandos do bot oficial
 client.commands = new Collection();
 try {
   const { loadBridgedCommands } = require('../official/bridge');
@@ -36,17 +34,14 @@ try {
   console.warn('⚠️ Não consegui carregar comandos oficiais:', e.message);
 }
 
-// 3) ctx.client
 require('../official/utils/context').client = client;
 
-// 4) Eventos PXK
 require('./events/ready')(client);
 require('./events/voiceStateUpdate')(client);
 require('./events/interactionCreate')(client);
 require('./events/messageCreate')(client);
-require('./events/guildLogs')(client); // <--- NOVO AQUI
+require('./events/guildLogs')(client);
 
-// 5) Eventos do bot oficial
 function loadOfficialEvents(client) {
   const dir = path.join(__dirname, '..', 'official', 'events');
   if (!fs.existsSync(dir)) return;
