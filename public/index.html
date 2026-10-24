@@ -152,41 +152,15 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--purple); border-radius: 4px; }
 
-        /* =========================================
-           CORREÇÃO PARA CELULAR (MOBILE) 
-           ========================================= */
+        /* MOBILE */
         @media(max-width: 900px) {
-            body { 
-                overflow: auto; /* Permite rolar a página inteira */
-                height: auto;
-                min-height: 100vh;
-            }
+            body { overflow: auto; height: auto; min-height: 100vh; }
             .header { padding: 16px 20px; }
-            .container { 
-                flex-direction: column; /* Empilha a sidebar em cima e o form embaixo */
-                overflow: visible; 
-                padding: 16px;
-                gap: 16px;
-            }
-            .sidebar { 
-                width: 100%; 
-                flex-shrink: 1;
-                max-height: 250px; /* Limita a altura do menu para não empurrar o form muito pra baixo */
-            }
-            .content { 
-                width: 100%;
-                padding: 20px;
-                overflow: visible; 
-            }
-            .grid { 
-                grid-template-columns: 1fr; /* Inputs ocupam 100% da largura no celular */
-            }
-            .save-bar {
-                padding: 10px 16px;
-                flex-direction: column;
-                border-radius: 16px;
-                gap: 10px;
-            }
+            .container { flex-direction: column; overflow: visible; padding: 16px; gap: 16px; }
+            .sidebar { width: 100%; flex-shrink: 1; max-height: 250px; }
+            .content { width: 100%; padding: 20px; overflow: visible; }
+            .grid { grid-template-columns: 1fr; }
+            .save-bar { padding: 10px 16px; flex-direction: column; border-radius: 16px; gap: 10px; }
             .btn-save { width: 100%; padding: 10px; }
         }
     </style>
@@ -224,9 +198,6 @@
         let globalConfig = {};
         let discordData = { ch: [], vc: [], cat: [], role: [] };
 
-        // =========================================================================
-        // CARREGAR USUÁRIO
-        // =========================================================================
         async function loadUser() {
             try {
                 const res = await fetch('/api/me');
@@ -255,11 +226,11 @@
             if (!event.target.closest('.user-menu-container')) {
                 document.getElementById('user-dropdown').classList.remove('active');
             }
+            if (!event.target.closest('.custom-ms')) {
+                document.querySelectorAll('.custom-ms').forEach(ms => ms.classList.remove('open'));
+            }
         }
 
-        // =========================================================================
-        // MÁSCARA DO "SALVAR" (Só aparece se alterar)
-        // =========================================================================
         document.getElementById('mainForm').addEventListener('input', () => {
             document.getElementById('saveBar').style.display = 'flex';
         });
@@ -267,9 +238,6 @@
             document.getElementById('saveBar').style.display = 'flex';
         });
 
-        // =========================================================================
-        // SCHEMA MESTRE (Com as novas adições)
-        // =========================================================================
         const SCHEMA = {
             identidade: {
                 icon: '🎨', name: 'Identidade Visual',
@@ -301,14 +269,22 @@
             canais: {
                 icon: '📡', name: 'Canais e Logs',
                 groups: [
+                    { title: 'Logs de Membros (Entrada/Saída)', fields: [
+                        { key: 'logs.join', label: 'Log: Entrou no Servidor', type: 'discord_ch' },
+                        { key: 'logs.leave', label: 'Log: Saiu do Servidor', type: 'discord_ch' },
+                    ]},
+                    { title: 'Logs de Call (Voz)', fields: [
+                        { key: 'logs.voiceJoin', label: 'Log: Entrou na Call', type: 'discord_ch' },
+                        { key: 'logs.voiceLeave', label: 'Log: Saiu da Call', type: 'discord_ch' },
+                    ]},
+                    { title: 'Logs de Moderação', fields: [
+                        { key: 'logs.ban', label: 'Log de Banimentos', type: 'discord_ch' },
+                        { key: 'logs.punish', label: 'Log de Castigos (Timeout)', type: 'discord_ch' },
+                    ]},
                     { title: 'Logs do Servidor Principal', fields: [
                         { key: 'logs.main.geral', label: 'Log Geral', type: 'discord_ch' },
                         { key: 'logs.main.tickets', label: 'Log Tickets', type: 'discord_ch' },
                         { key: 'logs.main.recrutamento', label: 'Log Recrutamento', type: 'discord_ch' },
-                        // NOVOS LOGS AQUI:
-                        { key: 'logs.ban', label: 'Log de Banimentos', type: 'discord_ch' },
-                        { key: 'logs.punish', label: 'Log de Castigos (Timeout)', type: 'discord_ch' },
-                        { key: 'logs.joinLeave', label: 'Log de Entrada/Saída de Membros', type: 'discord_ch' },
                     ]},
                     { title: 'Logs do Servidor Interno', fields: [
                         { key: 'logs.internal.geral', label: 'Log Geral Interno', type: 'discord_ch' },
@@ -396,7 +372,6 @@
             movcall: {
                 icon: '📢', name: 'MOV Call',
                 groups: [
-                    // NOVO CAMPO AQUI: Ativar/Desativar
                     { title: 'Status do Bate-Ponto (MOV Call)', fields: [
                         { key: 'movCall.enabled', label: 'Sistema Ativado?', type: 'select', options: [{v:true,l:'✅ Sim, Ativado'},{v:false,l:'❌ Não, Desativado'}] },
                     ]},
@@ -527,7 +502,6 @@
                 icon: '⚙️', name: 'Sistema',
                 groups: [
                     { title: 'Configurações Globais', fields: [
-                        // FUSO HORÁRIO FIXADO PARA O BRASIL (Apenas uma opção)
                         { key: 'timezone', label: 'Fuso Horário', type: 'select', options: [{v:'America/Sao_Paulo',l:'Brasília (America/Sao_Paulo)'}] },
                         { key: 'per_page', label: 'Itens por Página', type: 'number' },
                         { key: 'rank_max', label: 'Máx. Membros no Ranking', type: 'number' },
@@ -659,15 +633,6 @@
             const el = document.getElementById(`${id}_container`);
             document.querySelectorAll('.custom-ms').forEach(ms => { if(ms !== el) ms.classList.remove('open'); });
             el.classList.toggle('open');
-        }
-
-        window.onclick = function(event) {
-            if (!event.target.closest('.user-menu-container')) {
-                document.getElementById('user-dropdown')?.classList.remove('active');
-            }
-            if (!event.target.closest('.custom-ms')) {
-                document.querySelectorAll('.custom-ms').forEach(ms => ms.classList.remove('open'));
-            }
         }
 
         async function carregarDados() {
