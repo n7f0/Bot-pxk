@@ -167,7 +167,13 @@ function validateConfigPayload(value) {
   }
 
   inspect(value, 0);
-  const allowedRoots = new Set(Object.keys(DEFAULTS));
+  const allowedRoots = new Set([
+    ...Object.keys(DEFAULTS),
+    'bot_status', 'bp_area', 'bp_channel_id', 'bp_duration_min', 'bp_enabled', 'bp_goal', 'bp_reward',
+    'presence_interval', 'presence_rotation', 'presences', 'per_page', 'rank_max',
+    'roles_clear_on_reset', 'roles_enabled', 'timezone', 'ui_bar_empty', 'ui_bar_full',
+    'ui_color', 'ui_sep_char', 'ui_sep_len',
+  ]);
   for (const key of Object.keys(value)) {
     if (!allowedRoots.has(key)) throw new Error('Campo de configuração desconhecido: ' + key);
   }
