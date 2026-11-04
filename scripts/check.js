@@ -56,7 +56,6 @@ for (const file of files) {
   }
 }
 
-// Acesso SQLite só é permitido no importador de primeira execução.
 for (const file of files) {
   const relative = path.relative(root, file);
   const source = fs.readFileSync(file, 'utf8');
