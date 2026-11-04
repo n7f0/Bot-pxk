@@ -918,13 +918,17 @@
             btn.classList.add('active');
         }
 
-        try {
-            loadUser();
-            construirPainel();
-            carregarDados();
-        } catch (e) {
-            document.getElementById('loading').innerHTML = `<div class="error-box"><h3>Erro Crítico</h3><p>${e.message}</p></div>`;
-        }
+        (async function bootPanel() {
+            try {
+                await loadUser();
+                if (!csrfToken) return;
+                construirPainel();
+                await carregarDados();
+            } catch (e) {
+                const loading = document.getElementById('loading');
+                loading.textContent = 'Erro ao iniciar o painel: ' + (e.message || 'tente novamente.');
+            }
+        })();
     </script>
 </body>
 </html>
