@@ -60,7 +60,7 @@ for (const file of files) {
 for (const file of files) {
   const relative = path.relative(root, file);
   const source = fs.readFileSync(file, 'utf8');
-  const sqliteImporter = relative === 'src/official/database/migrate-sqlite.js';
+  const sqliteImporter = ['src/official/database/migrate-sqlite.js', 'src/official/database/migrate-bot-db.js'].includes(relative);
   if (!sqliteImporter && relative !== 'scripts/check.js' && /better-sqlite3|\bdb\.(?:prepare|transaction|pragma|backup)\s*\(/.test(source)) {
     architectureFailures += 1;
     console.error('ACESSO DIRETO AO SQLITE FORA DO IMPORTADOR: ' + relative);
@@ -78,9 +78,9 @@ for (const file of files) {
 }
 
 const bootstrap = fs.readFileSync(path.join(root, 'src', 'index.js'), 'utf8');
-if (!bootstrap.includes('runSqliteMigration()')) {
+if (!bootstrap.includes('runSqliteMigration()') || !bootstrap.includes('runBotDbMigration()')) {
   architectureFailures += 1;
-  console.error('O bootstrap não executa a migração SQLite antes de iniciar os serviços.');
+  console.error('O bootstrap não executa as migrações SQLite legadas antes de iniciar os serviços.');
 }
 
 if (syntaxFailures || importFailures || architectureFailures) {
