@@ -198,6 +198,15 @@ io.use((socket, next) => {
     socket.data.isBot = true;
     return next();
   }
+  const origin = socket.handshake.headers.origin;
+  const host = socket.handshake.headers.host;
+  if (origin && host) {
+    try {
+      if (new URL(origin).host !== host) return next(new Error('Origem não autorizada.'));
+    } catch {
+      return next(new Error('Origem inválida.'));
+    }
+  }
   if (socket.request.session && socket.request.session.user) return next();
   return next(new Error('Não autorizado.'));
 });
