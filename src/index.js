@@ -20,6 +20,11 @@ console.log('⏳ Iniciando PXK System com MongoDB unificado...');
     await initDb({ deferData: true });
     console.log('✅ Modelos e índices MongoDB inicializados.');
 
+    // Preserva também os dados do banco legado do bot antes de iniciar qualquer serviço.
+    const botDbMigration = require('./official/database/migrate-bot-db');
+    const botDbResult = await botDbMigration.runBotDbMigration();
+    if (!botDbResult.skipped) console.log('✅ Migração bot.db -> MongoDB validada:', botDbResult.report);
+
     // Migração executa antes do bot/dashboard. O SQLite antigo é copiado e nunca apagado.
     const migration = require('./official/database/migrate-sqlite');
     const migrationResult = await migration.runSqliteMigration();
