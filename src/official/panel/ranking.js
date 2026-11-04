@@ -185,7 +185,7 @@ async function handle(interaction, action, args) {
   if (action === 'wtoggle') {
     if (!(await requirePermission(interaction, 'manage_ranking'))) return;
     const next = !settings.get('reset_enabled');
-    settings.set('reset_enabled', next);
+    await settings.set('reset_enabled', next);
     if (next) settings.set('reset_enabled_at', Date.now());
     await adminLog(interaction, 'config_reset_weekly', 'Reset semanal alterado', `🔄 Reset semanal: **${next ? 'ATIVADO' : 'DESATIVADO'}** (${WEEKDAYS[settings.get('reset_day')]} às ${settings.get('reset_time')})`);
     return interaction.update(renderWeekly());
@@ -194,7 +194,7 @@ async function handle(interaction, action, args) {
   if (action === 'wday') {
     if (!(await requirePermission(interaction, 'manage_ranking'))) return;
     const day = Number(interaction.values[0]);
-    settings.set('reset_day', day);
+    await settings.set('reset_day', day);
     if (settings.get('reset_enabled')) settings.set('reset_enabled_at', Date.now());
     await adminLog(interaction, 'config_reset_weekly', 'Dia do reset semanal alterado', `📅 Novo dia: **${WEEKDAYS[day]}**`);
     return interaction.update(renderWeekly());
@@ -216,8 +216,8 @@ async function handle(interaction, action, args) {
     const tz = interaction.fields.getTextInputValue('tz').trim();
     if (!hm) return updateOrReply(interaction, { embeds: [errorEmbed('Horário inválido. Use o formato **HH:MM** (ex.: 23:59).')], components: renderWeekly().components });
     if (!isValidTimezone(tz)) return updateOrReply(interaction, { embeds: [errorEmbed('Fuso horário inválido. Exemplo: `America/Sao_Paulo`.')], components: renderWeekly().components });
-    settings.set('reset_time', hm.text);
-    settings.set('timezone', tz);
+    await settings.set('reset_time', hm.text);
+    await settings.set('timezone', tz);
     if (settings.get('reset_enabled')) settings.set('reset_enabled_at', Date.now());
     await adminLog(interaction, 'config_reset_weekly', 'Horário do reset semanal alterado', `🕐 Novo horário: **${hm.text}** (${tz})`);
     return updateOrReply(interaction, renderWeekly());
@@ -256,8 +256,8 @@ async function handle(interaction, action, args) {
     if (max === null || max < 10 || max > rankingService.RANK_MAX_LIMIT) return updateOrReply(interaction, { embeds: [errorEmbed(`Máximo de membros: informe um número entre **10** e **${rankingService.RANK_MAX_LIMIT}**.`)], components: render().components });
     const old = settings.get('per_page');
     const oldMax = settings.get('rank_max');
-    settings.set('per_page', n);
-    settings.set('rank_max', max);
+    await settings.set('per_page', n);
+    await settings.set('rank_max', max);
     await adminLog(interaction, 'config_ranking', 'Configuração do ranking alterada', `📄 Itens por página: **${old}** → **${n}**\n👥 Máx. de membros: **${oldMax}** → **${max}**`);
     return updateOrReply(interaction, render());
   }

@@ -1,6 +1,7 @@
 'use strict';
 
-const db = require('../database');
+const { FeatureLog } = require('../../models');
+const { state, nextId } = require('../database/store');
 const settings = require('../database/settings');
 const config = require('../config');
 const ctx = require('../utils/context');
@@ -17,17 +18,20 @@ const CATEGORIES = {
 
 const LOG_FOOTER = 'Log interno • Não compartilhar';
 
-function record({ category, action, guildId = null, actorId = null, targetId = null, summary = null, details = null }) {
-  const info = db
-    .prepare(
-      `INSERT INTO logs(category, action, guild_id, actor_id, target_id, summary, details, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-    .run(category, action, guildId, actorId, targetId, summary, details ? JSON.stringify(details) : null, Date.now());
-  return info.lastInsertRowid;
+async function record({ category, action, guildId = null, actorId = null, targetId = null, summary = null, details = null }) {
+  const id = await nextId('feature_logs');
+  const doc = {
+    _id: id, id, category: category || 'system', action: action || 'event',
+    guild_id: guildId || null, actor_id: actorId || null, target_id: targetId || null,
+    summary: summary || null, details: details == null ? null : details,
+    created_at: Date.now(),
+  };
+  await FeatureLog.create(doc);
+  state.logs.unshift(doc);
+  if (state.logs.length > 10000) state.logs.length = 10000;
+  return id;
 }
 
-/** Envia o embed para os canais de log configurados. SEMPRE restrito ao servidor interno. */
 async function sendToChannels(categories, embed) {
   const client = ctx.client;
   if (!client) return;
@@ -46,28 +50,12 @@ async function sendToChannels(categories, embed) {
   }
 }
 
-/**
- * Registra no banco e envia ao canal do servidor interno.
- * - mirror: categorias extras que também devem receber o embed (ex.: pontos também em "admin")
- * - embed: pode ser fornecido pronto; senão é montado com title/description/fields
- */
 async function logEvent({
-  category,
-  action,
-  guildId,
-  actorId,
-  targetId,
-  summary,
-  details,
-  title,
-  description,
-  fields,
-  color = COLORS.brand,
-  embed,
-  mirror = [],
+  category, action, guildId, actorId, targetId, summary, details,
+  title, description, fields, color = COLORS.brand, embed, mirror = [],
 }) {
   try {
-    record({ category, action, guildId, actorId, targetId, summary: summary || title || action, details });
+    await record({ category, action, guildId, actorId, targetId, summary: summary || title || action, details });
     const e = embed || baseEmbed({ title, description, color, footer: LOG_FOOTER });
     if (!embed && fields?.length) e.addFields(fields);
     await sendToChannels([category, ...mirror], e);
@@ -77,14 +65,12 @@ async function logEvent({
 }
 
 function recent(category, limit = 10) {
-  return db.prepare('SELECT * FROM logs WHERE category = ? ORDER BY id DESC LIMIT ?').all(category, limit);
+  return state.logs.filter((row) => row.category === category).slice(0, Math.max(0, limit));
 }
 
 module.exports = { CATEGORIES, LOG_FOOTER, record, logEvent, sendToChannels, recent };
 
-/** true se o canal é um canal de logs configurado (evita logar mensagens do próprio canal de logs). */
 function isLogChannel(channelId) {
   return Object.keys(CATEGORIES).some((c) => settings.get(`log_channel_${c}`) === channelId);
 }
-
 module.exports.isLogChannel = isLogChannel;

@@ -1,50 +1,63 @@
 # PXK Bot
 
-Bot Discord e painel administrativo do PXK.
+Bot Discord, comandos oficiais e painel administrativo.
 
 ## Requisitos
 
 - Node.js 20 ou superior
-- MongoDB (URI em \`DATABASE_URL\`)
+- MongoDB acessível pela URI `DATABASE_URL`
 - Aplicação Discord com bot e OAuth2 habilitados
-- Permissão de leitura/escrita no diretório \`data/\`
+- Volume persistente em `/app/data` durante a migração inicial
 
 ## Configuração
 
-1. Copie \`.env.example\` para \`.env\`.
-2. Preencha \`DISCORD_TOKEN\`, \`CLIENT_ID\`, os IDs dos servidores e \`DATABASE_URL\`.
-3. No Discord Developer Portal, adicione \`BASE_URL/callback\` como Redirect URI do OAuth2.
-4. Preencha \`DISCORD_CLIENT_ID\` e \`DISCORD_CLIENT_SECRET\`.
-5. Configure \`OWNER_IDS\` e/ou \`DEV_IDS\` com os IDs Discord autorizados a abrir o dashboard.
-6. Defina \`PANEL_SECRET\` com uma chave aleatória forte (pelo menos 32 caracteres). Uma opção é gerar com \`openssl rand -hex 32\`.
+1. Configure no Portainer as variáveis Discord, OAuth2, IDs dos servidores, `DATABASE_URL`, `BASE_URL` e `PANEL_SECRET`.
+2. No Discord Developer Portal, adicione `BASE_URL/callback` como Redirect URI do OAuth2.
+3. Defina `PANEL_SECRET` com uma chave aleatória forte de pelo menos 32 caracteres.
+4. Configure `OWNER_IDS` e/ou `DEV_IDS` com os IDs autorizados a abrir o dashboard.
+5. Mantenha o volume persistente antigo montado em `/app/data`. O arquivo padrão legado é `/app/data/pxk-features.sqlite`. Caso ele estivesse em outro local, configure `DB_PATH` para o caminho dentro do container.
 
-O dashboard só libera as rotas administrativas para as contas listadas em \`OWNER_IDS\` ou \`DEV_IDS\`. Não exponha o serviço sem HTTPS em produção.
+Não coloque tokens ou senhas no GitHub nem em mensagens. Cadastre-os apenas como variáveis/segredos no Portainer.
 
-## Execução
+## Banco único e migração automática
 
-\`\`\`bash
+O MongoDB é o banco operacional único. Os módulos legados continuam usando suas coleções MongoDB; os antigos módulos oficiais agora também usam coleções MongoDB com o prefixo `pxk_feature_`.
+
+No primeiro start desta versão, antes de iniciar o dashboard e o bot, o processo:
+
+1. conecta ao MongoDB e cria/valida os índices;
+2. lê o SQLite legado em `DB_PATH`;
+3. cria uma cópia integral SQLite em `/app/data/backups/pxk-pre-mongodb-migration-*.sqlite`;
+4. importa usuários, temporadas, placares, histórico de pontos, sessões e mensagens de bate-ponto, permissões, regras de cargos, rankings arquivados, logs e configurações;
+5. mantém os IDs e as relações originais;
+6. verifica as quantidades importadas e só grava o marcador de migração concluída depois das verificações;
+7. carrega o repositório MongoDB, recupera eventuais lançamentos pendentes e somente então inicializa dashboard e bot.
+
+A migração usa upserts idempotentes. Se falhar antes da conclusão, a inicialização para e uma nova tentativa pode retomar sem apagar o SQLite. O arquivo de origem **não é apagado nem alterado**. Não remova o volume antigo nem o backup até verificar os dados no bot e guardar uma cópia externa.
+
+**Proteção contra banco vazio:** se a migração ainda não foi concluída e o SQLite não estiver no caminho informado, o container para antes de ligar o bot. Isso evita iniciar silenciosamente com placares/configurações vazios. Apenas uma instalação genuinamente nova, sem dados SQLite anteriores, deve definir `ALLOW_EMPTY_FEATURE_DB=true`.
+
+Depois da migração, operações de pontuação e histórico, temporadas, ranking, bate-ponto, permissões, cargos e logs gravam no MongoDB. O histórico de pontuação fica em documentos individuais para não crescer sem limite dentro de um único documento.
+
+## Backups
+
+- Backups automáticos do MongoDB são exportados em Extended JSON para `/app/data/backups/`.
+- `MONGODB_BACKUP_INTERVAL_MS` define o intervalo (mínimo de uma hora).
+- `MONGODB_BACKUP_RETENTION` define quantos backups manter.
+- O backup SQLite pré-migração é uma cópia integral de segurança adicional.
+
+O volume `/app/data` deve ser persistente no Portainer. O MongoDB também precisa ter seu próprio volume persistente.
+
+## Execução e verificações
+
+```bash
 npm install
 npm test
 npm start
-\`\`\`
+```
 
-O painel fica disponível na porta definida em \`PORT\` (padrão 8080). O endpoint \`/healthz\` informa o estado da conexão MongoDB.
-
-## Dados e backups
-
-- O MongoDB guarda os dados dos módulos legados e as sessões do dashboard.
-- O SQLite oficial fica em \`DB_PATH\` (padrão \`data/pxk-features.sqlite\`).
-- Backups automáticos do SQLite são gravados em \`data/backups/\`.
-- \`SQLITE_BACKUP_INTERVAL_MS\` define o intervalo (mínimo de uma hora).
-- \`SQLITE_BACKUP_RETENTION\` define quantos backups manter.
-- Em Docker, monte um volume persistente em \`/app/data\`. Sem volume persistente, o banco SQLite e os backups podem ser perdidos quando o container for removido.
+O dashboard usa a porta definida em `PORT` (padrão 8080); `/healthz` informa o estado da conexão MongoDB. `npm test` verifica sintaxe/imports e regras de arquitetura estática; isso não substitui um start real com MongoDB, SQLite legado e credenciais Discord.
 
 ## Comandos
 
-\`npm run deploy\` registra os comandos legados e oficiais em uma única lista por servidor.
-
-\`npm test\` executa verificações estáticas de sintaxe JavaScript e imports relativos. Não substitui testes de integração com Discord, MongoDB ou SQLite.
-
-## Observações de migração
-
-O projeto mantém módulos legados em MongoDB e módulos oficiais em SQLite. Os dados ainda não foram unificados automaticamente. Não apague nem migre coleções/tabelas sem um plano de migração e backup validado.
+`npm run deploy` registra os comandos legados e oficiais em uma única lista por servidor.

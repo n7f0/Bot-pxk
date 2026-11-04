@@ -20,7 +20,7 @@ async function onMessage(message) {
   const hasContent =
     (message.content && message.content.trim().length > 0) || message.attachments.size > 0 || (message.stickers?.size ?? 0) > 0;
 
-  const result = service.countMessage({
+  const result = await service.countMessage({
     userId: message.author.id,
     channelId: message.channelId,
     messageId: message.id,
@@ -49,9 +49,8 @@ async function onMessage(message) {
   }
 }
 
-function onMessageDelete(messageId) {
-  const removed = service.uncountMessage(messageId);
-  return removed;
+async function onMessageDelete(messageId) {
+  return service.uncountMessage(messageId);
 }
 
 /**
@@ -73,7 +72,7 @@ async function backfillSession(client, session) {
     for (const m of msgs) {
       if (m.author.id !== session.user_id || m.createdTimestamp >= session.ends_at) continue;
       const hasContent = (m.content && m.content.trim().length > 0) || m.attachments.size > 0;
-      const r = service.countMessage({
+      const r = await service.countMessage({
         userId: session.user_id,
         channelId: session.channel_id,
         messageId: m.id,

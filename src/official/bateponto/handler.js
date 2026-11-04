@@ -20,7 +20,7 @@ async function handleComponent(interaction) {
       return interaction.reply({ embeds: [errorEmbed('O bate-ponto é iniciado pelo **servidor interno**. Use o painel de lá.')], flags: EPHEMERAL });
     }
     const roleName = interaction.member?.roles?.highest?.name;
-    const res = service.start({ userId, guildId: interaction.guildId, roleName: roleName && roleName !== '@everyone' ? roleName : null });
+    const res = await service.start({ userId, guildId: interaction.guildId, roleName: roleName && roleName !== '@everyone' ? roleName : null });
     if (res.error) {
       if (res.existing) {
         const panel = ui.buildActivePanel(res.existing);
@@ -30,7 +30,7 @@ async function handleComponent(interaction) {
       }
       return interaction.reply({ embeds: [errorEmbed(res.error)], flags: EPHEMERAL });
     }
-    logs.record({
+    await logs.record({
       category: 'bateponto',
       action: 'started',
       guildId: interaction.guildId,

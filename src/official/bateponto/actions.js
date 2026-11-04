@@ -11,7 +11,7 @@ const pointsActions = require('../points/actions');
 
 /** Finaliza uma sessão vencida: resultado, pontos, ranking, log interno e aviso ao usuário. */
 async function finalizeSession(client, sessionId) {
-  const res = service.finalize(sessionId, { actorId: client.user?.id || null });
+  const res = await service.finalize(sessionId, { actorId: client.user?.id || null });
   if (!res) return null;
   const { session, entry } = res;
 
@@ -39,7 +39,7 @@ async function sendDm(client, session, { textKey, embed, event }) {
     await user.send({ content: visual.text(textKey, vars).slice(0, 2000), embeds: embed ? [embed] : [] });
     return true;
   } catch (err) {
-    logs.record({
+    await logs.record({
       category: 'bateponto',
       action: 'dm_failed',
       guildId: session.guild_id,
@@ -87,7 +87,7 @@ async function sweep(client) {
 }
 
 async function cancelSession(client, sessionId, { actorId, note, notify = true }) {
-  const s = service.cancel(sessionId, note);
+  const s = await service.cancel(sessionId, note);
   if (!s) return null;
   if (notify) await notifyUser(client, s);
   else live.drop(s.id);
@@ -122,8 +122,8 @@ async function refreshPublicPanel(client) {
 /** Publica o painel público de bate-ponto em um canal (normalmente do servidor interno, junto do ranking). */
 async function publishPanel(channel) {
   const msg = await channel.send(ui.buildPublicPanel());
-  settings.set('bp_panel_channel_id', channel.id);
-  settings.set('bp_panel_message_id', msg.id);
+  await settings.set('bp_panel_channel_id', channel.id);
+  await settings.set('bp_panel_message_id', msg.id);
   return msg;
 }
 

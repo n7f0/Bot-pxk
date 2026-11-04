@@ -80,9 +80,9 @@ async function handle(interaction, action) {
     const banner = f('banner');
     const fail = (m) => updateOrReply(interaction, { embeds: [errorEmbed(m)], components: render().components });
     if (banner && !/^https:\/\/\S+$/i.test(banner)) return fail('O banner precisa ser um link **https** de imagem.');
-    settings.set('ap_ranking_title', f('title') || null);
-    settings.set('ap_ranking_footer', f('footer') || null);
-    settings.set('ap_ranking_banner', banner || null);
+    await settings.set('ap_ranking_title', f('title') || null);
+    await settings.set('ap_ranking_footer', f('footer') || null);
+    await settings.set('ap_ranking_banner', banner || null);
     await adminLog(interaction, 'config_appearance', 'Aparência do ranking alterada', '🎨 Título, rodapé ou banner do ranking foram atualizados.');
     publisher.refresh({ force: true }).catch(() => {});
     return updateOrReply(interaction, render());
@@ -112,7 +112,7 @@ async function handle(interaction, action) {
       return updateOrReply(interaction, { embeds: [errorEmbed(`Não salvei, corrija e tente de novo:\n${list}${errors.length > 8 ? `\n… e mais ${errors.length - 8}.` : ''}`)], components: render().components });
     }
     // Vazio = sem emoji nenhum (só números); para voltar ao padrão use "Restaurar padrão".
-    settings.set('ap_ranking_emojis', rules);
+    await settings.set('ap_ranking_emojis', rules);
     await adminLog(interaction, 'config_appearance', 'Emojis do ranking alterados', '🏅 Emojis das posições do ranking foram atualizados.');
     publisher.refresh({ force: true }).catch(() => {});
     return updateOrReply(interaction, render());

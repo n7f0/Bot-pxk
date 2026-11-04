@@ -19,7 +19,7 @@ async function resetSeason({ actorId = null, reason = 'Reset manual', auto = fal
   if (resetting) throw new Error('Já existe um reset em andamento.');
   resetting = true;
   try {
-    const result = seasons.closeAndStartNew({ actorId, reason });
+    const result = await seasons.closeAndStartNew({ actorId, reason });
     const tz = settings.get('timezone');
     const { closed, created, stats } = result;
 

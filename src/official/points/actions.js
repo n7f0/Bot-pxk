@@ -11,7 +11,7 @@ const publisher = require('../ranking/publisher');
  * type: 'adicionar' | 'remover' | 'definir' | 'bate-ponto' | 'sistema'
  */
 async function changePoints({ userId, actorId, mode, amount, reason, type, guildId }) {
-  const entry = service.applyChange({ userId, actorId, mode, amount, reason, type });
+  const entry = await service.applyChange({ userId, actorId, mode, amount, reason, type });
   await afterChange(entry, guildId);
   return entry;
 }

@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const { AttachmentBuilder } = require('discord.js');
-const db = require('../database');
+const { state } = require('../database/store');
 const settings = require('../database/settings');
 const backup = require('../database/backup');
 const config = require('../config');
@@ -14,7 +14,15 @@ const { row, button, buildModal, updateOrReply, EPHEMERAL } = require('../utils/
 const { menuButton, adminLog } = require('./util');
 
 function count(table) {
-  return db.prepare(`SELECT COUNT(*) AS c FROM ${table}`).get().c;
+  const collections = {
+    users: state.users.size,
+    seasons: state.seasons.size,
+    point_history: state.pointHistory.size,
+    logs: state.logs.length,
+    bateponto_sessions: state.sessions.size,
+    bateponto_messages: [...state.sessions.values()].reduce((n, x) => n + (x.messageRecords?.length || 0), 0),
+  };
+  return collections[table] ?? 0;
 }
 
 function render(client) {
@@ -22,12 +30,6 @@ function render(client) {
     const g = client.guilds.cache.get(id);
     return g ? `${label}: **${g.name}** (\`${id}\`) • ${num(g.memberCount)} membros` : `${label}: ⚠️ bot **não está** no servidor \`${id}\``;
   };
-  let size = 0;
-  try {
-    size = fs.statSync(config.dbPath).size;
-  } catch {
-    /* ignora */
-  }
   const up = Math.floor(process.uptime());
   const embed = baseEmbed({
     title: 'Sistema',
@@ -37,8 +39,8 @@ function render(client) {
       guildLine(config.externalGuildId, '🌍 Externo'),
       guildLine(config.internalGuildId, '🔒 Interno'),
       SEP,
-      '**🗄️ Banco de dados (SQLite)**',
-      `📦 Tamanho: **${(size / 1024).toFixed(1)} KB**`,
+      '**🗄️ Banco de dados (MongoDB unificado)**',
+      '✅ Dados operacionais armazenados no MongoDB',
       `👤 Usuários: **${num(count('users'))}** • 🏅 Temporadas: **${num(count('seasons'))}**`,
       `📜 Histórico de pontos: **${num(count('point_history'))}** • 📝 Logs: **${num(count('logs'))}**`,
       `⏱️ Bate-pontos: **${num(count('bateponto_sessions'))}** • 💬 Mensagens contadas: **${num(count('bateponto_messages'))}**`,
@@ -71,7 +73,7 @@ async function handle(interaction, action) {
     const tz = interaction.fields.getTextInputValue('tz').trim();
     if (!isValidTimezone(tz)) return updateOrReply(interaction, { embeds: [errorEmbed('Fuso horário inválido. Exemplo: `America/Sao_Paulo`.')], components: render(interaction.client).components });
     const old = settings.get('timezone');
-    settings.set('timezone', tz);
+    await settings.set('timezone', tz);
     await adminLog(interaction, 'config_system', 'Configuração geral alterada', `🌎 Fuso horário: **${old}** → **${tz}**`);
     return updateOrReply(interaction, render(interaction.client));
   }

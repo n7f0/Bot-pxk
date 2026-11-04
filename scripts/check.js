@@ -35,6 +35,7 @@ for (const relativeRoot of roots) walk(path.join(root, relativeRoot));
 
 let syntaxFailures = 0;
 let importFailures = 0;
+let architectureFailures = 0;
 
 for (const file of files) {
   const relative = path.relative(root, file);
@@ -55,8 +56,35 @@ for (const file of files) {
   }
 }
 
-if (syntaxFailures || importFailures) {
-  console.error('\nVerificação falhou: ' + syntaxFailures + ' erro(s) de sintaxe e ' + importFailures + ' import(s) local(is) ausente(s).');
+// Acesso SQLite só é permitido no importador de primeira execução.
+for (const file of files) {
+  const relative = path.relative(root, file);
+  const source = fs.readFileSync(file, 'utf8');
+  const sqliteImporter = relative === 'src/official/database/migrate-sqlite.js';
+  if (!sqliteImporter && /better-sqlite3|\bdb\.(?:prepare|transaction|pragma|backup)\s*\(/.test(source)) {
+    architectureFailures += 1;
+    console.error('ACESSO DIRETO AO SQLITE FORA DO IMPORTADOR: ' + relative);
+  }
+  if (relative !== 'src/official/database/settings.js') {
+    for (const match of source.matchAll(/settings\.set\s*\(/g)) {
+      const before = source.slice(Math.max(0, match.index - 24), match.index);
+      if (!/\bawait\s*$/.test(before)) {
+        architectureFailures += 1;
+        console.error('WRITE DE CONFIGURAÇÃO SEM AWAIT: ' + relative);
+        break;
+      }
+    }
+  }
+}
+
+const bootstrap = fs.readFileSync(path.join(root, 'src', 'index.js'), 'utf8');
+if (!bootstrap.includes('runSqliteMigration()')) {
+  architectureFailures += 1;
+  console.error('O bootstrap não executa a migração SQLite antes de iniciar os serviços.');
+}
+
+if (syntaxFailures || importFailures || architectureFailures) {
+  console.error('\nVerificação falhou: ' + syntaxFailures + ' erro(s) de sintaxe, ' + importFailures + ' import(s) local(is) ausente(s) e ' + architectureFailures + ' falha(s) de arquitetura.');
   process.exit(1);
 }
-console.log('Verificação estática OK: sintaxe e imports relativos em ' + files.length + ' arquivos JavaScript.');
+console.log('Verificação estática OK: sintaxe, imports relativos e banco único em ' + files.length + ' arquivos JavaScript.');
