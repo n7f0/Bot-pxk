@@ -74,12 +74,12 @@ async function handle(interaction, action, args = []) {
   if (action === 'chset') {
     const channel = interaction.channels.first();
     const old = settings.get(`log_channel_${cat}`);
-    settings.set(`log_channel_${cat}`, channel.id);
+    await settings.set(`log_channel_${cat}`, channel.id);
     await adminLog(interaction, 'config_logs', 'Canal de logs alterado', `${CATEGORIES[cat].emoji} **${CATEGORIES[cat].label}**\n${old ? `<#${old}>` : '—'} → <#${channel.id}>`);
     return interaction.update(renderChannel(cat));
   }
   if (action === 'chclear') {
-    settings.set(`log_channel_${cat}`, null);
+    await settings.set(`log_channel_${cat}`, null);
     await adminLog(interaction, 'config_logs', 'Canal de logs removido', `${CATEGORIES[cat].emoji} **${CATEGORIES[cat].label}**: canal removido`);
     return interaction.update(renderChannel(cat));
   }

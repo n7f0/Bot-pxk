@@ -177,7 +177,7 @@ function modalFor(action) {
 const chars = (s) => Array.from(String(s));
 
 /** Aplica o envio de um modal. Retorna { error } ou { log }. */
-function applySubmit(which, f) {
+async function applySubmit(which, f) {
   const val = (id) => f.getTextInputValue(id).trim();
 
   if (MODALS[which]) {
@@ -188,7 +188,7 @@ function applySubmit(which, f) {
       if (v && i.labels3 && v.split(',').filter((x) => x.trim()).length !== 3) return { error: 'Informe **3 rótulos** separados por vírgula (tempo, mensagens, progresso).' };
       updates[i.key] = v || null;
     }
-    for (const [k, v] of Object.entries(updates)) settings.set(k, v);
+    for (const [k, v] of Object.entries(updates)) await settings.set(k, v);
     return { log: `🎨 Visual atualizado: **${MODALS[which].title}**` };
   }
 
@@ -201,12 +201,12 @@ function applySubmit(which, f) {
       const e = val(id);
       if (e && e !== '-' && !visual.validEmoji(e)) return { error: `Emoji inválido no botão **${label}**. Use um emoji comum ou \`<:nome:id>\`; \`-\` para nenhum.` };
     }
-    settings.set('bpv_btn_start_label', val('start_label') || null);
-    settings.set('bpv_btn_start_emoji', val('start_emoji') || null);
-    settings.set('bpv_btn_view_label', val('view_label') || null);
-    settings.set('bpv_btn_view_emoji', val('view_emoji') || null);
-    settings.set('bpv_btn_start_style', s1);
-    settings.set('bpv_btn_view_style', s2);
+    await settings.set('bpv_btn_start_label', val('start_label') || null);
+    await settings.set('bpv_btn_start_emoji', val('start_emoji') || null);
+    await settings.set('bpv_btn_view_label', val('view_label') || null);
+    await settings.set('bpv_btn_view_emoji', val('view_emoji') || null);
+    await settings.set('bpv_btn_start_style', s1);
+    await settings.set('bpv_btn_view_style', s2);
     return { log: '🔘 Botões do painel público atualizados.' };
   }
 
@@ -230,12 +230,12 @@ function applySubmit(which, f) {
     if (barTokens.length && (barTokens.length !== 2 || barTokens.some((t) => chars(t).length > 2))) return { error: 'A barra precisa de **2 caracteres**: cheio e vazio (ex.: `▰ ▱` ou `█ ░`).' };
 
     const footer = val('footer');
-    settings.set('ui_color', color ? `#${color.replace('#', '').toLowerCase()}` : null);
-    settings.set('ui_sep_char', sepChar || UI_DEFAULTS.ui_sep_char);
-    settings.set('ui_sep_len', sepLen ?? UI_DEFAULTS.ui_sep_len);
-    settings.set('ui_footer', footer || null);
-    settings.set('ui_bar_full', barTokens[0] || UI_DEFAULTS.ui_bar_full);
-    settings.set('ui_bar_empty', barTokens[1] || UI_DEFAULTS.ui_bar_empty);
+    await settings.set('ui_color', color ? `#${color.replace('#', '').toLowerCase()}` : null);
+    await settings.set('ui_sep_char', sepChar || UI_DEFAULTS.ui_sep_char);
+    await settings.set('ui_sep_len', sepLen ?? UI_DEFAULTS.ui_sep_len);
+    await settings.set('ui_footer', footer || null);
+    await settings.set('ui_bar_full', barTokens[0] || UI_DEFAULTS.ui_bar_full);
+    await settings.set('ui_bar_empty', barTokens[1] || UI_DEFAULTS.ui_bar_empty);
     return { log: '🎨 Tema global atualizado (cor, linha, rodapé e barra).', theme: true };
   }
 
@@ -262,7 +262,7 @@ async function handle(interaction, action, args = []) {
   if (MODALS[action] || action === 'buttons' || action === 'theme') return interaction.showModal(modalFor(action));
 
   if (action === 'sub') {
-    const res = applySubmit(args[0], interaction.fields);
+    const res = await applySubmit(args[0], interaction.fields);
     if (res.error) return updateOrReply(interaction, { embeds: [errorEmbed(res.error)], components: render().components });
     await adminLog(interaction, 'config_visual', 'Visual alterado', res.log);
     await pushUpdates(interaction, { themeChanged: Boolean(res.theme) });
@@ -272,7 +272,7 @@ async function handle(interaction, action, args = []) {
   if (action === 'ts' || action === 'status') {
     const key = action === 'ts' ? 'ui_timestamp' : 'ui_status_colors';
     const next = !settings.get(key);
-    settings.set(key, next);
+    await settings.set(key, next);
     await adminLog(interaction, 'config_visual', 'Tema alterado', `🎨 ${action === 'ts' ? 'Hora no rodapé' : 'Cores de status'}: **${toggleLabel(next)}**`);
     await pushUpdates(interaction, { themeChanged: true });
     return interaction.update(render());
@@ -283,14 +283,14 @@ async function handle(interaction, action, args = []) {
     const [key, label] = map[args[0]] || [];
     if (!key) return;
     const next = !settings.get(key);
-    settings.set(key, next);
+    await settings.set(key, next);
     await adminLog(interaction, 'config_visual', 'Visual alterado', `📩 Mensagem no privado (${label}): **${toggleLabel(next)}**`);
     return interaction.update(render());
   }
 
   if (action === 'layout') {
     const next = settings.get('bpv_layout') === 'list' ? 'fields' : 'list';
-    settings.set('bpv_layout', next);
+    await settings.set('bpv_layout', next);
     await adminLog(interaction, 'config_visual', 'Visual alterado', `🧩 Layout do painel público: **${next === 'list' ? 'Lista' : 'Colunas'}**`);
     await pushUpdates(interaction);
     return interaction.update(render());
@@ -327,7 +327,7 @@ async function handle(interaction, action, args = []) {
   }
 
   if (action === 'reset') {
-    for (const k of Object.keys(settings.DEFAULTS)) if (k.startsWith('bpv_') || k.startsWith('ui_')) settings.set(k, settings.DEFAULTS[k]);
+    for (const k of Object.keys(settings.DEFAULTS)) if (k.startsWith('bpv_') || k.startsWith('ui_')) await settings.set(k, settings.DEFAULTS[k]);
     await adminLog(interaction, 'config_visual', 'Visual restaurado', '🧹 Tema e visual do bate-ponto restaurados para o padrão.');
     await pushUpdates(interaction, { themeChanged: true });
     return interaction.update(render());

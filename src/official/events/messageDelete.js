@@ -13,7 +13,7 @@ module.exports = {
   name: Events.MessageDelete,
   async execute(message) {
     // Mensagem apagada deixa de contar no bate-ponto (anti "enviar e apagar").
-    tracker.onMessageDelete(message.id);
+    await tracker.onMessageDelete(message.id).catch((error) => console.error('[bateponto] falha ao retirar mensagem apagada:', error.message));
 
     if (!message.guildId || !config.isKnownGuild(message.guildId)) return;
     if (message.author?.bot) return;

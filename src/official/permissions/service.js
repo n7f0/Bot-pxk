@@ -1,8 +1,8 @@
 'use strict';
 
-const db = require('../database');
+const { FeatureRolePermission } = require('../../models');
+const { state, permissionId } = require('../database/store');
 
-/** Todas as permissões configuráveis. Para criar uma nova, basta adicionar aqui. */
 const PERMISSIONS = {
   manage_points: { label: 'Gerenciar pontos', emoji: '⭐' },
   remove_points: { label: 'Remover pontos', emoji: '➖' },
@@ -19,52 +19,79 @@ const PERMISSIONS = {
 const isValid = (perm) => Object.prototype.hasOwnProperty.call(PERMISSIONS, perm);
 
 function listRoles(permission) {
-  return db.prepare('SELECT guild_id, role_id FROM role_permissions WHERE permission = ?').all(permission);
+  return [...state.rolePermissions.values()]
+    .filter((r) => r.permission === permission)
+    .map((r) => ({ guild_id: r.guild_id, role_id: r.role_id }));
 }
 
 function listAll() {
   const out = {};
   for (const key of Object.keys(PERMISSIONS)) out[key] = [];
-  for (const r of db.prepare('SELECT guild_id, role_id, permission FROM role_permissions').all()) {
+  for (const r of state.rolePermissions.values()) {
     if (out[r.permission]) out[r.permission].push({ guild_id: r.guild_id, role_id: r.role_id });
   }
   return out;
 }
 
-/** Substitui os cargos de uma permissão (apenas os do servidor informado). Retorna {added, removed}. */
-const setRoles = db.transaction((permission, guildId, roleIds) => {
+async function setRoles(permission, guildId, roleIds) {
   if (!isValid(permission)) throw new Error('Permissão inválida.');
-  const before = db
-    .prepare('SELECT role_id FROM role_permissions WHERE permission = ? AND guild_id = ?')
-    .all(permission, guildId)
+  const before = [...state.rolePermissions.values()]
+    .filter((r) => r.permission === permission && r.guild_id === String(guildId))
     .map((r) => r.role_id);
-  db.prepare('DELETE FROM role_permissions WHERE permission = ? AND guild_id = ?').run(permission, guildId);
-  const ins = db.prepare('INSERT OR IGNORE INTO role_permissions(guild_id, role_id, permission) VALUES (?, ?, ?)');
-  for (const id of roleIds) ins.run(guildId, id, permission);
+  const ids = [...new Set(roleIds.map(String))];
+  const docs = ids.map((roleId) => ({
+    _id: permissionId(guildId, roleId, permission),
+    guild_id: String(guildId), role_id: roleId, permission,
+  }));
+  if (docs.length) {
+    await FeatureRolePermission.bulkWrite(docs.map((doc) => ({
+      updateOne: { filter: { _id: doc._id }, update: { $set: doc }, upsert: true },
+    })), { ordered: false });
+  }
+  await FeatureRolePermission.deleteMany({
+    permission, guild_id: String(guildId),
+    role_id: { $nin: ids },
+  }).exec();
+  for (const [id, row] of state.rolePermissions) {
+    if (row.permission === permission && row.guild_id === String(guildId)) state.rolePermissions.delete(id);
+  }
+  for (const doc of docs) state.rolePermissions.set(String(doc._id), doc);
   return {
-    added: roleIds.filter((id) => !before.includes(id)),
-    removed: before.filter((id) => !roleIds.includes(id)),
+    added: ids.filter((id) => !before.includes(id)),
+    removed: before.filter((id) => !ids.includes(id)),
   };
-});
+}
 
-const grantAll = db.transaction((guildId, roleIds) => {
-  const ins = db.prepare('INSERT OR IGNORE INTO role_permissions(guild_id, role_id, permission) VALUES (?, ?, ?)');
-  for (const id of roleIds) for (const perm of Object.keys(PERMISSIONS)) ins.run(guildId, id, perm);
-});
+async function grantAll(guildId, roleIds) {
+  const docs = [];
+  for (const roleId of [...new Set(roleIds.map(String))]) {
+    for (const permission of Object.keys(PERMISSIONS)) {
+      docs.push({
+        _id: permissionId(guildId, roleId, permission),
+        guild_id: String(guildId), role_id: roleId, permission,
+      });
+    }
+  }
+  if (docs.length) {
+    await FeatureRolePermission.bulkWrite(docs.map((doc) => ({
+      updateOne: { filter: { _id: doc._id }, update: { $set: doc }, upsert: true },
+    })), { ordered: false });
+    for (const doc of docs) state.rolePermissions.set(String(doc._id), doc);
+  }
+}
 
-const revokeAll = db.transaction((roleIds) => {
-  const del = db.prepare('DELETE FROM role_permissions WHERE role_id = ?');
-  for (const id of roleIds) del.run(id);
-});
+async function revokeAll(roleIds) {
+  const ids = [...new Set(roleIds.map(String))];
+  await FeatureRolePermission.deleteMany({ role_id: { $in: ids } }).exec();
+  for (const [id, row] of state.rolePermissions) {
+    if (ids.includes(row.role_id)) state.rolePermissions.delete(id);
+  }
+}
 
-/** Verifica se algum dos cargos informados possui a permissão. */
 function anyRoleHas(roleIds, permission) {
   if (!roleIds.length) return false;
-  const marks = roleIds.map(() => '?').join(',');
-  const row = db
-    .prepare(`SELECT 1 FROM role_permissions WHERE permission = ? AND role_id IN (${marks}) LIMIT 1`)
-    .get(permission, ...roleIds);
-  return Boolean(row);
+  const roles = new Set(roleIds.map(String));
+  return [...state.rolePermissions.values()].some((r) => r.permission === permission && roles.has(r.role_id));
 }
 
 module.exports = { PERMISSIONS, isValid, listRoles, listAll, setRoles, grantAll, revokeAll, anyRoleHas };

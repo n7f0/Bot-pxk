@@ -74,7 +74,7 @@ async function handle(interaction, action, args = []) {
     const permKey = args[0];
     if (!permService.isValid(permKey)) return;
     const ids = [...interaction.roles.keys()];
-    const diff = permService.setRoles(permKey, config.internalGuildId, ids);
+    const diff = await permService.setRoles(permKey, config.internalGuildId, ids);
     await adminLog(
       interaction,
       'permissions_changed',
@@ -86,14 +86,14 @@ async function handle(interaction, action, args = []) {
 
   if (action === 'grant') {
     const ids = [...interaction.roles.keys()];
-    permService.grantAll(config.internalGuildId, ids);
+    await permService.grantAll(config.internalGuildId, ids);
     await adminLog(interaction, 'permissions_changed', 'Permissões concedidas em massa', `✅ Todas as permissões concedidas a: ${ids.map((i) => `<@&${i}>`).join(' ')}`);
     return interaction.update(render());
   }
 
   if (action === 'revoke') {
     const ids = [...interaction.roles.keys()];
-    permService.revokeAll(ids);
+    await permService.revokeAll(ids);
     await adminLog(interaction, 'permissions_changed', 'Permissões revogadas em massa', `🚫 Todas as permissões revogadas de: ${ids.map((i) => `<@&${i}>`).join(' ')}`);
     return interaction.update(render());
   }

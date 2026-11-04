@@ -1,61 +1,56 @@
 'use strict';
 
-const db = require('../database');
+const { state } = require('../database/store');
 const settings = require('../database/settings');
-
-const ORDER = 'points DESC, COALESCE(last_change_at, 0) ASC, user_id ASC';
 
 const RANK_MAX_LIMIT = 500;
 
-/** Máximo de membros exibidos no ranking (padrão 100, até 500). */
 function maxMembers() {
   return Math.max(1, Math.min(RANK_MAX_LIMIT, Number(settings.get('rank_max')) || 100));
 }
 
+function rankedRows(seasonId) {
+  return [...state.scores.values()]
+    .filter((s) => Number(s.season_id) === Number(seasonId) && Number(s.points) > 0)
+    .sort((a, b) =>
+      Number(b.points) - Number(a.points) ||
+      (Number(a.last_change_at) || 0) - (Number(b.last_change_at) || 0) ||
+      String(a.user_id).localeCompare(String(b.user_id))
+    );
+}
+
 function countRanked(seasonId) {
-  const c = db.prepare('SELECT COUNT(*) AS c FROM season_scores WHERE season_id = ? AND points > 0').get(seasonId).c;
-  return Math.min(c, maxMembers());
+  return Math.min(rankedRows(seasonId).length, maxMembers());
 }
 
 function getPage(seasonId, page, perPage) {
-  const offset = (page - 1) * perPage;
+  const offset = Math.max(0, (page - 1) * perPage);
   const limit = Math.max(0, Math.min(perPage, maxMembers() - offset));
-  const rows = db
-    .prepare(`SELECT user_id, points FROM season_scores WHERE season_id = ? AND points > 0 ORDER BY ${ORDER} LIMIT ? OFFSET ?`)
-    .all(seasonId, limit, offset);
-  return rows.map((r, i) => ({ ...r, position: offset + i + 1 }));
+  return rankedRows(seasonId).slice(offset, offset + limit)
+    .map((r, i) => ({ ...r, position: offset + i + 1 }));
 }
 
-/** Posição (1-based) do usuário no ranking da temporada, ou null se não pontuou. */
 function getPosition(seasonId, userId) {
-  const row = db.prepare('SELECT points, last_change_at FROM season_scores WHERE season_id = ? AND user_id = ?').get(seasonId, userId);
-  if (!row || row.points <= 0) return null;
-  const l = row.last_change_at || 0;
-  const ahead = db
-    .prepare(
-      `SELECT COUNT(*) AS c FROM season_scores
-       WHERE season_id = ? AND points > 0
-         AND (points > ? OR (points = ? AND (COALESCE(last_change_at, 0) < ? OR (COALESCE(last_change_at, 0) = ? AND user_id < ?))))`
-    )
-    .get(seasonId, row.points, row.points, l, l, userId).c;
-  return ahead + 1;
+  const rows = rankedRows(seasonId);
+  const index = rows.findIndex((r) => String(r.user_id) === String(userId));
+  return index < 0 || index >= maxMembers() ? index < 0 ? null : index + 1 : index + 1;
 }
 
-/** Total de mensagens contadas em bate-pontos (e nº de bate-pontos aprovados) por usuário, na temporada. */
 function getMessageTotals(userIds, season) {
-  const ids = [...new Set(userIds.filter(Boolean))];
-  if (!ids.length) return new Map();
-  const marks = ids.map(() => '?').join(',');
-  const rows = db
-    .prepare(
-      `SELECT user_id, COALESCE(SUM(messages), 0) AS messages,
-              COALESCE(SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END), 0) AS approved
-       FROM bateponto_sessions
-       WHERE user_id IN (${marks}) AND status != 'cancelled' AND started_at >= ? AND started_at <= ?
-       GROUP BY user_id`
-    )
-    .all(...ids, season.started_at, season.ended_at || Date.now());
-  return new Map(rows.map((r) => [r.user_id, r]));
+  const ids = [...new Set(userIds.filter(Boolean).map(String))];
+  const out = new Map();
+  for (const id of ids) out.set(id, { user_id: id, messages: 0, approved: 0 });
+  const from = Number(season.started_at) || 0;
+  const to = Number(season.ended_at) || Date.now();
+  for (const s of state.sessions.values()) {
+    if (!ids.includes(String(s.user_id)) || s.status === 'cancelled') continue;
+    const started = Number(s.started_at) || 0;
+    if (started < from || started > to) continue;
+    const row = out.get(String(s.user_id));
+    row.messages += Number(s.messages) || 0;
+    if (s.status === 'approved') row.approved += 1;
+  }
+  return out;
 }
 
 const pageOfPosition = (position, perPage) => Math.max(1, Math.ceil(position / perPage));

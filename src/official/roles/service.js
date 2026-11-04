@@ -1,6 +1,7 @@
 'use strict';
 
-const db = require('../database');
+const { FeaturePointRole } = require('../../models');
+const { state } = require('../database/store');
 const settings = require('../database/settings');
 const config = require('../config');
 const ctx = require('../utils/context');
@@ -8,26 +9,24 @@ const logs = require('../logs');
 const { baseEmbed, COLORS } = require('../utils/embeds');
 
 function listRules() {
-  return db.prepare('SELECT * FROM point_roles ORDER BY points ASC').all();
+  return [...state.pointRoles.values()].sort((a, b) => Number(a.points) - Number(b.points));
 }
 
-function addRule({ guildId, roleId, points, removePrevious }) {
-  db.prepare(
-    `INSERT INTO point_roles(guild_id, role_id, points, remove_previous) VALUES (?, ?, ?, ?)
-     ON CONFLICT(points) DO UPDATE SET guild_id = excluded.guild_id, role_id = excluded.role_id, remove_previous = excluded.remove_previous`
-  ).run(guildId, roleId, points, removePrevious ? 1 : 0);
+async function addRule({ guildId, roleId, points, removePrevious }) {
+  const doc = {
+    _id: Number(points), points: Number(points), guild_id: String(guildId),
+    role_id: String(roleId), remove_previous: removePrevious ? 1 : 0,
+  };
+  await FeaturePointRole.updateOne({ _id: Number(points) }, { $set: doc }, { upsert: true }).exec();
+  state.pointRoles.set(Number(points), doc);
 }
 
-function removeRule(points) {
-  return db.prepare('DELETE FROM point_roles WHERE points = ?').run(points).changes > 0;
+async function removeRule(points) {
+  const result = await FeaturePointRole.deleteOne({ _id: Number(points) }).exec();
+  state.pointRoles.delete(Number(points));
+  return result.deletedCount > 0;
 }
 
-/**
- * Sincroniza os cargos por pontuação de um membro (idempotente):
- * - concede os cargos conquistados (pontos >= requisito)
- * - remove cargos não conquistados
- * - remove cargos anteriores quando a regra do cargo mais alto estiver com "remover anterior"
- */
 async function syncMember(userId, points, { silent = false } = {}) {
   if (!settings.get('roles_enabled')) return { added: [], removed: [] };
   const client = ctx.client;
@@ -42,7 +41,7 @@ async function syncMember(userId, points, { silent = false } = {}) {
     const member = guild ? await guild.members.fetch(userId).catch(() => null) : null;
     if (!member) continue;
 
-    const earned = gRules.filter((r) => points >= r.points);
+    const earned = gRules.filter((r) => points >= Number(r.points));
     const top = earned[earned.length - 1];
     const keep = new Set(earned.map((r) => r.role_id));
     if (top?.remove_previous) {
@@ -62,16 +61,12 @@ async function syncMember(userId, points, { silent = false } = {}) {
         }
       } catch (err) {
         console.error(`[roles] não foi possível ajustar o cargo ${rule.role_id}:`, err.message);
-        if (!silent) {
-          await logs.logEvent({
-            category: 'ranking',
-            action: 'role_auto_error',
-            targetId: userId,
-            title: 'Falha ao ajustar cargo por pontuação',
-            description: `Não foi possível ajustar <@&${rule.role_id}> de <@${userId}>.\nVerifique se o cargo do bot está acima do cargo alvo e se ele possui **Gerenciar Cargos**.`,
-            color: COLORS.warning,
-          });
-        }
+        if (!silent) await logs.logEvent({
+          category: 'ranking', action: 'role_auto_error', targetId: userId,
+          title: 'Falha ao ajustar cargo por pontuação',
+          description: `Não foi possível ajustar <@&${rule.role_id}> de <@${userId}>.\nVerifique se o cargo do bot está acima do cargo alvo e se ele possui **Gerenciar Cargos**.`,
+          color: COLORS.warning,
+        });
       }
     }
   }
@@ -82,22 +77,18 @@ async function syncMember(userId, points, { silent = false } = {}) {
       ...result.removed.map((id) => `➖ <@&${id}>`),
     ];
     await logs.logEvent({
-      category: 'ranking',
-      action: 'role_auto',
-      targetId: userId,
+      category: 'ranking', action: 'role_auto', targetId: userId,
       summary: `Cargos por pontuação ajustados (${points} pts)`,
       embed: baseEmbed({
         title: 'CARGO POR PONTUAÇÃO',
         description: `👤 <@${userId}>\n🏆 Pontos: **${points}**\n\n${lines.join('\n')}`,
-        color: COLORS.gold,
-        footer: logs.LOG_FOOTER,
+        color: COLORS.gold, footer: logs.LOG_FOOTER,
       }),
     });
   }
   return result;
 }
 
-/** Remove todos os cargos por pontuação de uma lista de usuários (usado no reset de temporada). */
 async function clearMembers(userIds) {
   for (const id of userIds) {
     await syncMember(id, 0, { silent: true }).catch(() => {});

@@ -1,7 +1,7 @@
 'use strict';
 
 const rolesService = require('../roles/service');
-const pointsDb = require('../database');
+const { state } = require('../database/store');
 const settings = require('../database/settings');
 const config = require('../config');
 const { requirePermission } = require('../permissions');
@@ -78,7 +78,7 @@ async function handle(interaction, action) {
     if (!roleId) return fail('ID do cargo inválido.');
     const found = await findRole(interaction.client, roleId);
     if (!found) return fail('Cargo não encontrado em nenhum dos dois servidores.');
-    rolesService.addRule({ guildId: found.guildId, roleId, points, removePrevious: prev });
+    await rolesService.addRule({ guildId: found.guildId, roleId, points, removePrevious: prev });
     await adminLog(interaction, 'config_roles', 'Cargo por pontuação configurado', `🏅 **${num(points)} pts** → <@&${roleId}> (servidor ${guildName(found.guildId)}) • ${prev ? 'remove o anterior' : 'acumula'}`);
     return updateOrReply(interaction, render());
   }
@@ -89,7 +89,7 @@ async function handle(interaction, action) {
 
   if (action === 'rmsub') {
     const points = parseIntStrict(interaction.fields.getTextInputValue('points'));
-    const ok = points !== null && rolesService.removeRule(points);
+    const ok = points !== null && await rolesService.removeRule(points);
     if (!ok) return updateOrReply(interaction, { embeds: [errorEmbed('Nenhuma regra com essa pontuação.')], components: render().components });
     await adminLog(interaction, 'config_roles', 'Cargo por pontuação removido', `🗑️ Regra de **${num(points)} pts** removida.`);
     return updateOrReply(interaction, render());
@@ -97,22 +97,25 @@ async function handle(interaction, action) {
 
   if (action === 'toggle') {
     const next = !settings.get('roles_enabled');
-    settings.set('roles_enabled', next);
+    await settings.set('roles_enabled', next);
     await adminLog(interaction, 'config_roles', 'Cargos por pontuação ' + (next ? 'ativados' : 'desativados'), `🔘 Sistema: **${next ? 'ATIVADO' : 'DESATIVADO'}**`);
     return interaction.update(render());
   }
 
   if (action === 'clear') {
     const next = !settings.get('roles_clear_on_reset');
-    settings.set('roles_clear_on_reset', next);
+    await settings.set('roles_clear_on_reset', next);
     await adminLog(interaction, 'config_roles', 'Limpeza de cargos no reset alterada', `🧹 Limpar cargos no reset: **${next ? 'SIM' : 'NÃO'}**`);
     return interaction.update(render());
   }
 
   if (action === 'sync') {
-    const users = pointsDb
-      .prepare('SELECT user_id, points FROM season_scores WHERE season_id = (SELECT id FROM seasons WHERE status = ? LIMIT 1)')
-      .all('active');
+    const current = [...state.seasons.values()].find((s) => s.status === 'active');
+    const users = current
+      ? [...state.scores.values()]
+          .filter((s) => Number(s.season_id) === Number(current._id))
+          .map((s) => ({ user_id: s.user_id, points: Number(s.points) || 0 }))
+      : [];
     await interaction.update({ embeds: [successEmbed(`Sincronizando **${users.length}** usuário(s) em segundo plano…`, 'Sincronização iniciada')], components: render().components });
     (async () => {
       for (const u of users) {

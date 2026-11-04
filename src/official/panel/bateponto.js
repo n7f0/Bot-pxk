@@ -135,42 +135,42 @@ async function applySubmit(interaction, field, raw) {
       const ms = parseDuration(raw);
       if (!ms || ms < 60000 || ms > 24 * 3600000) return fail('Tempo inválido. Use de **1 minuto** a **24 horas** (ex.: `2h`, `90m`, `1h30`).');
       const old = settings.get('bp_duration_min');
-      settings.set('bp_duration_min', Math.round(ms / 60000));
+      await settings.set('bp_duration_min', Math.round(ms / 60000));
       return { log: `⏱️ Tempo: **${humanDuration(old * 60000)}** → **${humanDuration(ms)}**` };
     }
     case 'goal': {
       const n = parseIntStrict(raw);
       if (n === null || n < 1 || n > 100000) return fail('Meta inválida (1 a 100000).');
       const old = settings.get('bp_goal');
-      settings.set('bp_goal', n);
+      await settings.set('bp_goal', n);
       return { log: `💬 Meta: **${old}** → **${n}**` };
     }
     case 'reward': {
       const n = parseIntStrict(raw);
       if (n === null || n < 0 || n > config.limits.maxPoints) return fail('Recompensa inválida.');
       const old = settings.get('bp_reward');
-      settings.set('bp_reward', n);
+      await settings.set('bp_reward', n);
       return { log: `🏆 Recompensa: **+${old}** → **+${n}**` };
     }
     case 'area': {
       const v = String(raw).trim();
       if (v.length < 2 || v.length > 40) return fail('O nome da área deve ter de 2 a 40 caracteres.');
       const old = settings.get('bp_area');
-      settings.set('bp_area', v);
+      await settings.set('bp_area', v);
       return { log: `🏷️ Área: **${old}** → **${v}**` };
     }
     case 'cd': {
       const n = parseIntStrict(raw);
       if (n === null || n < 0 || n > 60) return fail('Informe de 0 a 60 segundos.');
       const old = settings.get('bp_cooldown_sec');
-      settings.set('bp_cooldown_sec', n);
+      await settings.set('bp_cooldown_sec', n);
       return { log: `🛡️ Anti-flood: **${old}s** → **${n}s**` };
     }
     case 'chan': {
       const r = await resolveCountChannel(interaction, raw);
       if (r.error) return fail(r.error);
       const old = settings.get('bp_channel_id');
-      settings.set('bp_channel_id', r.channel.id);
+      await settings.set('bp_channel_id', r.channel.id);
       return { log: `📍 Canal de contagem: ${old ? `<#${old}>` : '—'} → <#${r.channel.id}>` };
     }
     case 'pub': {
@@ -212,7 +212,7 @@ async function handle(interaction, action, args = []) {
 
   if (action === 'inrank') {
     const next = !settings.get('bp_in_ranking');
-    settings.set('bp_in_ranking', next);
+    await settings.set('bp_in_ranking', next);
     await adminLog(interaction, 'config_bateponto', 'Bate-ponto no ranking', `🏆 Botões do bate-ponto junto do ranking: **${next ? 'ATIVADOS' : 'DESATIVADOS'}**`);
     publisher.refresh({ force: true }).catch(() => {});
     return interaction.update(render());
@@ -220,7 +220,7 @@ async function handle(interaction, action, args = []) {
 
   if (action === 'toggle') {
     const next = !settings.get('bp_enabled');
-    settings.set('bp_enabled', next);
+    await settings.set('bp_enabled', next);
     await adminLog(interaction, 'config_bateponto', 'Bate-ponto ' + (next ? 'ativado' : 'desativado'), `🔘 Status: **${next ? 'ATIVADO' : 'DESATIVADO'}**`);
     await actions.refreshPublicPanel(interaction.client);
     return interaction.update(render());

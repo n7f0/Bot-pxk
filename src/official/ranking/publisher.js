@@ -26,8 +26,8 @@ async function buildPayload(client, guildId) {
 /** Publica o ranking fixo (mensagem pública que se atualiza sozinha). Os botões dão a cada pessoa uma cópia própria. */
 async function publish(channel) {
   const msg = await channel.send(await buildPayload(channel.client, channel.guildId));
-  settings.set('rank_channel_id', channel.id);
-  settings.set('rank_message_id', msg.id);
+  await settings.set('rank_channel_id', channel.id);
+  await settings.set('rank_message_id', msg.id);
   publishedHash = null;
   return msg;
 }
@@ -77,7 +77,7 @@ async function refresh({ force = false } = {}) {
     if (!message.flags.has(ui.V2)) {
       // Mensagem antiga (embed): o Discord não converte para o novo layout, então publica de novo e apaga a antiga.
       const fresh = await channel.send(payload);
-      settings.set('rank_message_id', fresh.id);
+      await settings.set('rank_message_id', fresh.id);
       publishedHash = sig;
       await message.delete().catch(() => {});
       return true;

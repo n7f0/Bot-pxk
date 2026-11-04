@@ -116,6 +116,39 @@ const LogEntry = model('LogEntry', new Schema({ at: { type: Date, default: Date.
 const Counter = model('Counter', new Schema({ _id: String, n: { type: Number, default: 0 } }));
 const AdminLog = model('AdminLog', new Schema({ at: { type: Date, default: Date.now, index: true }, userId: String, userTag: String, guildId: String, action: String, label: String, path: String, value: String }));
 
+
+// Coleções do módulo oficial: o MongoDB é o armazenamento único do sistema.
+// IDs numéricos antigos do SQLite são preservados em _id durante a migração.
+const featureSchema = (idType, collection) => new Schema({ _id: idType }, {
+  collection, strict: false, versionKey: false, minimize: false,
+});
+const FeatureUser = model('FeatureUser', featureSchema(String, 'pxk_feature_users'));
+const FeatureSeason = model('FeatureSeason', featureSchema(Number, 'pxk_feature_seasons'));
+const FeatureSeasonScore = model('FeatureSeasonScore', featureSchema(String, 'pxk_feature_season_scores'));
+const FeaturePointHistory = model('FeaturePointHistory', featureSchema(Number, 'pxk_feature_point_history'));
+const FeatureBatepontoSession = model('FeatureBatepontoSession', featureSchema(Number, 'pxk_feature_bateponto_sessions'));
+const FeatureRolePermission = model('FeatureRolePermission', featureSchema(String, 'pxk_feature_role_permissions'));
+const FeaturePointRole = model('FeaturePointRole', featureSchema(Number, 'pxk_feature_point_roles'));
+const FeatureSeasonRanking = model('FeatureSeasonRanking', featureSchema(String, 'pxk_feature_season_rankings'));
+const FeatureLog = model('FeatureLog', featureSchema(Number, 'pxk_feature_logs'));
+const FeatureSetting = model('FeatureSetting', featureSchema(String, 'pxk_feature_settings'));
+const FeatureCounter = model('FeatureCounter', featureSchema(String, 'pxk_feature_counters'));
+const FeatureMigration = model('FeatureMigration', featureSchema(String, 'pxk_feature_migrations'));
+
+FeatureSeason.schema.index({ status: 1 }, {
+  unique: true, partialFilterExpression: { status: 'active' }, name: 'uniq_pxk_feature_active_season'
+});
+FeatureSeasonScore.schema.index({ season_id: 1, points: -1, last_change_at: 1, user_id: 1 }, { name: 'pxk_feature_score_rank' });
+FeaturePointHistory.schema.index({ key: 1 }, { unique: true, sparse: true, name: 'uniq_pxk_feature_history_key' });
+FeaturePointHistory.schema.index({ user_id: 1, created_at: -1, id: -1 }, { name: 'pxk_feature_history_user' });
+FeatureBatepontoSession.schema.index({ user_id: 1 }, {
+  unique: true, partialFilterExpression: { status: 'active' }, name: 'uniq_pxk_feature_active_bateponto'
+});
+FeatureBatepontoSession.schema.index({ status: 1, ends_at: 1 }, { name: 'pxk_feature_bateponto_due' });
+FeatureRolePermission.schema.index({ permission: 1, guild_id: 1, role_id: 1 }, { unique: true, name: 'uniq_pxk_feature_permission' });
+FeatureSeasonRanking.schema.index({ season_id: 1, position: 1 }, { unique: true, name: 'uniq_pxk_feature_season_position' });
+FeatureLog.schema.index({ category: 1, _id: -1 }, { name: 'pxk_feature_logs_category' });
+
 let cfgCache = null;
 const cfgNow = () => cfgCache ?? merge(clone(DEFAULTS), {});
 const getCfg = () => cfgCache || merge(clone(DEFAULTS), {});
@@ -189,17 +222,29 @@ async function ensureSeason() {
 const getSeason = async () => seasonCache || ensureSeason();
 const resetSeasonCache = () => { seasonCache = null; };
 
-async function initDb() {
+async function initDb({ deferData = false } = {}) {
   await Ticket.collection.dropIndex('userId_1').catch(() => {});
-  const models = [Config, Season, MemberStat, PointTx, VoiceSession, MovEvent, MovOccurrence, MovParticipation, MonitorSession, UserMov, MovMonitoria, MovLista, Goal, GoalCompletion, AuditLog, UserStat, Ticket, Recruitment, Shift, LogEntry, Counter, AdminLog];
-  for (const m of models) { try { await m.init(); } catch (e) {} }
-  await loadCfg();
-  await ensureSeason();
+  const models = [Config, Season, MemberStat, PointTx, VoiceSession, MovEvent, MovOccurrence, MovParticipation, MonitorSession, UserMov, MovMonitoria, MovLista, Goal, GoalCompletion, AuditLog, UserStat, Ticket, Recruitment, Shift, LogEntry, Counter, AdminLog, FeatureUser, FeatureSeason, FeatureSeasonScore, FeaturePointHistory, FeatureBatepontoSession, FeatureRolePermission, FeaturePointRole, FeatureSeasonRanking, FeatureLog, FeatureSetting, FeatureCounter, FeatureMigration];
+  for (const m of models) {
+    try {
+      await m.init();
+    } catch (error) {
+      console.error('[db:init] falha ao inicializar ' + m.modelName + ':', error.message);
+      throw error;
+    }
+  }
+  if (!deferData) {
+    await loadCfg();
+    await ensureSeason();
+  }
 }
 
 module.exports = {
   DEFAULTS, DEFAULT_QUESTIONS, clone, merge, getPath, presetDefaults, viewCfg,
   Config, getCfg, cfgNow, setCfg, delCfg, unsetCfg, loadCfg, initDb,
   Season, MemberStat, PointTx, VoiceSession, MovEvent, MovOccurrence, MovParticipation, MonitorSession, UserMov, MovMonitoria, MovLista, Goal, GoalCompletion, AuditLog, getSeason, ensureSeason, resetSeasonCache,
-  UserStat, Ticket, Recruitment, Shift, LogEntry, Counter, AdminLog
+  UserStat, Ticket, Recruitment, Shift, LogEntry, Counter, AdminLog,
+  FeatureUser, FeatureSeason, FeatureSeasonScore, FeaturePointHistory, FeatureBatepontoSession,
+  FeatureRolePermission, FeaturePointRole, FeatureSeasonRanking, FeatureLog,
+  FeatureSetting, FeatureCounter, FeatureMigration
 };
