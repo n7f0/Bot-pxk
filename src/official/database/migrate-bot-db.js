@@ -50,6 +50,9 @@ async function runBotDbMigration() {
   const records = database.collection('legacy_bot_records');
   const marker = await migrations.findOne({ _id: MIGRATION_ID });
   if (marker?.status === 'complete') {
+    if (Number(marker.report?.records) > 0) {
+      throw new Error('[bot-db-migration] Os dados antigos de bot.db estão preservados no MongoDB, mas ainda não existe um mapeamento funcional validado para todos os módulos legados. Inicialização bloqueada para evitar perda aparente de níveis, tickets, sugestões, votos, logs e horas de staff. Não apague os bancos originais.');
+    }
     return { skipped: true, reason: 'already-complete', report: marker.report };
   }
 
@@ -132,6 +135,9 @@ async function runBotDbMigration() {
       { upsert: true },
     );
     console.log('[bot-db-migration] Banco legado preservado no MongoDB:', report);
+    if (report.records > 0) {
+      throw new Error('[bot-db-migration] Os registros antigos foram arquivados e validados no MongoDB, mas ainda não há mapeamento funcional validado para todos os módulos legados. Inicialização bloqueada para evitar que o bot opere como se os dados antigos não existissem.');
+    }
     return { skipped: false, report };
   } finally {
     sqlite.close();
