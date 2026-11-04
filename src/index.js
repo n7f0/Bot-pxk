@@ -1,25 +1,32 @@
-// src/index.js
+'use strict';
+
 require('dotenv').config();
 const mongoose = require('mongoose');
+const { initDb } = require('./models');
 
-console.log("⏳ Iniciando PXK System Unificado...");
+console.log('⏳ Iniciando PXK System...');
 
 (async () => {
   try {
-    // 1. Conecta ao MongoDB PRIMEIRO (O banco único de tudo)
-    await mongoose.connect(process.env.DATABASE_URL, { serverSelectionTimeoutMS: 20000 });
-    console.log('✅ MongoDB conectado com sucesso (Banco Único).');
+    if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não foi definida.');
 
-    // 2. Inicia o Painel Web (Socket.IO + Express)
+    await mongoose.connect(process.env.DATABASE_URL, {
+      serverSelectionTimeoutMS: 20000,
+      autoIndex: true,
+    });
+    console.log('✅ MongoDB conectado.');
+
+    await initDb();
+    console.log('✅ Modelos, índices e configurações do MongoDB inicializados.');
+
     require('./dashboard');
-    console.log('✅ Painel Web (Dashboard) iniciado.');
+    console.log('✅ Dashboard web iniciado.');
 
-    // 3. Inicia a lógica do bot do Discord
-    require('./bot/index'); 
-    console.log('✅ Bot do Discord inicializado.');
-    
-  } catch (e) {
-    console.error('❌ Falha ao conectar no MongoDB:', e.message);
+    require('./bot/index');
+    console.log('✅ Inicialização do bot iniciada.');
+  } catch (error) {
+    console.error('❌ Falha fatal na inicialização do PXK:', error);
+    await mongoose.disconnect().catch(() => {});
     process.exit(1);
   }
 })();
