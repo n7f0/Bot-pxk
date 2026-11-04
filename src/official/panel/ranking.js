@@ -218,7 +218,7 @@ async function handle(interaction, action, args) {
     if (!isValidTimezone(tz)) return updateOrReply(interaction, { embeds: [errorEmbed('Fuso horário inválido. Exemplo: `America/Sao_Paulo`.')], components: renderWeekly().components });
     await settings.set('reset_time', hm.text);
     await settings.set('timezone', tz);
-    if (settings.get('reset_enabled')) settings.set('reset_enabled_at', Date.now());
+    if (settings.get('reset_enabled')) await settings.set('reset_enabled_at', Date.now());
     await adminLog(interaction, 'config_reset_weekly', 'Horário do reset semanal alterado', `🕐 Novo horário: **${hm.text}** (${tz})`);
     return updateOrReply(interaction, renderWeekly());
   }
