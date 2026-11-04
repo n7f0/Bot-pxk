@@ -1,13 +1,23 @@
-require('dotenv').config();
-const { registerCommands } = require('./src/register');
+'use strict';
 
-const { DISCORD_TOKEN, CLIENT_ID, SERVER_PRINCIPAL_ID, SERVER_INTERNO_ID } = process.env;
-const missing = ['DISCORD_TOKEN', 'CLIENT_ID', 'SERVER_PRINCIPAL_ID', 'SERVER_INTERNO_ID'].filter((k) => !process.env[k]);
+require('dotenv').config();
+const { registerCommands } = require('./register');
+const { commandGuildIds } = require('./core');
+
+const { DISCORD_TOKEN, CLIENT_ID } = process.env;
+const missing = ['DISCORD_TOKEN', 'CLIENT_ID'].filter((key) => !process.env[key]);
 if (missing.length) {
-  console.error(`Faltam variáveis no .env: ${missing.join(', ')}`);
+  console.error('Variáveis ausentes no .env: ' + missing.join(', '));
   process.exit(1);
 }
 
-registerCommands({ token: DISCORD_TOKEN, clientId: CLIENT_ID, guildIds: [SERVER_PRINCIPAL_ID, SERVER_INTERNO_ID] }).then((r) =>
-  process.exit(r.ok ? 0 : 1),
-);
+registerCommands({
+  token: DISCORD_TOKEN,
+  clientId: CLIENT_ID,
+  guildIds: commandGuildIds(),
+})
+  .then((result) => process.exit(result.ok ? 0 : 1))
+  .catch((error) => {
+    console.error('Falha ao registrar comandos:', error.message);
+    process.exit(1);
+  });
