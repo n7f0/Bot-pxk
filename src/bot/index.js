@@ -53,7 +53,9 @@ function loadOfficialEvents(client) {
       const handler = (...args) => Promise.resolve(ev.execute(...args)).catch((err) => console.error(`[official:${file}]`, err));
       if (ev.once) client.once(ev.name, handler);
       else client.on(ev.name, handler);
-    } catch (err) { }
+    } catch (err) {
+      console.error(`[official:${file}] falha ao carregar evento:`, err);
+    }
   }
 }
 loadOfficialEvents(client);
@@ -94,11 +96,21 @@ client.once('ready', async () => {
   try { updateBotPresence(await loadCfg() || {}); } catch (e) {}
 });
 
-const socket = io(process.env.DASHBOARD_URL || 'http://localhost:8080');
+const socket = io(process.env.DASHBOARD_URL || 'http://localhost:8080', {
+  auth: {
+    role: 'bot',
+    token: process.env.PANEL_SECRET || process.env.DISCORD_CLIENT_SECRET,
+  },
+  reconnection: true,
+  reconnectionDelayMax: 10000,
+});
 socket.on('config_updated', async (newCfg) => {
   await loadCfg();
   updateBotPresence(newCfg);
 });
 
-client.login(process.env.DISCORD_TOKEN).catch(e => console.error('Erro login:', e));
+client.login(process.env.DISCORD_TOKEN).catch((error) => {
+  console.error('Falha fatal no login do Discord:', error.message);
+  process.exit(1);
+});
 module.exports = client;
