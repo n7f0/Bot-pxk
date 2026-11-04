@@ -192,7 +192,14 @@ const resetSeasonCache = () => { seasonCache = null; };
 async function initDb() {
   await Ticket.collection.dropIndex('userId_1').catch(() => {});
   const models = [Config, Season, MemberStat, PointTx, VoiceSession, MovEvent, MovOccurrence, MovParticipation, MonitorSession, UserMov, MovMonitoria, MovLista, Goal, GoalCompletion, AuditLog, UserStat, Ticket, Recruitment, Shift, LogEntry, Counter, AdminLog];
-  for (const m of models) { try { await m.init(); } catch (e) {} }
+  for (const m of models) {
+    try {
+      await m.init();
+    } catch (error) {
+      console.error('[db:init] falha ao inicializar ' + m.modelName + ':', error.message);
+      throw error;
+    }
+  }
   await loadCfg();
   await ensureSeason();
 }
