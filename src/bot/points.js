@@ -77,7 +77,7 @@ async function reconcileMemberStats(userId, seasonId) {
 }
 
 async function awardPoints({ key, userId, tag, category, amount = 0, seconds = 0, reason = '', by = null, refId = null }) {
-  if (!FIELD[category]) throw new Error(\`Categoria de pontos inválida: \${category}\`);
+  if (!FIELD[category]) throw new Error('Categoria de pontos inválida: ' + category);
   if (typeof key !== 'string' || !key || !seasonIdSafe(userId)) throw new Error('Identificadores da transação inválidos.');
 
   const season = await getSeason();
