@@ -89,14 +89,14 @@ async function runBotDbMigration() {
         .filter((column) => Number(column.pk) > 0)
         .sort((a, b) => Number(a.pk) - Number(b.pk))
         .map((column) => column.name);
-      const rows = sqlite.prepare('SELECT rowid AS __migration_rowid, * FROM ' + safeTable).all();
+      const hasPrimaryKey = primaryKeys.length > 0;\n      const rows = sqlite.prepare(hasPrimaryKey\n        ? 'SELECT * FROM ' + safeTable\n        : 'SELECT rowid AS __pxk_migration_rowid, * FROM ' + safeTable).all();
       const collection = records;
       let imported = 0;
 
       for (let offset = 0; offset < rows.length; offset += 250) {
         const batch = rows.slice(offset, offset + 250);
         if (!batch.length) continue;
-        const operations = batch.map((row, batchIndex) => {
+        const ids = [];\n        const operations = batch.map((row, batchIndex) => {
           const clean = { ...row };
           const rowIndex = Number(clean.__migration_rowid ?? (offset + batchIndex));
           delete clean.__migration_rowid;
