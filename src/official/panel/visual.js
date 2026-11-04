@@ -188,7 +188,7 @@ async function applySubmit(which, f) {
       if (v && i.labels3 && v.split(',').filter((x) => x.trim()).length !== 3) return { error: 'Informe **3 rótulos** separados por vírgula (tempo, mensagens, progresso).' };
       updates[i.key] = v || null;
     }
-    for (const [k, v] of Object.entries(updates)) settings.set(k, v);
+    for (const [k, v] of Object.entries(updates)) await settings.set(k, v);
     return { log: `🎨 Visual atualizado: **${MODALS[which].title}**` };
   }
 
@@ -327,7 +327,7 @@ async function handle(interaction, action, args = []) {
   }
 
   if (action === 'reset') {
-    for (const k of Object.keys(settings.DEFAULTS)) if (k.startsWith('bpv_') || k.startsWith('ui_')) settings.set(k, settings.DEFAULTS[k]);
+    for (const k of Object.keys(settings.DEFAULTS)) if (k.startsWith('bpv_') || k.startsWith('ui_')) await settings.set(k, settings.DEFAULTS[k]);
     await adminLog(interaction, 'config_visual', 'Visual restaurado', '🧹 Tema e visual do bate-ponto restaurados para o padrão.');
     await pushUpdates(interaction, { themeChanged: true });
     return interaction.update(render());

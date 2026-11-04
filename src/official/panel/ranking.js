@@ -186,7 +186,7 @@ async function handle(interaction, action, args) {
     if (!(await requirePermission(interaction, 'manage_ranking'))) return;
     const next = !settings.get('reset_enabled');
     await settings.set('reset_enabled', next);
-    if (next) settings.set('reset_enabled_at', Date.now());
+    if (next) await settings.set('reset_enabled_at', Date.now());
     await adminLog(interaction, 'config_reset_weekly', 'Reset semanal alterado', `🔄 Reset semanal: **${next ? 'ATIVADO' : 'DESATIVADO'}** (${WEEKDAYS[settings.get('reset_day')]} às ${settings.get('reset_time')})`);
     return interaction.update(renderWeekly());
   }
@@ -195,7 +195,7 @@ async function handle(interaction, action, args) {
     if (!(await requirePermission(interaction, 'manage_ranking'))) return;
     const day = Number(interaction.values[0]);
     await settings.set('reset_day', day);
-    if (settings.get('reset_enabled')) settings.set('reset_enabled_at', Date.now());
+    if (settings.get('reset_enabled')) await settings.set('reset_enabled_at', Date.now());
     await adminLog(interaction, 'config_reset_weekly', 'Dia do reset semanal alterado', `📅 Novo dia: **${WEEKDAYS[day]}**`);
     return interaction.update(renderWeekly());
   }

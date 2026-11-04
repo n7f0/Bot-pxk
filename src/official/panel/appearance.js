@@ -151,7 +151,7 @@ async function handle(interaction, action) {
   }
 
   if (action === 'reset') {
-    for (const k of ['ap_ranking_title', 'ap_ranking_footer', 'ap_ranking_color', 'ap_ranking_banner', 'ap_ranking_emojis']) settings.set(k, null);
+    for (const k of ['ap_ranking_title', 'ap_ranking_footer', 'ap_ranking_color', 'ap_ranking_banner', 'ap_ranking_emojis']) await settings.set(k, null);
     await adminLog(interaction, 'config_appearance', 'Aparência do ranking restaurada', '🧹 Aparência restaurada para o padrão.');
     publisher.refresh({ force: true }).catch(() => {});
     return interaction.update(render());

@@ -104,7 +104,7 @@ async function handle(interaction, action) {
 
   if (action === 'clear') {
     const next = !settings.get('roles_clear_on_reset');
-    settings.set('roles_clear_on_reset', next);
+    await settings.set('roles_clear_on_reset', next);
     await adminLog(interaction, 'config_roles', 'Limpeza de cargos no reset alterada', `🧹 Limpar cargos no reset: **${next ? 'SIM' : 'NÃO'}**`);
     return interaction.update(render());
   }

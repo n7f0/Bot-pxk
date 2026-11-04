@@ -61,7 +61,7 @@ for (const file of files) {
   const relative = path.relative(root, file);
   const source = fs.readFileSync(file, 'utf8');
   const sqliteImporter = relative === 'src/official/database/migrate-sqlite.js';
-  if (!sqliteImporter && /better-sqlite3|\bdb\.(?:prepare|transaction|pragma|backup)\s*\(/.test(source)) {
+  if (!sqliteImporter && relative !== 'scripts/check.js' && /better-sqlite3|\bdb\.(?:prepare|transaction|pragma|backup)\s*\(/.test(source)) {
     architectureFailures += 1;
     console.error('ACESSO DIRETO AO SQLITE FORA DO IMPORTADOR: ' + relative);
   }
