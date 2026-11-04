@@ -78,9 +78,9 @@ for (const file of files) {
 }
 
 const bootstrap = fs.readFileSync(path.join(root, 'src', 'index.js'), 'utf8');
-if (!bootstrap.includes('runSqliteMigration()') || !bootstrap.includes('runBotDbMigration()')) {
+if (bootstrap.includes('runSqliteMigration()') || bootstrap.includes('runBotDbMigration()')) {
   architectureFailures += 1;
-  console.error('O bootstrap não executa as migrações SQLite legadas antes de iniciar os serviços.');
+  console.error('O bootstrap ainda tenta importar bancos SQLite antigos; a instalação foi configurada para iniciar limpa no MongoDB.');
 }
 
 if (syntaxFailures || importFailures || architectureFailures) {
